@@ -2,20 +2,26 @@
 VENV   ?= .venv
 PYTHON ?= $(if $(wildcard $(VENV)/bin/python),$(VENV)/bin/python,python3)
 
-.PHONY: install install-catalog catalog schema lineage lineage-wip test check check-wip
-
-# Catalogue de donnees (dbt-colibri) : dependance optionnelle, hors make check.
-install-catalog: install
-	$(VENV)/bin/python -m pip install -e ".[catalog]"
-
-# Genere dist/catalog/index.html + colibri-manifest.json depuis les contrats.
-catalog:
-	$(PYTHON) tools/build_catalog.py
+.PHONY: install install-catalog catalog catalog-open schema lineage lineage-wip test check check-wip
 
 install:
 	python3 -m venv $(VENV)
 	$(VENV)/bin/python -m pip install --upgrade pip
 	$(VENV)/bin/python -m pip install -e .
+
+# Catalogue de donnees (dbt-colibri) : dependance optionnelle, hors make check.
+install-catalog: install
+	$(VENV)/bin/python -m pip install -e ".[catalog]"
+
+# Catalogue : dist/catalog/index.html + colibri-manifest.json. Autonome : cree le venv et installe
+# dbt-colibri au besoin, donc `make catalog` suffit pour n'importe quel collaborateur.
+catalog:
+	@test -x $(VENV)/bin/python && $(VENV)/bin/python -c "import dbt_colibri" 2>/dev/null || $(MAKE) install-catalog
+	$(VENV)/bin/python tools/build_catalog.py $(ARGS)
+
+# Idem et ouvre le catalogue dans le navigateur.
+catalog-open: ARGS=--open
+catalog-open: catalog
 
 schema:
 	$(PYTHON) tools/validate_schema.py

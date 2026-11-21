@@ -9,7 +9,7 @@ tags: [raw, pos]
 description:
   purpose: Tickets de caisse des 40 magasins (France et Belgique), une ligne par ticket, tels que exportes par le logiciel de caisse (aucune transformation metier).
   usage: Source des contrats customer (indicateurs clients omnicanaux, audiences). Ne pas exposer directement aux consommateurs metier.
-  limitations: Objet de schema `tickets`. Les montants sont des entiers en centimes, TTC. Les dates et heures sont en heure LOCALE du magasin (fuseau dans raw__stores__pos#stores.timezone), pas en UTC. Environ 50 % des tickets sont anonymes (loyalty_card_id vide) ; aucun e-mail n'est present, il vient uniquement de raw__loyalty_members__pos. Les retours sont des tickets de type return avec montants negatifs. Un seul moyen de paiement est porte par ticket (mixed si plusieurs).
+  limitations: Objet `tickets`. Montants en centimes TTC, heures locales du magasin (fuseau dans stores.timezone). Environ 50 % de tickets anonymes (loyalty_card_id vide), aucun e-mail ici. Retours en type return, montants negatifs, un seul moyen de paiement par ticket (mixed si plusieurs).
 
 servers:
   - server: bigquery_prod

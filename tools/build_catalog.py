@@ -17,10 +17,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from catalog_template import TemplateMismatch, patch_template
 from common import REPO_ROOT
 from validate_lineage import all_props, custom_prop, load_contracts, schema_objects, sources_of
 
@@ -130,7 +132,9 @@ def build_manifest(root: Path) -> dict:
                 entry["tests"] = tests
             columns[name] = {k: v for k, v in entry.items() if v is not None}
 
-        table = (schema_objects(c) or [{}])[0].get("physicalName") or (schema_objects(c) or [{}])[0].get("name")
+        objs = schema_objects(c) or [{}]
+        tables = [o.get("physicalName") or o.get("name") for o in objs]
+        table = tables[0] if len(tables) == 1 else "{" + ",".join(str(t) for t in tables) + "}"
         node_meta = {
             "contractId": c.cid,
             "contractVersion": d.get("version"),
@@ -141,6 +145,13 @@ def build_manifest(root: Path) -> dict:
             "support": d.get("support"),
             "slaProperties": d.get("slaProperties"),
             "apiVersion": d.get("apiVersion"),
+            "descriptionParts": desc if isinstance(desc, dict) else None,
+            "customProperties": {
+                cp["property"]: cp.get("value")
+                for cp in d.get("customProperties") or []
+                if isinstance(cp, dict) and "property" in cp
+            }
+            or None,
         }
         nodes[c.cid] = {
             "id": c.cid,
@@ -237,7 +248,7 @@ def build_manifest(root: Path) -> dict:
             "dbt_invocation_id": None,
             "dbt_project_name": "data-contracts",
             "dbt_project_id": fingerprint,
-            "total_model_count": len(nodes),
+            "total_model_count": len(contracts),
             "unmaterialized_model_count": 0,
         },
         "nodes": nodes,
@@ -271,8 +282,14 @@ def render_html(manifest: dict, out_dir: Path) -> Path:
     }
     template = Path(gen.__file__).parent / "index.html"
     html = out_dir / "index.html"
+    patched = out_dir / ".template.html"
+    try:
+        patched.write_text(patch_template(template.read_text(encoding="utf-8")), encoding="utf-8")
+    except TemplateMismatch as exc:
+        raise SystemExit(f"Template colibri incompatible (version epinglee dans pyproject.toml) : {exc}")
     # La telemetrie (PostHog) de l'interface colibri est toujours desactivee.
-    gen.inject_data_into_html(stripped, str(template), str(html), disable_telemetry=True)
+    gen.inject_data_into_html(stripped, str(patched), str(html), disable_telemetry=True)
+    patched.unlink()
     return html
 
 
@@ -280,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=Path, default=REPO_ROOT)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument("--open", action="store_true", help="ouvre le catalogue dans le navigateur")
     ap.add_argument("--json-only", action="store_true", help="ne produit que colibri-manifest.json")
     args = ap.parse_args(argv)
 
@@ -287,9 +305,14 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "colibri-manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     n_cols = sum(len(n["columns"]) for n in manifest["nodes"].values())
-    print(f"OK {len(manifest['nodes'])} contrats, {n_cols} colonnes, {len(manifest['lineage']['edges'])} aretes -> {args.out}/colibri-manifest.json")
+    print(f"OK {manifest['metadata']['total_model_count']} contrats, {n_cols} colonnes, {len(manifest['lineage']['edges'])} aretes -> {args.out}/colibri-manifest.json")
     if not args.json_only:
-        print(f"OK catalogue -> {render_html(manifest, args.out)}")
+        page = render_html(manifest, args.out)
+        print(f"OK catalogue -> {page}")
+        if args.open:
+            import webbrowser
+
+            webbrowser.open(page.resolve().as_uri())
     return 0
 
 

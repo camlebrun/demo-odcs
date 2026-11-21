@@ -10,7 +10,7 @@ tags: [raw, googleads]
 description:
   purpose: Statistiques publicitaires Google Ads au grain jour par campagne (cout, impressions, clics, conversions), telles que livrees par l'export standard sans transformation metier.
   usage: Source des contrats customer pour la depense et la performance media Google Ads. Les conversions plateforme ne servent pas a l'attribution ; l'attribution se fait ailleurs. Ne pas exposer directement aux consommateurs metier.
-  limitations: Le cout est en micros (metrics_cost_micros) dans la devise du compte (currency_code), sans conversion. Les conversions et leur valeur sont des mesures plateforme NON dedupliquees, qui peuvent compter une meme vente que d'autres canaux. Les corrections retroactives de Google Ads (clics invalides, conversions tardives) modifient les jours passes. Aucun UTM ni mapping vers un canal.
+  limitations: Cout en micros dans la devise du compte, sans conversion. Conversions et valeur sont des mesures plateforme NON dedupliquees, ne servent pas a l'attribution. Jours passes recalcules par Google Ads. Aucun UTM ni mapping vers un canal.
 
 servers:
   - server: bigquery_prod

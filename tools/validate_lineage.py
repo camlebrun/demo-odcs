@@ -18,6 +18,7 @@ Regles (code dans la sortie) :
   L014 documentation et classification des properties
   L015 nommage des properties (snake_case, suffixes _at/_date/_amount/_eur/is_/has_ vs type physique)
   L016 customer_key : classification confidential et tag pseudonymized
+  L017 description du contrat (purpose, usage, limitations) et des objets : 350 caracteres maximum (5 lignes)
 
 Code retour 1 s'il y a au moins une erreur.
 """
@@ -42,6 +43,7 @@ PII_CLASSIFICATION = "restricted"
 TECH_FIELDS = ("meta_loaded_at", "meta_source_file")
 LOGICS = ("map", "transform", "create")
 API_VERSION = "v3.2.0"
+DESCRIPTION_MAX = 350  # caracteres : 5 lignes dans le catalogue
 
 SNAKE = r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*"
 RAW_RE = re.compile(rf"^raw__(?P<table>{SNAKE})__(?P<source>[a-z0-9]+)$")
@@ -275,9 +277,15 @@ def check_docs(c: Contract) -> list[Err]:
     desc = d.get("description")
     if not isinstance(desc, dict) or not str(desc.get("purpose", "")).strip():
         errs.append(Err("L014", c.rel, "description.purpose manquant"))
+    for part in ("purpose", "usage", "limitations"):
+        text = str(desc.get(part, "")) if isinstance(desc, dict) else ""
+        if len(text) > DESCRIPTION_MAX:
+            errs.append(Err("L017", c.rel, f"description.{part} : {len(text)} caracteres (maximum {DESCRIPTION_MAX}, soit 5 lignes)"))
     for obj in schema_objects(c):
         if not str(obj.get("description", "")).strip():
             errs.append(Err("L014", f"{c.rel} {obj.get('name')}", "description de l'objet manquante"))
+        elif len(str(obj.get("description"))) > DESCRIPTION_MAX:
+            errs.append(Err("L017", f"{c.rel} {obj.get('name')}", f"description de l'objet : {len(str(obj.get('description')))} caracteres (maximum {DESCRIPTION_MAX})"))
     for p in all_props(c):
         where = f"{c.rel} {p.path}"
         if not str(p.node.get("description", "")).strip():

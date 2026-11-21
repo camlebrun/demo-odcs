@@ -12,7 +12,7 @@ tags:
 description:
   purpose: Evenements de navigation (page_view et view_item) du site, extraits de l'export BigQuery GA4 et exposes par la vue page_view_events du dataset raw_ga4 (objet de schema events), une ligne par evenement.
   usage: Source des contrats customer (parcours web, acquisition, interet produit). Ne pas exposer directement aux consommateurs metier.
-  limitations: 'Donnees incompletes par construction : avec Consent Mode, les visiteurs qui refusent le consentement analytics sont absents ou sans user_pseudo_id (modelisation non exportee), et les bloqueurs de publicite masquent une partie du trafic. L''export est limite par quotas (1 million d''evenements par jour pour la version standard). Les sessions se reconstruisent via event_params (ga_session_id) et user_pseudo_id. traffic_source est la premiere acquisition de l''utilisateur. L''export natif GA4 n''a pas de colonnes meta_loaded_at ni meta_source_file : elles sont ajoutees par la vue ou la copie d''ingestion.'
+  limitations: 'Donnees incompletes (Consent Mode : visiteurs sans consentement absents ou sans user_pseudo_id, bloqueurs de publicite). traffic_source est la premiere acquisition. Les colonnes meta_loaded_at et meta_source_file n''existent pas dans l''export natif : la vue ou la copie les ajoute.'
 servers:
 - server: bigquery_prod
   type: bigquery
@@ -416,3 +416,6 @@ schema:
     classification: internal
     transformLogic: create
     transformDescription: URI du fichier de depot renseignee par l'ingestion.
+customProperties:
+- property: details
+  value: Export limite par quotas (1 million d'evenements par jour en version standard). Sessions reconstruites via event_params (ga_session_id) et user_pseudo_id. event_date dans le fuseau du compte, event_timestamp en UTC.

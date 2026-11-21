@@ -8,16 +8,9 @@ status: active
 domain: customer
 tags: [customer]
 description:
-  purpose: Indicateurs clients et chiffre d'affaires net de retours par mois, canal (magasin ou web) et magasin, pour le controle de gestion et le comex. Une ligne par mois x canal x magasin (store_code, valeur conventionnelle WEB pour le canal web).
-  usage: Alimente le rapport Power BI comex (sponsor DAF / controle de gestion). Le mois est fige a M+3 jours OUVRES (non calendaires), la table est rafraichie chaque jour (J+1) ; un mois non fige peut encore bouger (retours, remboursements tardifs). Les montants sont en EUR decimal TTC, les mois sont calcules en date locale (magasin pour la caisse, Europe/Paris pour le web). Les mesures de clients distincts ne sont pas additives entre magasins ni entre canaux (un client present dans plusieurs cellules est compte dans chacune).
-  limitations: |-
-    Limites assumees du lot 1.
-    (1) Identite client deterministe : customer_key = SHA256(LOWER(TRIM(email))), sans rapprochement flou. Les tickets sans carte fidelite sont anonymes (environ 50 % des tickets) : ils sont comptes dans le CA mais pas au niveau client (clients actifs, nouveaux, reachat, omnicanaux). Cote caisse l'e-mail vient de raw__loyalty_members__pos via loyalty_card_id (facultatif, saisi sans verification) ; cote Shopify de orders puis customers.
-    (2) Un client qui achete en magasin sans carte puis sur le web est compte comme nouveau au premier achat identifie : les nouveaux clients et l'omnicanalite sont sous ou sur-estimes dans cette mesure. L'historique de depart est celui disponible dans les raw (3 ans).
-    (3) Unites normalisees : caisse en centimes TTC et heure locale du magasin (le mois est pris sur la date locale du magasin, sans conversion de fuseau), Shopify en decimal TTC et UTC. Seules les lignes en EUR sont retenues (les autres devises sont ignorees). Commandes Shopify de test, annulees ou nees en caisse Shopify (source_name pos) exclues.
-    (4) Retours : un retour en magasin d'un achat web (original_web_order_id) est impute au canal web, a la date du retour. Si Shopify a deja enregistre un remboursement pour la meme commande, le ticket de retour caisse est ignore pour ne pas compter deux fois. Les remboursements web sont les transactions de remboursement reussies, a la date du remboursement.
-    (5) Le CA est TTC ; le rapprochement avec le CA comptable (hors lot 1, fourni par le controle de gestion) est un controle de reconciliation d'ecart inferieur a 0,5 % sur les mois figes.
-    (6) Consentement, audiences et attribution marketing sont hors de ce contrat.
+  purpose: Indicateurs clients et CA net de retours TTC par mois, canal (store ou web) et magasin (store_code, WEB pour le web), pour le controle de gestion et le comex. Une ligne par mois x canal x magasin.
+  usage: Alimente le Power BI comex (DAF / controle de gestion). Rafraichi chaque jour (J+1), mois fige a M+3 jours ouvres. Montants en EUR TTC. Les clients distincts ne sont pas additifs entre lignes. Definitions detaillees dans la fiche et la customProperty details.
+  limitations: Identite deterministe customer_key = SHA256(LOWER(TRIM(email))). Tickets sans carte (environ 50 %) anonymes, comptes dans le CA mais pas par client. Pas d'attribution marketing ni de consentement. CA TTC, EUR uniquement, rapproche du CA comptable (ecart < 0,5 %, controle hors lot 1). Voir details.
 
 servers:
   - server: bigquery_prod
@@ -69,6 +62,16 @@ slaProperties:
 customProperties:
   - property: consumers
     value: Power BI comex (sponsor DAF / controle de gestion)
+  - property: details
+    value: |-
+      Alimente le rapport Power BI comex (sponsor DAF / controle de gestion). Le mois est fige a M+3 jours OUVRES (non calendaires), la table est rafraichie chaque jour (J+1) ; un mois non fige peut encore bouger (retours, remboursements tardifs). Les montants sont en EUR decimal TTC, les mois sont calcules en date locale (magasin pour la caisse, Europe/Paris pour le web). Les mesures de clients distincts ne sont pas additives entre magasins ni entre canaux (un client present dans plusieurs cellules est compte dans chacune).
+      Limites assumees du lot 1.
+      (1) Identite client deterministe : customer_key = SHA256(LOWER(TRIM(email))), sans rapprochement flou. Les tickets sans carte fidelite sont anonymes (environ 50 % des tickets) : ils sont comptes dans le CA mais pas au niveau client (clients actifs, nouveaux, reachat, omnicanaux). Cote caisse l'e-mail vient de raw__loyalty_members__pos via loyalty_card_id (facultatif, saisi sans verification) ; cote Shopify de orders puis customers.
+      (2) Un client qui achete en magasin sans carte puis sur le web est compte comme nouveau au premier achat identifie : les nouveaux clients et l'omnicanalite sont sous ou sur-estimes dans cette mesure. L'historique de depart est celui disponible dans les raw (3 ans).
+      (3) Unites normalisees : caisse en centimes TTC et heure locale du magasin (le mois est pris sur la date locale du magasin, sans conversion de fuseau), Shopify en decimal TTC et UTC. Seules les lignes en EUR sont retenues (les autres devises sont ignorees). Commandes Shopify de test, annulees ou nees en caisse Shopify (source_name pos) exclues.
+      (4) Retours : un retour en magasin d'un achat web (original_web_order_id) est impute au canal web, a la date du retour. Si Shopify a deja enregistre un remboursement pour la meme commande, le ticket de retour caisse est ignore pour ne pas compter deux fois. Les remboursements web sont les transactions de remboursement reussies, a la date du remboursement.
+      (5) Le CA est TTC ; le rapprochement avec le CA comptable (hors lot 1, fourni par le controle de gestion) est un controle de reconciliation d'ecart inferieur a 0,5 % sur les mois figes.
+      (6) Consentement, audiences et attribution marketing sont hors de ce contrat.
   - property: sponsor
     value: DAF / controle de gestion
   - property: accountingReconciliationReference

@@ -10,7 +10,7 @@ tags: [raw, metaads]
 description:
   purpose: Statistiques publicitaires Meta Ads au grain jour par campagne (depense, impressions, clics, portee, actions), telles que livrees par l'API Insights sans transformation metier.
   usage: Source des contrats customer pour la depense et la performance media Meta. Les actions et le ROAS plateforme ne servent pas a l'attribution ; l'attribution se fait ailleurs. Ne pas exposer directement aux consommateurs metier.
-  limitations: La depense est dans la devise du compte (account_currency), sans conversion. actions, action_values et purchase_roas sont des mesures plateforme NON dedupliquees, qui peuvent compter une meme vente que d'autres canaux. Meta recalcule les jours recents (fenetre d'attribution), donc les jours passes peuvent changer. La portee (reach) n'est pas additive. Aucun UTM ni mapping vers un canal.
+  limitations: Depense dans la devise du compte, sans conversion. actions, action_values et purchase_roas sont des mesures plateforme NON dedupliquees, ne servent pas a l'attribution. Jours recents recalcules par Meta. Aucun UTM ni mapping vers un canal.
 
 servers:
   - server: bigquery_prod

@@ -1,6 +1,8 @@
 """Tests du generateur de catalogue (JSON consomme par dbt-colibri)."""
 from pathlib import Path
 
+import pytest
+
 import build_catalog
 
 FIXTURE = Path(__file__).parent / "fixtures" / "valid" / "mini_repo"
@@ -37,3 +39,13 @@ def test_parents_and_children_are_symmetric():
             for s in srcs:
                 back = m["lineage"]["children"][s["dbt_node"]][s["column"]]
                 assert {"dbt_node": tgt, "column": tcol, "lineage_type": s["lineage_type"]} in back
+
+
+def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
+    gen = pytest.importorskip("dbt_colibri.report.generator")
+    from catalog_template import patch_template
+
+    html = patch_template((Path(gen.__file__).parent / "index.html").read_text(encoding="utf-8"))
+    for forbidden in ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views"):
+        assert forbidden not in html, forbidden
+    assert "cpColumnHtml" in html and "cpNodeHtml" in html and "cpToggleExpert" in html

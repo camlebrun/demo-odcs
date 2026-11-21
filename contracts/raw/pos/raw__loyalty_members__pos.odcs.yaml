@@ -9,7 +9,7 @@ tags: [raw, pos]
 description:
   purpose: Membres du programme de fidelite enregistres en caisse, une ligne par carte fidelite, tels que exportes par le logiciel de caisse (aucune transformation metier).
   usage: Source des contrats customer (indicateurs clients omnicanaux, audiences). Ne pas exposer directement aux consommateurs metier.
-  limitations: Objet de schema `loyalty_members`. C'est la seule table de la caisse qui porte des donnees personnelles directes (e-mail, telephone, nom, adresse). L'e-mail est facultatif et saisi en caisse sans verification. Le consentement marketing est celui recueilli en caisse (opt-in fidelite) et ne couvre pas les autres canaux. Les dates sont en UTC sauf mention contraire.
+  limitations: Objet `loyalty_members`. Seule table caisse avec des donnees personnelles directes (e-mail, telephone, nom, adresse). E-mail facultatif et non verifie. Le consentement marketing est celui recueilli en caisse et ne couvre pas les autres canaux. Dates en UTC.
 
 servers:
   - server: bigquery_prod
