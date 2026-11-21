@@ -88,6 +88,10 @@ schema:
             mustBe: 0
             dimension: uniqueness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.loyalty_card_id
+        transformDescription: Recopie du champ loyalty_card_id de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: email
         physicalType: STRING
         logicalType: string
@@ -96,48 +100,80 @@ schema:
         tags: [pii]
         logicalTypeOptions:
           format: email
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.email
+        transformDescription: Recopie du champ email de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: phone
         physicalType: STRING
         logicalType: string
         description: Numero de telephone saisi en caisse, au format fourni par le client.
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.phone
+        transformDescription: Recopie du champ phone de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: last_name
         physicalType: STRING
         logicalType: string
         description: Nom de famille du membre.
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.last_name
+        transformDescription: Recopie du champ last_name de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: first_name
         physicalType: STRING
         logicalType: string
         description: Prenom du membre.
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.first_name
+        transformDescription: Recopie du champ first_name de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: birth_date
         physicalType: DATE
         logicalType: date
         description: Date de naissance du membre. Peut etre vide.
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.birth_date
+        transformDescription: Recopie du champ birth_date de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: address_line
         physicalType: STRING
         logicalType: string
         description: Adresse postale du membre (numero et rue).
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.address_line
+        transformDescription: Recopie du champ address_line de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: postal_code
         physicalType: STRING
         logicalType: string
         description: Code postal de l'adresse du membre.
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.postal_code
+        transformDescription: Recopie du champ postal_code de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: city
         physicalType: STRING
         logicalType: string
         description: Ville de l'adresse du membre.
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.city
+        transformDescription: Recopie du champ city de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: country_code
         physicalType: STRING
         logicalType: string
@@ -145,6 +181,10 @@ schema:
         classification: C3
         tags: [pii]
         examples: [FR]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.country_code
+        transformDescription: Recopie du champ country_code de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: marketing_opt_in
         physicalType: BOOL
         logicalType: boolean
@@ -157,28 +197,48 @@ schema:
             mustBe: 0
             dimension: completeness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.marketing_opt_in
+        transformDescription: Recopie du champ marketing_opt_in de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: marketing_opt_in_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure du dernier recueil ou changement du consentement marketing, en UTC. Vide si jamais recueilli.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.marketing_opt_in_at
+        transformDescription: Recopie du champ marketing_opt_in_at de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: enrolled_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure d'adhesion au programme fidelite, en UTC.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.enrolled_at
+        transformDescription: Recopie du champ enrolled_at de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: enrollment_store_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du magasin ou le membre a adhere (cle vers raw__stores__pos, objet stores).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.enrollment_store_id
+        transformDescription: Recopie du champ enrollment_store_id de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: updated_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de derniere modification de la fiche membre, en UTC.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#loyalty_members.updated_at
+        transformDescription: Recopie du champ updated_at de l'objet loyalty_members de l'export de la caisse (POS), sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -186,7 +246,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -194,4 +254,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

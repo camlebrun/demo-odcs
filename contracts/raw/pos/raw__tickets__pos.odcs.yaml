@@ -88,6 +88,10 @@ schema:
             mustBe: 0
             dimension: uniqueness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.ticket_id
+        transformDescription: Recopie du champ ticket_id de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: ticket_number
         physicalType: STRING
         logicalType: string
@@ -95,23 +99,39 @@ schema:
         required: true
         classification: C1
         examples: ["0042-000187"]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.ticket_number
+        transformDescription: Recopie du champ ticket_number de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: store_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du magasin (cle vers raw__stores__pos, objet stores).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.store_id
+        transformDescription: Recopie du champ store_id de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: register_id
         physicalType: STRING
         logicalType: string
         description: Identifiant de la caisse physique dans le magasin.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.register_id
+        transformDescription: Recopie du champ register_id de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: cashier_id
         physicalType: STRING
         logicalType: string
         description: Identifiant interne du vendeur ou de la vendeuse en caisse (donnee RH, pas un client).
         classification: C2
         tags: [pseudonymized]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.cashier_id
+        transformDescription: Recopie du champ cashier_id de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: ticket_type
         physicalType: STRING
         logicalType: string
@@ -130,6 +150,10 @@ schema:
             dimension: conformity
             severity: warning
             description: Detecte l'apparition d'une nouvelle valeur cote caisse.
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.ticket_type
+        transformDescription: Recopie du champ ticket_type de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: ticket_datetime_local
         physicalType: DATETIME
         logicalType: timestamp
@@ -142,29 +166,49 @@ schema:
             mustBe: 0
             dimension: completeness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.ticket_datetime_local
+        transformDescription: Recopie du champ ticket_datetime_local de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: updated_at_local
         physicalType: DATETIME
         logicalType: timestamp
         description: Date et heure de derniere modification du ticket en caisse, en heure LOCALE du magasin.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.updated_at_local
+        transformDescription: Recopie du champ updated_at_local de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: loyalty_card_id
         physicalType: STRING
         logicalType: string
         description: Identifiant de la carte fidelite presentee (cle vers raw__loyalty_members__pos, objet loyalty_members). Vide pour un ticket anonyme (environ 50 % des tickets).
         classification: C2
         tags: [pseudonymized]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.loyalty_card_id
+        transformDescription: Recopie du champ loyalty_card_id de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: original_ticket_id
         physicalType: INT64
         logicalType: integer
         description: Pour un retour - identifiant du ticket de vente d'origine (cle vers tickets.ticket_id) quand l'achat a eu lieu en magasin. Vide pour une vente ou un retour sans ticket.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.original_ticket_id
+        transformDescription: Recopie du champ original_ticket_id de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: original_web_order_id
         physicalType: INT64
         logicalType: integer
         description: Pour un retour cross-canal (achat web rendu en magasin) - identifiant de la commande Shopify d'origine (raw__orders__shopify, objet orders, id). Vide sinon.
         classification: C2
         tags: [pseudonymized]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.original_web_order_id
+        transformDescription: Recopie du champ original_web_order_id de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: payment_method
         physicalType: STRING
         logicalType: string
@@ -188,6 +232,10 @@ schema:
             dimension: conformity
             severity: warning
             description: Detecte l'apparition d'une nouvelle valeur cote caisse.
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.payment_method
+        transformDescription: Recopie du champ payment_method de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: currency
         physicalType: STRING
         logicalType: string
@@ -198,6 +246,10 @@ schema:
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.currency
+        transformDescription: Recopie du champ currency de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: total_amount_cents
         physicalType: INT64
         logicalType: integer
@@ -211,23 +263,39 @@ schema:
             mustBe: 0
             dimension: completeness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.total_amount_cents
+        transformDescription: Recopie du champ total_amount_cents de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: total_tax_cents
         physicalType: INT64
         logicalType: integer
         description: Montant total de TVA contenu dans le total TTC, en centimes d'euro (entier).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.total_tax_cents
+        transformDescription: Recopie du champ total_tax_cents de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: total_discount_cents
         physicalType: INT64
         logicalType: integer
         description: Somme des remises accordees sur le ticket, en centimes d'euro (entier, positif). 0 si aucune remise.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.total_discount_cents
+        transformDescription: Recopie du champ total_discount_cents de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: items_count
         physicalType: INT64
         logicalType: integer
         description: Nombre total d'articles (somme des quantites) du ticket.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#tickets.items_count
+        transformDescription: Recopie du champ items_count de l'objet tickets de l'export de la caisse (POS), sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -235,7 +303,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -243,4 +311,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

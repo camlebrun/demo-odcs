@@ -46,7 +46,7 @@ make catalog-open   # installe ce qu'il faut, génère dist/catalog/index.html e
 make catalog        # génère sans ouvrir
 ```
 
-Démo publique : https://demo-odcs.camillelebrun.fr, hébergée sur Cloudflare Pages (projet `demo-odcs`, plan gratuit, aussi sur https://demo-odcs.pages.dev). Miroir GitHub Pages : https://camlebrun.github.io/demo-odcs/ (`.github/workflows/pages.yml`, déployé à chaque push sur `main`). La licence MIT de dbt-colibri est jointe à la page (`THIRD_PARTY_LICENSES.txt`).
+Démo publique : https://demo-odcs.camillelebrun.fr, hébergée sur Cloudflare Pages (projet `demo-odcs`, plan gratuit, aussi sur https://demo-odcs.pages.dev). Déployé à chaque push sur `main` par `.github/workflows/pages.yml`. La licence MIT de dbt-colibri est jointe à la page (`THIRD_PARTY_LICENSES.txt`).
 
 Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrangler pages deploy`, voir `wrangler.jsonc` ; nécessite `wrangler login`).
 

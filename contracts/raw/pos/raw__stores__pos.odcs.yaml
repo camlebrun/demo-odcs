@@ -88,6 +88,10 @@ schema:
             mustBe: 0
             dimension: uniqueness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.store_id
+        transformDescription: Recopie du champ store_id de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: store_code
         physicalType: STRING
         logicalType: string
@@ -96,12 +100,20 @@ schema:
         unique: true
         classification: C1
         examples: ["FR-LYO-01"]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.store_code
+        transformDescription: Recopie du champ store_code de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: store_name
         physicalType: STRING
         logicalType: string
         description: Nom commercial du magasin.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.store_name
+        transformDescription: Recopie du champ store_name de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: country_code
         physicalType: STRING
         logicalType: string
@@ -120,21 +132,37 @@ schema:
             dimension: conformity
             severity: warning
             description: Detecte l'apparition d'une nouvelle valeur cote caisse.
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.country_code
+        transformDescription: Recopie du champ country_code de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: address_line
         physicalType: STRING
         logicalType: string
         description: Adresse du magasin (numero et rue).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.address_line
+        transformDescription: Recopie du champ address_line de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: postal_code
         physicalType: STRING
         logicalType: string
         description: Code postal du magasin.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.postal_code
+        transformDescription: Recopie du champ postal_code de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: city
         physicalType: STRING
         logicalType: string
         description: Ville du magasin.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.city
+        transformDescription: Recopie du champ city de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: timezone
         physicalType: STRING
         logicalType: string
@@ -142,6 +170,10 @@ schema:
         required: true
         classification: C1
         examples: [Europe/Paris]
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.timezone
+        transformDescription: Recopie du champ timezone de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: currency
         physicalType: STRING
         logicalType: string
@@ -152,28 +184,48 @@ schema:
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.currency
+        transformDescription: Recopie du champ currency de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: opening_date
         physicalType: DATE
         logicalType: date
         description: Date d'ouverture du magasin (heure locale).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.opening_date
+        transformDescription: Recopie du champ opening_date de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: closing_date
         physicalType: DATE
         logicalType: date
         description: Date de fermeture definitive du magasin. Vide si le magasin est ouvert.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.closing_date
+        transformDescription: Recopie du champ closing_date de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: is_active
         physicalType: BOOL
         logicalType: boolean
         description: Vrai si le magasin est actif dans la caisse.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.is_active
+        transformDescription: Recopie du champ is_active de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: updated_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de derniere modification de la fiche magasin, en UTC.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#stores.updated_at
+        transformDescription: Recopie du champ updated_at de l'objet stores de l'export de la caisse (POS), sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -181,7 +233,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -189,4 +241,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

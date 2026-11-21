@@ -32,6 +32,10 @@ schema:
     logicalType: string
     description: Champ event_name.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#events.event_name
+    transformDescription: Recopie du champ event_name de l'objet events de l'API Admin Shopify, sans transformation.
   - name: event_params
     physicalType: ARRAY<STRUCT<key STRING>>
     logicalType: array
@@ -45,17 +49,21 @@ schema:
         logicalType: string
         description: Champ key.
         classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#events.event_params
+    transformDescription: Recopie du champ event_params de l'objet events de l'API Admin Shopify, sans transformation.
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ meta_loaded_at.
     classification: C1
     transformLogic: create
-    transformDescription: Horodatage de chargement.
+    transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
     description: Champ meta_source_file.
     classification: C1
     transformLogic: create
-    transformDescription: Fichier de depot.
+    transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

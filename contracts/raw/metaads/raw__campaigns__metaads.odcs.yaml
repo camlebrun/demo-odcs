@@ -88,28 +88,48 @@ schema:
             mustBe: 0
             dimension: uniqueness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.campaign_id
+        transformDescription: Recopie du champ campaign_id de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: ad_account_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du compte publicitaire Meta, sans le prefixe act_.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.ad_account_id
+        transformDescription: Recopie du champ ad_account_id de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: name
         physicalType: STRING
         logicalType: string
         description: Nom de la campagne saisi dans Meta Ads, tel quel.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.name
+        transformDescription: Recopie du champ name de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: objective
         physicalType: STRING
         logicalType: string
         description: Objectif de la campagne (OUTCOME_SALES, OUTCOME_TRAFFIC, OUTCOME_AWARENESS, OUTCOME_LEADS, etc.).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.objective
+        transformDescription: Recopie du champ objective de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: buying_type
         physicalType: STRING
         logicalType: string
         description: Mode d'achat (AUCTION ou RESERVED).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.buying_type
+        transformDescription: Recopie du champ buying_type de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: status
         physicalType: STRING
         logicalType: string
@@ -130,43 +150,75 @@ schema:
             dimension: conformity
             severity: warning
             description: Detecte l'apparition d'un nouveau statut cote Meta.
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.status
+        transformDescription: Recopie du champ status de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: effective_status
         physicalType: STRING
         logicalType: string
         description: Statut effectif de diffusion (ACTIVE, PAUSED, CAMPAIGN_PAUSED, WITH_ISSUES, etc.), tenant compte du compte et des ensembles de publicites.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.effective_status
+        transformDescription: Recopie du champ effective_status de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: daily_budget
         physicalType: INT64
         logicalType: integer
         description: Budget quotidien au niveau campagne, en unite mineure de la devise du compte (centimes pour l'EUR). Vide si le budget est defini au niveau des ensembles de publicites.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.daily_budget
+        transformDescription: Recopie du champ daily_budget de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: lifetime_budget
         physicalType: INT64
         logicalType: integer
         description: Budget total sur la duree de la campagne, en unite mineure de la devise du compte. Vide si un budget quotidien est utilise.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.lifetime_budget
+        transformDescription: Recopie du champ lifetime_budget de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: start_time
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de debut de la campagne, en UTC. Vide si non renseignee.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.start_time
+        transformDescription: Recopie du champ start_time de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: stop_time
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de fin planifiee de la campagne, en UTC. Vide si pas de fin.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.stop_time
+        transformDescription: Recopie du champ stop_time de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: created_time
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de creation de la campagne dans Meta Ads, en UTC.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.created_time
+        transformDescription: Recopie du champ created_time de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: updated_time
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de derniere modification de la campagne, en UTC.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#campaign.updated_time
+        transformDescription: Recopie du champ updated_time de l'objet campaign de l'API Meta Marketing, sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -174,7 +226,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -182,4 +234,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

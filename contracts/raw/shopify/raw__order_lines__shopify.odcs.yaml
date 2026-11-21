@@ -85,6 +85,10 @@ schema:
       mustBe: 0
       dimension: uniqueness
       severity: error
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.id
+    transformDescription: Recopie du champ id de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: order_id
     physicalType: INT64
     logicalType: integer
@@ -97,80 +101,140 @@ schema:
       mustBe: 0
       dimension: completeness
       severity: error
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.order_id
+    transformDescription: Recopie du champ order_id de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: product_id
     physicalType: INT64
     logicalType: integer
     description: Identifiant du produit Shopify. Vide pour un article personnalise saisi en caisse.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.product_id
+    transformDescription: Recopie du champ product_id de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: variant_id
     physicalType: INT64
     logicalType: integer
     description: Identifiant de la variante Shopify (taille, couleur). Vide pour un article personnalise.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.variant_id
+    transformDescription: Recopie du champ variant_id de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: sku
     physicalType: STRING
     logicalType: string
     description: Reference article (SKU) de la variante, commune au catalogue magasin. Peut etre vide.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.sku
+    transformDescription: Recopie du champ sku de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: title
     physicalType: STRING
     logicalType: string
     description: Libelle du produit au moment de la commande.
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.title
+    transformDescription: Recopie du champ title de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: variant_title
     physicalType: STRING
     logicalType: string
     description: Libelle de la variante (ex. taille et couleur) au moment de la commande.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.variant_title
+    transformDescription: Recopie du champ variant_title de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: vendor
     physicalType: STRING
     logicalType: string
     description: Marque ou fournisseur du produit.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.vendor
+    transformDescription: Recopie du champ vendor de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: quantity
     physicalType: INT64
     logicalType: integer
     description: Quantite commandee de la ligne.
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.quantity
+    transformDescription: Recopie du champ quantity de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: price
     physicalType: NUMERIC
     logicalType: number
     description: Prix unitaire avant remise, dans la devise de la commande (colonne currency de raw__orders__shopify#orders).
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.price
+    transformDescription: Recopie du champ price de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: total_discount
     physicalType: NUMERIC
     logicalType: number
     description: Somme des remises appliquees a la ligne, dans la devise de la commande.
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.total_discount
+    transformDescription: Recopie du champ total_discount de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: fulfillable_quantity
     physicalType: INT64
     logicalType: integer
     description: Quantite restant a expedier.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.fulfillable_quantity
+    transformDescription: Recopie du champ fulfillable_quantity de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: fulfillment_status
     physicalType: STRING
     logicalType: string
     description: Statut d'expedition de la ligne (fulfilled, partial, null si non expediee).
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.fulfillment_status
+    transformDescription: Recopie du champ fulfillment_status de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: taxable
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si la ligne est soumise a taxe.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.taxable
+    transformDescription: Recopie du champ taxable de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: gift_card
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si la ligne est une carte cadeau.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.gift_card
+    transformDescription: Recopie du champ gift_card de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: requires_shipping
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si la ligne necessite une expedition (faux pour un article numerique ou une carte cadeau).
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.requires_shipping
+    transformDescription: Recopie du champ requires_shipping de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: discount_allocations
     physicalType: ARRAY<STRUCT<amount NUMERIC, discount_application_index INT64>>
     logicalType: array
@@ -190,6 +254,10 @@ schema:
         logicalType: integer
         description: Index de la remise dans la liste discount_applications de la commande.
         classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.discount_allocations
+    transformDescription: Recopie du champ discount_allocations de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: tax_lines
     physicalType: ARRAY<STRUCT<title STRING, rate FLOAT64, price NUMERIC>>
     logicalType: array
@@ -214,6 +282,10 @@ schema:
         logicalType: number
         description: Montant de la taxe, dans la devise de la commande.
         classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#LineItem.tax_lines
+    transformDescription: Recopie du champ tax_lines de l'objet LineItem de l'API Admin Shopify, sans transformation.
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
@@ -221,7 +293,7 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+    transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
@@ -229,4 +301,4 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: URI du fichier de depot renseignee par l'ingestion.
+    transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

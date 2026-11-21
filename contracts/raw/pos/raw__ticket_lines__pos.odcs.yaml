@@ -87,63 +87,107 @@ schema:
             mustBe: 0
             dimension: uniqueness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.ticket_line_id
+        transformDescription: Recopie du champ ticket_line_id de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: ticket_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du ticket parent (cle vers raw__tickets__pos, objet tickets).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.ticket_id
+        transformDescription: Recopie du champ ticket_id de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: line_number
         physicalType: INT64
         logicalType: integer
         description: Rang de la ligne dans le ticket, a partir de 1.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.line_number
+        transformDescription: Recopie du champ line_number de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: store_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du magasin (cle vers raw__stores__pos, objet stores), repete depuis le ticket.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.store_id
+        transformDescription: Recopie du champ store_id de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: product_sku
         physicalType: STRING
         logicalType: string
         description: Reference article (SKU) vendue, telle que saisie en caisse.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.product_sku
+        transformDescription: Recopie du champ product_sku de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: product_label
         physicalType: STRING
         logicalType: string
         description: Libelle de l'article affiche en caisse.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.product_label
+        transformDescription: Recopie du champ product_label de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: product_category_code
         physicalType: STRING
         logicalType: string
         description: Code de la famille ou categorie d'article du referentiel caisse.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.product_category_code
+        transformDescription: Recopie du champ product_category_code de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: quantity
         physicalType: INT64
         logicalType: integer
         description: Quantite vendue. Negative pour un article retourne.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.quantity
+        transformDescription: Recopie du champ quantity de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: unit_price_cents
         physicalType: INT64
         logicalType: integer
         description: Prix unitaire TTC avant remise, en centimes d'euro (entier).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.unit_price_cents
+        transformDescription: Recopie du champ unit_price_cents de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: discount_cents
         physicalType: INT64
         logicalType: integer
         description: Remise appliquee sur la ligne, en centimes d'euro (entier, positif). 0 si aucune remise.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.discount_cents
+        transformDescription: Recopie du champ discount_cents de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: discount_label
         physicalType: STRING
         logicalType: string
         description: Libelle ou code de la remise appliquee (promotion, soldes, remise vendeur, code). Vide si aucune remise.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.discount_label
+        transformDescription: Recopie du champ discount_label de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: line_amount_cents
         physicalType: INT64
         logicalType: integer
@@ -157,30 +201,50 @@ schema:
             mustBe: 0
             dimension: completeness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.line_amount_cents
+        transformDescription: Recopie du champ line_amount_cents de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: vat_rate_pct
         physicalType: NUMERIC
         logicalType: number
         description: Taux de TVA applique a la ligne, en pourcentage (ex. 20 ou 21 selon le pays).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.vat_rate_pct
+        transformDescription: Recopie du champ vat_rate_pct de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: vat_amount_cents
         physicalType: INT64
         logicalType: integer
         description: Montant de TVA contenu dans la ligne, en centimes d'euro (entier).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.vat_amount_cents
+        transformDescription: Recopie du champ vat_amount_cents de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: ticket_datetime_local
         physicalType: DATETIME
         logicalType: timestamp
         description: Date et heure d'encaissement du ticket, en heure LOCALE du magasin (sans fuseau, pas en UTC).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.ticket_datetime_local
+        transformDescription: Recopie du champ ticket_datetime_local de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: updated_at_local
         physicalType: DATETIME
         logicalType: timestamp
         description: Date et heure de derniere modification de la ligne en caisse, en heure LOCALE du magasin.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - pos_export#ticket_lines.updated_at_local
+        transformDescription: Recopie du champ updated_at_local de l'objet ticket_lines de l'export de la caisse (POS), sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -188,7 +252,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -196,4 +260,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

@@ -7,7 +7,8 @@ Regles (code dans la sortie) :
   L003 references transformSourceObjects (contrat, objet, property, chemins imbriques)
   L004 couches : un customer ne reference que des raw
   L005 cycle dans le graphe de references
-  L006 un raw ne porte aucun transform* (sauf meta_loaded_at / meta_source_file en create)
+  L006 lineage raw : chaque champ de premier niveau est `map` depuis 1 champ de la source externe
+       (<systeme>#<objet>.<champ>), sauf meta_loaded_at / meta_source_file en `create` sans source
   L007 coherence de transformLogic (map / transform / create) et des sources
   L008 transformLogic et transformDescription presents sur tout champ customer
   L009 un contrat customer vit dans contracts/customer/<flux>/ avec <flux> parmi acquisition, audiences, sales
@@ -42,6 +43,8 @@ CLASSIFICATIONS = ("C0", "C1", "C2", "C3")  # confidentialite : public, interne,
 PII_TAG = "pii"
 PII_CLASSIFICATION = "C3"
 TECH_FIELDS = ("meta_loaded_at", "meta_source_file")
+# Systeme source externe cite dans transformSourceObjects d'un raw : <systeme>#<objet>.<champ>.
+RAW_SYSTEMS = {"shopify": "shopify_admin_api", "pos": "pos_export", "ga4": "ga4_bigquery_export", "googleads": "googleads_api", "metaads": "metaads_api"}
 LOGICS = ("map", "transform", "create")
 API_VERSION = "v3.2.0"
 DESCRIPTION_MAX = 350  # caracteres : 5 lignes dans le catalogue
@@ -347,17 +350,34 @@ def check_pii(c: Contract) -> list[Err]:
 
 
 def check_raw_transform(c: Contract) -> list[Err]:
+    """L006 : chaque champ de premier niveau d'un raw porte son lineage vers la source externe."""
     errs = []
+    system = RAW_SYSTEMS.get(c.folder)
     for p in all_props(c):
-        n = p.node
-        used = [k for k in ("transformLogic", "transformSourceObjects", "transformDescription") if k in n]
-        if not used:
+        if not p.top:
             continue
+        n = p.node
         where = f"{c.rel} {p.path}"
-        if n.get("name") not in TECH_FIELDS or not p.top:
-            errs.append(Err("L006", where, f"un raw ne porte aucun transform* ({', '.join(used)}); seuls {', '.join(TECH_FIELDS)} sont admis en create"))
-        elif n.get("transformLogic") != "create" or sources_of(n):
-            errs.append(Err("L006", where, "un champ technique raw doit etre transformLogic: create, sans transformSourceObjects"))
+        logic = n.get("transformLogic")
+        srcs = sources_of(n)
+        if not logic:
+            errs.append(Err("L006", where, "transformLogic manquant sur un champ raw"))
+            continue
+        if not str(n.get("transformDescription", "")).strip():
+            errs.append(Err("L006", where, "transformDescription manquante sur un champ raw"))
+        if n.get("name") in TECH_FIELDS:
+            if logic != "create" or srcs:
+                errs.append(Err("L006", where, "un champ technique raw doit etre transformLogic: create, sans transformSourceObjects"))
+            continue
+        if logic != "map":
+            errs.append(Err("L006", where, f"un champ raw est transformLogic: map (aucun calcul), pas '{logic}'"))
+            continue
+        if len(srcs) != 1:
+            errs.append(Err("L006", where, f"map exige exactement 1 source externe ({len(srcs)} trouvee(s))"))
+            continue
+        m = REF_RE.match(str(srcs[0]))
+        if not m or m["contract"] != system:
+            errs.append(Err("L006", where, f"source '{srcs[0]}' invalide (attendu {system}#<objet>.<champ>)"))
     return errs
 
 

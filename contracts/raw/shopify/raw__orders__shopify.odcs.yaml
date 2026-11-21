@@ -89,6 +89,10 @@ schema:
             mustBe: 0
             dimension: uniqueness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.id
+        transformDescription: Recopie du champ id de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: name
         physicalType: STRING
         logicalType: string
@@ -96,12 +100,20 @@ schema:
         required: true
         classification: C1
         examples: ["#1001"]
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.name
+        transformDescription: Recopie du champ name de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: order_number
         physicalType: INT64
         logicalType: integer
         description: Numero de commande sequentiel sans prefixe.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.order_number
+        transformDescription: Recopie du champ order_number de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: email
         physicalType: STRING
         logicalType: string
@@ -110,50 +122,86 @@ schema:
         tags: [pii]
         logicalTypeOptions:
           format: email
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.email
+        transformDescription: Recopie du champ email de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: phone
         physicalType: STRING
         logicalType: string
         description: Numero de telephone saisi a la commande, au format fourni par le client.
         classification: C3
         tags: [pii]
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.phone
+        transformDescription: Recopie du champ phone de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: customer_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du client Shopify (cle vers raw__customers__shopify). Vide pour une commande invite.
         classification: C2
         tags: [pseudonymized]
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.customer_id
+        transformDescription: Recopie du champ customer_id de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: created_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de creation de la commande, en UTC.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.created_at
+        transformDescription: Recopie du champ created_at de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: updated_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de derniere modification de la commande, en UTC.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.updated_at
+        transformDescription: Recopie du champ updated_at de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: processed_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de validation du paiement par le client, en UTC.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.processed_at
+        transformDescription: Recopie du champ processed_at de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: closed_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de cloture de la commande, en UTC. Vide tant que la commande est ouverte.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.closed_at
+        transformDescription: Recopie du champ closed_at de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: cancelled_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure d'annulation de la commande, en UTC. Vide si la commande n'est pas annulee.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.cancelled_at
+        transformDescription: Recopie du champ cancelled_at de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: cancel_reason
         physicalType: STRING
         logicalType: string
         description: Motif d'annulation fourni par Shopify (customer, fraud, inventory, declined, other). Vide si non annulee.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.cancel_reason
+        transformDescription: Recopie du champ cancel_reason de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: financial_status
         physicalType: STRING
         logicalType: string
@@ -177,11 +225,19 @@ schema:
             dimension: conformity
             severity: warning
             description: Detecte l'apparition d'un nouveau statut cote Shopify.
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.financial_status
+        transformDescription: Recopie du champ financial_status de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: fulfillment_status
         physicalType: STRING
         logicalType: string
         description: Statut d'expedition (fulfilled, partial, restocked). Vide si rien n'a ete expedie.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.fulfillment_status
+        transformDescription: Recopie du champ fulfillment_status de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: currency
         physicalType: STRING
         logicalType: string
@@ -192,24 +248,40 @@ schema:
           minLength: 3
           maxLength: 3
         examples: [EUR]
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.currency
+        transformDescription: Recopie du champ currency de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: subtotal_price
         physicalType: NUMERIC
         logicalType: number
         description: Montant des articles apres remises, hors livraison, dans la devise currency.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.subtotal_price
+        transformDescription: Recopie du champ subtotal_price de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: total_discounts
         physicalType: NUMERIC
         logicalType: number
         description: Somme des remises appliquees a la commande.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.total_discounts
+        transformDescription: Recopie du champ total_discounts de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: total_tax
         physicalType: NUMERIC
         logicalType: number
         description: Somme des taxes de la commande.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.total_tax
+        transformDescription: Recopie du champ total_tax de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: total_price
         physicalType: NUMERIC
         logicalType: number
@@ -223,17 +295,29 @@ schema:
             mustBe: 0
             dimension: completeness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.total_price
+        transformDescription: Recopie du champ total_price de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: source_name
         physicalType: STRING
         logicalType: string
         description: Canal d'origine de la commande (web, pos, shopify_draft_order, application tierce).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.source_name
+        transformDescription: Recopie du champ source_name de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: test
         physicalType: BOOL
         logicalType: boolean
         description: Vrai pour une commande de test, a exclure des analyses.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.test
+        transformDescription: Recopie du champ test de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: discount_codes
         physicalType: ARRAY<STRUCT<code STRING, amount NUMERIC, type STRING>>
         logicalType: array
@@ -258,6 +342,10 @@ schema:
               logicalType: string
               description: Type de remise (fixed_amount, percentage, shipping).
               classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - shopify_admin_api#Order.discount_codes
+        transformDescription: Recopie du champ discount_codes de l'objet Order de l'API Admin Shopify, sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -265,7 +353,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -273,4 +361,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).
