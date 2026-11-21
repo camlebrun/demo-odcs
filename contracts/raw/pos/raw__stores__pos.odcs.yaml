@@ -1,0 +1,192 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__stores__pos
+name: raw__stores__pos
+version: 1.0.0
+status: active
+domain: pos
+tags: [raw, pos]
+description:
+  purpose: Referentiel des magasins (40 magasins en France et en Belgique), une ligne par magasin, tel que exporte par le logiciel de caisse (aucune transformation metier).
+  usage: Source des contrats customer (indicateurs clients omnicanaux, audiences). Ne pas exposer directement aux consommateurs metier.
+  limitations: Objet de schema `stores`. Le fuseau (timezone) de chaque magasin est la reference pour interpreter les heures locales de raw__tickets__pos et raw__ticket_lines__pos. Les magasins fermes sont conserves (closing_date renseignee). Les adresses sont celles de points de vente professionnels, pas de personnes.
+
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la source caisse (POS).
+    project: retail-data-prod
+    dataset: raw_pos
+
+team:
+  name: team-pos
+  description: Equipe proprietaire des contrats et de l'ingestion de la caisse.
+  members:
+    - username: "@org/team-pos"
+      role: owner
+
+support:
+  - channel: data-pos
+    tool: email
+    scope: issues
+    url: mailto:data-pos@retail.example
+    description: Questions et incidents sur les donnees de caisse.
+
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: stores
+    driver: analytics
+    description: Une ingestion complete par jour (export de fin de journee des caisses).
+  - property: latency
+    value: 12
+    unit: h
+    element: stores.updated_at
+    driver: analytics
+    description: Donnees disponibles au plus tard 12 heures apres la modification en caisse.
+  - property: retention
+    value: 3
+    unit: y
+    element: stores
+    description: Historique conserve 3 ans.
+
+schema:
+  - name: stores
+    physicalName: stores
+    physicalType: table
+    description: Objet `stores` - magasins de l'enseigne, une ligne par magasin.
+    dataGranularityDescription: Une ligne par magasin.
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table ne doit jamais etre vide apres une ingestion.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE closing_date IS NOT NULL AND opening_date IS NOT NULL AND closing_date < opening_date
+        mustBe: 0
+        dimension: accuracy
+        severity: error
+        description: La date de fermeture ne precede jamais la date d'ouverture.
+    properties:
+      - name: store_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant technique du magasin dans la caisse.
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        unique: true
+        classification: internal
+        examples: [12]
+        quality:
+          - type: library
+            metric: duplicateValues
+            mustBe: 0
+            dimension: uniqueness
+            severity: error
+      - name: store_code
+        physicalType: STRING
+        logicalType: string
+        description: Code court du magasin utilise en exploitation.
+        required: true
+        unique: true
+        classification: internal
+        examples: ["FR-LYO-01"]
+      - name: store_name
+        physicalType: STRING
+        logicalType: string
+        description: Nom commercial du magasin.
+        required: true
+        classification: internal
+      - name: country_code
+        physicalType: STRING
+        logicalType: string
+        description: Code pays ISO 3166-1 alpha-2 du magasin - FR ou BE.
+        required: true
+        classification: internal
+        enum:
+          - value: FR
+          - value: BE
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues: [FR, BE]
+            mustBe: 0
+            dimension: conformity
+            severity: warning
+            description: Detecte l'apparition d'une nouvelle valeur cote caisse.
+      - name: address_line
+        physicalType: STRING
+        logicalType: string
+        description: Adresse du magasin (numero et rue).
+        classification: internal
+      - name: postal_code
+        physicalType: STRING
+        logicalType: string
+        description: Code postal du magasin.
+        classification: internal
+      - name: city
+        physicalType: STRING
+        logicalType: string
+        description: Ville du magasin.
+        classification: internal
+      - name: timezone
+        physicalType: STRING
+        logicalType: string
+        description: Fuseau horaire IANA du magasin (Europe/Paris, Europe/Brussels), a utiliser pour convertir les heures locales en UTC.
+        required: true
+        classification: internal
+        examples: [Europe/Paris]
+      - name: currency
+        physicalType: STRING
+        logicalType: string
+        description: Code devise ISO 4217 du magasin (EUR).
+        required: true
+        classification: internal
+        examples: [EUR]
+        logicalTypeOptions:
+          minLength: 3
+          maxLength: 3
+      - name: opening_date
+        physicalType: DATE
+        logicalType: date
+        description: Date d'ouverture du magasin (heure locale).
+        classification: internal
+      - name: closing_date
+        physicalType: DATE
+        logicalType: date
+        description: Date de fermeture definitive du magasin. Vide si le magasin est ouvert.
+        classification: internal
+      - name: is_active
+        physicalType: BOOL
+        logicalType: boolean
+        description: Vrai si le magasin est actif dans la caisse.
+        required: true
+        classification: internal
+      - name: updated_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de derniere modification de la fiche magasin, en UTC.
+        required: true
+        classification: internal
+      - name: _loaded_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+      - name: _source_file
+        physicalType: STRING
+        logicalType: string
+        description: URI du fichier de depot dont la ligne est issue (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: URI du fichier de depot renseignee par l'ingestion.

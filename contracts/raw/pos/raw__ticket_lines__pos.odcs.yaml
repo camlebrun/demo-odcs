@@ -1,0 +1,199 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__ticket_lines__pos
+name: raw__ticket_lines__pos
+version: 1.0.0
+status: active
+domain: pos
+tags: [raw, pos]
+description:
+  purpose: Lignes de tickets de caisse, une ligne par article d'un ticket, telles que exportees par le logiciel de caisse (aucune transformation metier).
+  usage: Source des contrats customer (indicateurs clients omnicanaux, audiences). Ne pas exposer directement aux consommateurs metier.
+  limitations: Objet de schema `ticket_lines`. Les montants sont des entiers en centimes, TTC. Les heures sont en heure LOCALE du magasin. Les lignes d'un retour portent des quantites et montants negatifs. Le taux de TVA est en pourcentage par ligne. L'en-tete (client, paiement, magasin) est dans raw__tickets__pos.
+
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la source caisse (POS).
+    project: retail-data-prod
+    dataset: raw_pos
+
+team:
+  name: team-pos
+  description: Equipe proprietaire des contrats et de l'ingestion de la caisse.
+  members:
+    - username: "@org/team-pos"
+      role: owner
+
+support:
+  - channel: data-pos
+    tool: email
+    scope: issues
+    url: mailto:data-pos@retail.example
+    description: Questions et incidents sur les donnees de caisse.
+
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: ticket_lines
+    driver: analytics
+    description: Une ingestion complete par jour (export de fin de journee des caisses).
+  - property: latency
+    value: 12
+    unit: h
+    element: ticket_lines.updated_at_local
+    driver: analytics
+    description: Donnees disponibles au plus tard 12 heures apres la modification en caisse.
+  - property: retention
+    value: 3
+    unit: y
+    element: ticket_lines
+    description: Historique conserve 3 ans.
+
+schema:
+  - name: ticket_lines
+    physicalName: ticket_lines
+    physicalType: table
+    description: Objet `ticket_lines` - lignes de ticket de caisse, une ligne par article vendu ou retourne.
+    dataGranularityDescription: Une ligne par article (ou groupe d'articles identiques) d'un ticket.
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table ne doit jamais etre vide apres une ingestion.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE vat_rate_pct < 0 OR vat_rate_pct > 100
+        mustBe: 0
+        dimension: accuracy
+        severity: error
+        description: Taux de TVA compris entre 0 et 100.
+    properties:
+      - name: ticket_line_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant technique de la ligne de ticket dans la caisse.
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        unique: true
+        classification: internal
+        quality:
+          - type: library
+            metric: duplicateValues
+            mustBe: 0
+            dimension: uniqueness
+            severity: error
+      - name: ticket_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant du ticket parent (cle vers raw__tickets__pos, objet tickets).
+        required: true
+        classification: internal
+      - name: line_number
+        physicalType: INT64
+        logicalType: integer
+        description: Rang de la ligne dans le ticket, a partir de 1.
+        required: true
+        classification: internal
+      - name: store_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant du magasin (cle vers raw__stores__pos, objet stores), repete depuis le ticket.
+        required: true
+        classification: internal
+      - name: product_sku
+        physicalType: STRING
+        logicalType: string
+        description: Reference article (SKU) vendue, telle que saisie en caisse.
+        required: true
+        classification: internal
+      - name: product_label
+        physicalType: STRING
+        logicalType: string
+        description: Libelle de l'article affiche en caisse.
+        classification: internal
+      - name: product_category_code
+        physicalType: STRING
+        logicalType: string
+        description: Code de la famille ou categorie d'article du referentiel caisse.
+        classification: internal
+      - name: quantity
+        physicalType: INT64
+        logicalType: integer
+        description: Quantite vendue. Negative pour un article retourne.
+        required: true
+        classification: internal
+      - name: unit_price_cents
+        physicalType: INT64
+        logicalType: integer
+        description: Prix unitaire TTC avant remise, en centimes d'euro (entier).
+        required: true
+        classification: internal
+      - name: discount_cents
+        physicalType: INT64
+        logicalType: integer
+        description: Remise appliquee sur la ligne, en centimes d'euro (entier, positif). 0 si aucune remise.
+        required: true
+        classification: internal
+      - name: discount_label
+        physicalType: STRING
+        logicalType: string
+        description: Libelle ou code de la remise appliquee (promotion, soldes, remise vendeur, code). Vide si aucune remise.
+        classification: internal
+      - name: line_amount_cents
+        physicalType: INT64
+        logicalType: integer
+        description: Montant TTC de la ligne apres remise, en centimes d'euro (entier). Negatif pour un retour.
+        required: true
+        classification: internal
+        criticalDataElement: true
+        quality:
+          - type: library
+            metric: nullValues
+            mustBe: 0
+            dimension: completeness
+            severity: error
+      - name: vat_rate_pct
+        physicalType: NUMERIC
+        logicalType: number
+        description: Taux de TVA applique a la ligne, en pourcentage (ex. 20 ou 21 selon le pays).
+        required: true
+        classification: internal
+      - name: vat_amount_cents
+        physicalType: INT64
+        logicalType: integer
+        description: Montant de TVA contenu dans la ligne, en centimes d'euro (entier).
+        required: true
+        classification: internal
+      - name: ticket_datetime_local
+        physicalType: DATETIME
+        logicalType: timestamp
+        description: Date et heure d'encaissement du ticket, en heure LOCALE du magasin (sans fuseau, pas en UTC).
+        required: true
+        classification: internal
+      - name: updated_at_local
+        physicalType: DATETIME
+        logicalType: timestamp
+        description: Date et heure de derniere modification de la ligne en caisse, en heure LOCALE du magasin.
+        required: true
+        classification: internal
+      - name: _loaded_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+      - name: _source_file
+        physicalType: STRING
+        logicalType: string
+        description: URI du fichier de depot dont la ligne est issue (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: URI du fichier de depot renseignee par l'ingestion.

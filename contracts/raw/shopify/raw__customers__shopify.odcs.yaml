@@ -1,0 +1,293 @@
+# Objet de schema : customers. Cles : customers.id (PII, pseudonymise), customers.email (PII), customers.phone (PII), customers.accepts_marketing, customers.default_address.*.
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__customers__shopify
+name: raw__customers__shopify
+version: 1.0.0
+status: active
+domain: shopify
+tags:
+- raw
+- shopify
+description:
+  purpose: Clients du site e-commerce Shopify (objet de schema customers), une ligne par compte client, tels que livres par l'API Admin REST (aucune transformation metier).
+  usage: 'Source des contrats customer (identite, consentement marketing, adresse). Contient des donnees personnelles directes : acces restreint, ne pas exposer directement aux consommateurs metier.'
+  limitations: Les commandes passees en invite n'ont pas de client (orders.customer_id vide) et n'apparaissent pas ici. Les agregats (orders_count, total_spent) sont ceux de Shopify, non recalcules. Les clients du magasin physique et du POS ne sont pas inclus. accepts_marketing ne couvre que le consentement Shopify.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  description: Dataset BigQuery de la source Shopify.
+  project: retail-data-prod
+  dataset: raw_shopify
+team:
+  name: team-shopify
+  description: Equipe proprietaire des contrats et de l'ingestion Shopify.
+  members:
+  - username: '@org/team-shopify'
+    role: owner
+support:
+- channel: data-shopify
+  tool: email
+  scope: issues
+  url: mailto:data-shopify@retail.example
+  description: Questions et incidents sur les donnees Shopify.
+slaProperties:
+- property: frequency
+  value: 1
+  unit: d
+  element: customers
+  driver: analytics
+  description: Une ingestion complete par jour.
+- property: latency
+  value: 6
+  unit: h
+  element: customers.updated_at
+  driver: analytics
+  description: Donnees disponibles au plus tard 6 heures apres la modification dans Shopify.
+- property: retention
+  value: 3
+  unit: y
+  element: customers
+  description: Historique conserve 3 ans.
+schema:
+- name: customers
+  physicalName: customers
+  physicalType: table
+  description: Clients Shopify (objet Customer de l'API Admin REST), une ligne par compte client. Les commandes invite n'y figurent pas.
+  dataGranularityDescription: Une ligne par client.
+  quality:
+  - type: library
+    metric: rowCount
+    mustBeGreaterThan: 0
+    dimension: completeness
+    severity: error
+    description: La table ne doit jamais etre vide apres une ingestion.
+  properties:
+  - name: id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant technique du client dans Shopify (identifiant personnel pseudonymise, cle vers raw__orders__shopify#orders.customer_id).
+    required: true
+    classification: confidential
+    unique: true
+    primaryKey: true
+    primaryKeyPosition: 1
+    quality:
+    - type: library
+      metric: duplicateValues
+      mustBe: 0
+      dimension: uniqueness
+      severity: error
+    tags: &id002
+    - pseudonymized
+  - name: email
+    physicalType: STRING
+    logicalType: string
+    description: Adresse e-mail du client. Peut etre vide (client cree sans e-mail, par exemple en caisse).
+    classification: restricted
+    logicalTypeOptions:
+      format: email
+    tags: &id001
+    - pii
+  - name: phone
+    physicalType: STRING
+    logicalType: string
+    description: Numero de telephone du client, au format fourni par le client.
+    classification: restricted
+    tags: *id001
+  - name: first_name
+    physicalType: STRING
+    logicalType: string
+    description: Prenom du client.
+    classification: restricted
+    tags: *id001
+  - name: last_name
+    physicalType: STRING
+    logicalType: string
+    description: Nom de famille du client.
+    classification: restricted
+    tags: *id001
+  - name: created_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de creation du compte client, en UTC.
+    required: true
+    classification: internal
+  - name: updated_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de derniere modification du client, en UTC.
+    required: true
+    classification: internal
+  - name: state
+    physicalType: STRING
+    logicalType: string
+    description: Etat du compte client (disabled, invited, enabled, declined).
+    required: true
+    classification: internal
+    enum:
+    - value: disabled
+    - value: invited
+    - value: enabled
+    - value: declined
+    quality:
+    - type: library
+      metric: invalidValues
+      arguments:
+        validValues:
+        - disabled
+        - invited
+        - enabled
+        - declined
+      mustBe: 0
+      dimension: conformity
+      severity: warning
+      description: Detecte l'apparition d'un nouvel etat cote Shopify.
+  - name: accepts_marketing
+    physicalType: BOOL
+    logicalType: boolean
+    description: Vrai si le client a accepte de recevoir des communications marketing par e-mail (consentement declare dans Shopify).
+    required: true
+    classification: internal
+  - name: accepts_marketing_updated_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de derniere modification du consentement marketing, en UTC.
+    classification: internal
+  - name: marketing_opt_in_level
+    physicalType: STRING
+    logicalType: string
+    description: Niveau de consentement marketing (single_opt_in, confirmed_opt_in, unknown).
+    classification: internal
+  - name: verified_email
+    physicalType: BOOL
+    logicalType: boolean
+    description: Vrai si l'adresse e-mail a ete verifiee.
+    classification: internal
+  - name: tax_exempt
+    physicalType: BOOL
+    logicalType: boolean
+    description: Vrai si le client est exonere de taxe.
+    classification: internal
+  - name: currency
+    physicalType: STRING
+    logicalType: string
+    description: Code devise ISO 4217 de la derniere commande du client.
+    classification: internal
+  - name: orders_count
+    physicalType: INT64
+    logicalType: integer
+    description: Nombre de commandes du client selon Shopify a la date d'extraction.
+    classification: internal
+  - name: total_spent
+    physicalType: NUMERIC
+    logicalType: number
+    description: Montant cumule depense par le client selon Shopify, dans la devise currency. Indicatif, non recalcule.
+    classification: internal
+  - name: last_order_id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant de la derniere commande du client (cle vers raw__orders__shopify#orders.id).
+    classification: confidential
+    tags: *id002
+  - name: tags
+    physicalType: STRING
+    logicalType: string
+    description: Etiquettes libres attachees au client, separees par des virgules.
+    classification: internal
+  - name: note
+    physicalType: STRING
+    logicalType: string
+    description: Note libre sur le client, susceptible de contenir des donnees personnelles.
+    classification: restricted
+    tags: *id001
+  - name: default_address
+    physicalType: STRUCT<id INT64, name STRING, company STRING, address1 STRING, address2 STRING, zip STRING, city STRING, province STRING, country STRING, country_code STRING, phone STRING>
+    logicalType: object
+    description: Adresse par defaut du client (donnees personnelles directes).
+    classification: restricted
+    properties:
+    - name: id
+      physicalType: INT64
+      logicalType: integer
+      description: Identifiant de l'adresse dans Shopify.
+      classification: confidential
+      tags: *id002
+    - name: name
+      physicalType: STRING
+      logicalType: string
+      description: Nom complet du destinataire de l'adresse.
+      classification: restricted
+      tags: *id001
+    - name: company
+      physicalType: STRING
+      logicalType: string
+      description: Societe du destinataire.
+      classification: restricted
+      tags: *id001
+    - name: address1
+      physicalType: STRING
+      logicalType: string
+      description: Premiere ligne de l'adresse (numero et rue).
+      classification: restricted
+      tags: *id001
+    - name: address2
+      physicalType: STRING
+      logicalType: string
+      description: Complement d'adresse.
+      classification: restricted
+      tags: *id001
+    - name: zip
+      physicalType: STRING
+      logicalType: string
+      description: Code postal.
+      classification: restricted
+      tags: *id001
+    - name: city
+      physicalType: STRING
+      logicalType: string
+      description: Ville.
+      classification: restricted
+      tags: *id001
+    - name: province
+      physicalType: STRING
+      logicalType: string
+      description: Region ou province.
+      classification: restricted
+      tags: *id001
+    - name: country
+      physicalType: STRING
+      logicalType: string
+      description: Nom du pays.
+      classification: restricted
+      tags: *id001
+    - name: country_code
+      physicalType: STRING
+      logicalType: string
+      description: Code pays ISO 3166-1 alpha-2 (FR, BE).
+      classification: restricted
+      tags: *id001
+    - name: phone
+      physicalType: STRING
+      logicalType: string
+      description: Telephone associe a l'adresse.
+      classification: restricted
+      tags: *id001
+    tags: *id001
+  - name: _loaded_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+  - name: _source_file
+    physicalType: STRING
+    logicalType: string
+    description: URI du fichier de depot dont la ligne est issue (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: URI du fichier de depot renseignee par l'ingestion.

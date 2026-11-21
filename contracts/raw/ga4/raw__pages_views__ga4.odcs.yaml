@@ -1,0 +1,415 @@
+# Objet de schema : events (evenements page_view et view_item). Cles : events.user_pseudo_id, events.event_timestamp, events.event_params.key (ga_session_id), events.traffic_source.*, events.collected_traffic_source.*, events.items.item_id.
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__pages_views__ga4
+name: raw__pages_views__ga4
+version: 1.0.0
+status: active
+domain: ga4
+tags:
+- raw
+- ga4
+description:
+  purpose: Evenements de navigation (page_view et view_item) du site, extraits de l'export BigQuery GA4 (objet de schema events), une ligne par evenement.
+  usage: Source des contrats customer (parcours web, acquisition, interet produit). Ne pas exposer directement aux consommateurs metier.
+  limitations: 'Donnees incompletes par construction : avec Consent Mode, les visiteurs qui refusent le consentement analytics sont absents ou sans user_pseudo_id (modelisation non exportee), et les bloqueurs de publicite masquent une partie du trafic. L''export est limite par quotas (1 million d''evenements par jour pour la version standard). Les sessions se reconstruisent via event_params (ga_session_id) et user_pseudo_id. traffic_source est la premiere acquisition de l''utilisateur.'
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  description: Dataset BigQuery de la source GA4.
+  project: retail-data-prod
+  dataset: raw_ga4
+team:
+  name: team-ga4
+  description: Equipe proprietaire des contrats et de l'ingestion GA4.
+  members:
+  - username: '@org/team-ga4'
+    role: owner
+support:
+- channel: data-ga4
+  tool: email
+  scope: issues
+  url: mailto:data-ga4@retail.example
+  description: Questions et incidents sur les donnees GA4.
+slaProperties:
+- property: frequency
+  value: 1
+  unit: d
+  element: events
+  driver: analytics
+  description: Une ingestion complete par jour.
+- property: latency
+  value: 24
+  unit: h
+  element: events.event_timestamp
+  driver: analytics
+  description: Tables quotidiennes de l'export BigQuery GA4 disponibles au plus tard 24 heures apres la fin du jour.
+- property: retention
+  value: 3
+  unit: y
+  element: events
+  description: Historique conserve 3 ans.
+schema:
+- name: events
+  physicalName: events_*
+  physicalType: table
+  description: Evenements page_view et view_item de l'export BigQuery GA4 (tables quotidiennes events_AAAAMMJJ, interrogees via le motif events_*), une ligne par evenement.
+  dataGranularityDescription: Une ligne par evenement GA4.
+  quality:
+  - type: library
+    metric: rowCount
+    mustBeGreaterThan: 0
+    dimension: completeness
+    severity: error
+    description: La table ne doit jamais etre vide apres une ingestion.
+  - type: sql
+    query: SELECT COUNT(*) FROM ${table} WHERE event_timestamp IS NULL
+    mustBe: 0
+    dimension: completeness
+    severity: error
+    description: Chaque evenement est horodate.
+  properties:
+  - name: event_date
+    physicalType: STRING
+    logicalType: string
+    description: Date de l'evenement au format AAAAMMJJ, dans le fuseau du compte GA4 (pas en UTC).
+    required: true
+    classification: internal
+  - name: event_timestamp
+    physicalType: INT64
+    logicalType: integer
+    description: Horodatage de l'evenement en microsecondes depuis l'epoque Unix, en UTC.
+    required: true
+    classification: internal
+  - name: event_name
+    physicalType: STRING
+    logicalType: string
+    description: 'Nom de l''evenement GA4 : page_view ou view_item.'
+    required: true
+    classification: internal
+    quality:
+    - type: library
+      metric: invalidValues
+      arguments:
+        validValues:
+        - page_view
+        - view_item
+      mustBe: 0
+      dimension: conformity
+      severity: error
+      description: La table ne contient que les evenements attendus.
+  - name: event_params
+    physicalType: ARRAY<STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>>>
+    logicalType: array
+    description: Parametres de l'evenement, liste cle/valeur (REPEATED RECORD). On y lit notamment ga_session_id (int_value), ga_session_number (int_value), page_location, page_referrer et page_title (string_value), session_engaged, engagement_time_msec.
+    classification: internal
+    items:
+      logicalType: object
+      physicalType: STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>>
+      properties:
+      - name: key
+        physicalType: STRING
+        logicalType: string
+        description: Nom du parametre (ex. ga_session_id, page_location).
+        classification: internal
+      - name: value
+        physicalType: STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>
+        logicalType: object
+        description: 'Valeur du parametre : un seul des champs est renseigne selon le type.'
+        classification: internal
+        properties:
+        - name: string_value
+          physicalType: STRING
+          logicalType: string
+          description: Valeur texte du parametre.
+          classification: internal
+        - name: int_value
+          physicalType: INT64
+          logicalType: integer
+          description: Valeur entiere du parametre.
+          classification: internal
+        - name: float_value
+          physicalType: FLOAT64
+          logicalType: number
+          description: Valeur decimale simple precision du parametre.
+          classification: internal
+        - name: double_value
+          physicalType: FLOAT64
+          logicalType: number
+          description: Valeur decimale double precision du parametre.
+          classification: internal
+  - name: event_previous_timestamp
+    physicalType: INT64
+    logicalType: integer
+    description: Horodatage de l'evenement precedent du meme nom pour l'utilisateur, en microsecondes UTC.
+    classification: internal
+  - name: event_bundle_sequence_id
+    physicalType: INT64
+    logicalType: integer
+    description: Numero de sequence du lot d'evenements envoye avec cet evenement.
+    classification: internal
+  - name: user_pseudo_id
+    physicalType: STRING
+    logicalType: string
+    description: Identifiant pseudonyme de l'appareil ou du navigateur genere par GA4 (cookie). Peut etre vide quand le consentement analytics est refuse.
+    classification: confidential
+    tags: &id001
+    - pseudonymized
+  - name: user_id
+    physicalType: STRING
+    logicalType: string
+    description: Identifiant utilisateur envoye par le site apres connexion. Vide pour un visiteur non connecte.
+    classification: confidential
+    tags: *id001
+  - name: user_first_touch_timestamp
+    physicalType: INT64
+    logicalType: integer
+    description: Date de premiere visite de l'utilisateur, en microsecondes UTC.
+    classification: internal
+  - name: privacy_info
+    physicalType: STRUCT<analytics_storage STRING, ads_storage STRING, uses_transient_token STRING>
+    logicalType: object
+    description: Etat du consentement (Consent Mode) au moment de l'evenement.
+    classification: internal
+    properties:
+    - name: analytics_storage
+      physicalType: STRING
+      logicalType: string
+      description: Consentement au stockage analytics (Yes, No).
+      classification: internal
+    - name: ads_storage
+      physicalType: STRING
+      logicalType: string
+      description: Consentement au stockage publicitaire (Yes, No).
+      classification: internal
+    - name: uses_transient_token
+      physicalType: STRING
+      logicalType: string
+      description: Indique l'usage d'un jeton transitoire quand le consentement est refuse (Yes, No).
+      classification: internal
+  - name: device
+    physicalType: STRUCT<category STRING, mobile_brand_name STRING, operating_system STRING, browser STRING, language STRING>
+    logicalType: object
+    description: Appareil du visiteur.
+    classification: internal
+    properties:
+    - name: category
+      physicalType: STRING
+      logicalType: string
+      description: Categorie d'appareil (desktop, mobile, tablet).
+      classification: internal
+    - name: mobile_brand_name
+      physicalType: STRING
+      logicalType: string
+      description: Marque de l'appareil mobile.
+      classification: internal
+    - name: operating_system
+      physicalType: STRING
+      logicalType: string
+      description: Systeme d'exploitation.
+      classification: internal
+    - name: browser
+      physicalType: STRING
+      logicalType: string
+      description: Navigateur.
+      classification: internal
+    - name: language
+      physicalType: STRING
+      logicalType: string
+      description: Langue du navigateur.
+      classification: internal
+  - name: geo
+    physicalType: STRUCT<continent STRING, country STRING, region STRING, city STRING>
+    logicalType: object
+    description: Localisation approximative deduite de l'adresse IP (non conservee).
+    classification: internal
+    properties:
+    - name: continent
+      physicalType: STRING
+      logicalType: string
+      description: Continent.
+      classification: internal
+    - name: country
+      physicalType: STRING
+      logicalType: string
+      description: Pays, en nom anglais.
+      classification: internal
+    - name: region
+      physicalType: STRING
+      logicalType: string
+      description: Region.
+      classification: internal
+    - name: city
+      physicalType: STRING
+      logicalType: string
+      description: Ville approximative.
+      classification: internal
+  - name: traffic_source
+    physicalType: STRUCT<name STRING, medium STRING, source STRING>
+    logicalType: object
+    description: Source de la premiere acquisition de l'utilisateur (first touch), pas de la session en cours.
+    classification: internal
+    properties:
+    - name: name
+      physicalType: STRING
+      logicalType: string
+      description: Nom de la campagne de premiere acquisition.
+      classification: internal
+    - name: medium
+      physicalType: STRING
+      logicalType: string
+      description: Canal de premiere acquisition (organic, cpc, email, referral).
+      classification: internal
+    - name: source
+      physicalType: STRING
+      logicalType: string
+      description: Source de premiere acquisition (google, facebook).
+      classification: internal
+  - name: collected_traffic_source
+    physicalType: STRUCT<manual_source STRING, manual_medium STRING, manual_campaign_name STRING, gclid STRING>
+    logicalType: object
+    description: Source de trafic collectee avec l'evenement (parametres UTM et identifiants publicitaires).
+    classification: internal
+    properties:
+    - name: manual_source
+      physicalType: STRING
+      logicalType: string
+      description: Source manuelle (utm_source).
+      classification: internal
+    - name: manual_medium
+      physicalType: STRING
+      logicalType: string
+      description: Canal manuel (utm_medium).
+      classification: internal
+    - name: manual_campaign_name
+      physicalType: STRING
+      logicalType: string
+      description: Nom de campagne manuel (utm_campaign).
+      classification: internal
+    - name: gclid
+      physicalType: STRING
+      logicalType: string
+      description: Identifiant de clic Google Ads.
+      classification: internal
+  - name: ecommerce
+    physicalType: STRUCT<transaction_id STRING, purchase_revenue FLOAT64, purchase_revenue_in_usd FLOAT64, total_item_quantity INT64, unique_items INT64>
+    logicalType: object
+    description: Donnees e-commerce de l'evenement.
+    classification: internal
+    properties:
+    - name: transaction_id
+      physicalType: STRING
+      logicalType: string
+      description: 'Identifiant de transaction, vide hors evenement purchase. '
+      classification: internal
+    - name: purchase_revenue
+      physicalType: FLOAT64
+      logicalType: number
+      description: Revenu de l'achat, dans la devise du site (EUR).
+      classification: internal
+    - name: purchase_revenue_in_usd
+      physicalType: FLOAT64
+      logicalType: number
+      description: Revenu de l'achat converti en dollars par GA4.
+      classification: internal
+    - name: total_item_quantity
+      physicalType: INT64
+      logicalType: integer
+      description: Nombre total d'articles de l'evenement.
+      classification: internal
+    - name: unique_items
+      physicalType: INT64
+      logicalType: integer
+      description: Nombre d'articles distincts de l'evenement.
+      classification: internal
+  - name: items
+    physicalType: ARRAY<STRUCT<item_id STRING, item_name STRING, item_brand STRING, item_variant STRING, item_category STRING, item_category2 STRING, price FLOAT64, quantity INT64, item_revenue FLOAT64, coupon STRING, index INT64>>
+    logicalType: array
+    description: Articles lies a l'evenement (REPEATED RECORD), renseignes pour view_item et purchase.
+    classification: internal
+    items:
+      logicalType: object
+      physicalType: STRUCT<item_id STRING, item_name STRING, item_brand STRING, item_variant STRING, item_category STRING, item_category2 STRING, price FLOAT64, quantity INT64, item_revenue FLOAT64, coupon STRING, index INT64>
+      properties:
+      - name: item_id
+        physicalType: STRING
+        logicalType: string
+        description: Identifiant de l'article envoye par le site (en pratique le SKU ou l'identifiant produit).
+        classification: internal
+      - name: item_name
+        physicalType: STRING
+        logicalType: string
+        description: Nom de l'article.
+        classification: internal
+      - name: item_brand
+        physicalType: STRING
+        logicalType: string
+        description: Marque de l'article.
+        classification: internal
+      - name: item_variant
+        physicalType: STRING
+        logicalType: string
+        description: Variante de l'article.
+        classification: internal
+      - name: item_category
+        physicalType: STRING
+        logicalType: string
+        description: Categorie principale de l'article.
+        classification: internal
+      - name: item_category2
+        physicalType: STRING
+        logicalType: string
+        description: Deuxieme niveau de categorie.
+        classification: internal
+      - name: price
+        physicalType: FLOAT64
+        logicalType: number
+        description: Prix unitaire de l'article, dans la devise ecommerce.
+        classification: internal
+      - name: quantity
+        physicalType: INT64
+        logicalType: integer
+        description: Quantite de l'article.
+        classification: internal
+      - name: item_revenue
+        physicalType: FLOAT64
+        logicalType: number
+        description: Revenu de l'article (renseigne pour les achats).
+        classification: internal
+      - name: coupon
+        physicalType: STRING
+        logicalType: string
+        description: Code promotionnel applique a l'article.
+        classification: internal
+      - name: index
+        physicalType: INT64
+        logicalType: integer
+        description: Position de l'article dans la liste.
+        classification: internal
+  - name: stream_id
+    physicalType: STRING
+    logicalType: string
+    description: Identifiant du flux de donnees GA4.
+    classification: internal
+  - name: platform
+    physicalType: STRING
+    logicalType: string
+    description: Plateforme du flux (WEB, IOS, ANDROID).
+    classification: internal
+  - name: _loaded_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+  - name: _source_file
+    physicalType: STRING
+    logicalType: string
+    description: URI du fichier de depot dont la ligne est issue (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: URI du fichier de depot renseignee par l'ingestion.

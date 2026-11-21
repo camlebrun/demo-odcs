@@ -1,0 +1,265 @@
+# Objet de schema : refunds. Cles : refunds.id, refunds.order_id (-> raw__orders__shopify#orders.id), refunds.created_at, refunds.refund_line_items.{line_item_id,location_id,quantity,subtotal}, refunds.transactions.amount.
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__refunds__shopify
+name: raw__refunds__shopify
+version: 1.0.0
+status: active
+domain: shopify
+tags:
+- raw
+- shopify
+description:
+  purpose: Remboursements des commandes Shopify (objet de schema refunds), une ligne par remboursement, tels que livres par l'API Admin REST (aucune transformation metier).
+  usage: Source des contrats customer (retours, taux de retour, valeur nette client). Les retours en magasin enregistres dans Shopify (retours cross-canal) sont identifies par location_id.
+  limitations: 'Les montants sont dans la devise de la transaction, sans conversion. Les retours en magasin non enregistres dans Shopify sont absents (voir la source POS). Il n''y a pas de total de remboursement dans la source : il se deduit des transactions.'
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  description: Dataset BigQuery de la source Shopify.
+  project: retail-data-prod
+  dataset: raw_shopify
+team:
+  name: team-shopify
+  description: Equipe proprietaire des contrats et de l'ingestion Shopify.
+  members:
+  - username: '@org/team-shopify'
+    role: owner
+support:
+- channel: data-shopify
+  tool: email
+  scope: issues
+  url: mailto:data-shopify@retail.example
+  description: Questions et incidents sur les donnees Shopify.
+slaProperties:
+- property: frequency
+  value: 1
+  unit: d
+  element: refunds
+  driver: analytics
+  description: Une ingestion complete par jour.
+- property: latency
+  value: 6
+  unit: h
+  element: refunds.created_at
+  driver: analytics
+  description: Donnees disponibles au plus tard 6 heures apres la modification dans Shopify.
+- property: retention
+  value: 3
+  unit: y
+  element: refunds
+  description: Historique conserve 3 ans.
+schema:
+- name: refunds
+  physicalName: refunds
+  physicalType: table
+  description: Remboursements Shopify (objet Refund de l'API Admin REST), une ligne par remboursement, avec lignes remboursees et transactions imbriquees.
+  dataGranularityDescription: Une ligne par remboursement.
+  quality:
+  - type: library
+    metric: rowCount
+    mustBeGreaterThan: 0
+    dimension: completeness
+    severity: warning
+    description: La table ne doit pas etre vide apres une ingestion.
+  - type: sql
+    query: SELECT COUNT(*) FROM ${table} WHERE ARRAY_LENGTH(refund_line_items) = 0 AND ARRAY_LENGTH(order_adjustments) = 0
+    mustBe: 0
+    dimension: completeness
+    severity: warning
+    description: Un remboursement porte au moins une ligne ou un ajustement.
+  properties:
+  - name: id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant technique du remboursement dans Shopify.
+    required: true
+    classification: internal
+    unique: true
+    primaryKey: true
+    primaryKeyPosition: 1
+    quality:
+    - type: library
+      metric: duplicateValues
+      mustBe: 0
+      dimension: uniqueness
+      severity: error
+  - name: order_id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant de la commande remboursee (cle vers raw__orders__shopify#orders.id).
+    required: true
+    classification: internal
+    quality:
+    - type: library
+      metric: nullValues
+      mustBe: 0
+      dimension: completeness
+      severity: error
+  - name: created_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de creation du remboursement, en UTC.
+    required: true
+    classification: internal
+  - name: processed_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de traitement du remboursement, en UTC.
+    classification: internal
+  - name: user_id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant du collaborateur Shopify ayant cree le remboursement. Vide si automatique.
+    classification: internal
+  - name: note
+    physicalType: STRING
+    logicalType: string
+    description: Note libre saisie lors du remboursement, susceptible de contenir des donnees personnelles.
+    classification: restricted
+    tags:
+    - pii
+  - name: restock
+    physicalType: BOOL
+    logicalType: boolean
+    description: Vrai si les articles sont remis en stock (champ historique, voir restock_type par ligne).
+    classification: internal
+  - name: refund_line_items
+    physicalType: ARRAY<STRUCT<id INT64, line_item_id INT64, location_id INT64, quantity INT64, restock_type STRING, subtotal NUMERIC, total_tax NUMERIC>>
+    logicalType: array
+    description: Lignes de commande remboursees, avec le lieu de remise en stock (location_id) pour les retours cross-canal.
+    classification: internal
+    items:
+      logicalType: object
+      physicalType: STRUCT<id INT64, line_item_id INT64, location_id INT64, quantity INT64, restock_type STRING, subtotal NUMERIC, total_tax NUMERIC>
+      properties:
+      - name: id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de la ligne de remboursement.
+        classification: internal
+      - name: line_item_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de la ligne de commande remboursee (cle vers raw__order_lines__shopify#order_lines.id).
+        classification: internal
+      - name: location_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant du lieu (magasin ou entrepot) ou l'article est remis en stock (retour cross-canal). Vide si non remis en stock.
+        classification: internal
+      - name: quantity
+        physicalType: INT64
+        logicalType: integer
+        description: Quantite remboursee.
+        classification: internal
+      - name: restock_type
+        physicalType: STRING
+        logicalType: string
+        description: Type de remise en stock (no_restock, cancel, return, legacy_restock).
+        classification: internal
+      - name: subtotal
+        physicalType: NUMERIC
+        logicalType: number
+        description: Montant hors taxe rembourse pour la ligne, dans la devise de la transaction.
+        classification: internal
+      - name: total_tax
+        physicalType: NUMERIC
+        logicalType: number
+        description: Taxe remboursee pour la ligne, dans la devise de la transaction.
+        classification: internal
+  - name: transactions
+    physicalType: ARRAY<STRUCT<id INT64, kind STRING, gateway STRING, status STRING, amount NUMERIC, currency STRING>>
+    logicalType: array
+    description: Transactions de remboursement envoyees au moyen de paiement.
+    classification: internal
+    items:
+      logicalType: object
+      physicalType: STRUCT<id INT64, kind STRING, gateway STRING, status STRING, amount NUMERIC, currency STRING>
+      properties:
+      - name: id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de la transaction de remboursement.
+        classification: internal
+      - name: kind
+        physicalType: STRING
+        logicalType: string
+        description: Nature de la transaction (refund).
+        classification: internal
+      - name: gateway
+        physicalType: STRING
+        logicalType: string
+        description: Passerelle de paiement utilisee.
+        classification: internal
+      - name: status
+        physicalType: STRING
+        logicalType: string
+        description: Statut de la transaction (success, pending, failure, error).
+        classification: internal
+      - name: amount
+        physicalType: NUMERIC
+        logicalType: number
+        description: Montant rembourse, dans la devise currency.
+        classification: internal
+      - name: currency
+        physicalType: STRING
+        logicalType: string
+        description: Code devise ISO 4217 de la transaction.
+        classification: internal
+  - name: order_adjustments
+    physicalType: ARRAY<STRUCT<id INT64, kind STRING, amount NUMERIC, tax_amount NUMERIC, reason STRING>>
+    logicalType: array
+    description: Ajustements hors articles (remboursement de livraison, ecart de remboursement).
+    classification: internal
+    items:
+      logicalType: object
+      physicalType: STRUCT<id INT64, kind STRING, amount NUMERIC, tax_amount NUMERIC, reason STRING>
+      properties:
+      - name: id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de l'ajustement.
+        classification: internal
+      - name: kind
+        physicalType: STRING
+        logicalType: string
+        description: Nature de l'ajustement (shipping_refund, refund_discrepancy).
+        classification: internal
+      - name: amount
+        physicalType: NUMERIC
+        logicalType: number
+        description: Montant de l'ajustement (negatif quand il est rembourse).
+        classification: internal
+      - name: tax_amount
+        physicalType: NUMERIC
+        logicalType: number
+        description: Taxe liee a l'ajustement.
+        classification: internal
+      - name: reason
+        physicalType: STRING
+        logicalType: string
+        description: Motif de l'ajustement.
+        classification: internal
+  - name: admin_graphql_api_id
+    physicalType: STRING
+    logicalType: string
+    description: Identifiant global (GID) du remboursement dans l'API GraphQL Admin.
+    classification: internal
+  - name: _loaded_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+  - name: _source_file
+    physicalType: STRING
+    logicalType: string
+    description: URI du fichier de depot dont la ligne est issue (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: URI du fichier de depot renseignee par l'ingestion.

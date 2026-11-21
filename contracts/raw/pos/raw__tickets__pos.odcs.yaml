@@ -1,0 +1,245 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__tickets__pos
+name: raw__tickets__pos
+version: 1.0.0
+status: active
+domain: pos
+tags: [raw, pos]
+description:
+  purpose: Tickets de caisse des 40 magasins (France et Belgique), une ligne par ticket, tels que exportes par le logiciel de caisse (aucune transformation metier).
+  usage: Source des contrats customer (indicateurs clients omnicanaux, audiences). Ne pas exposer directement aux consommateurs metier.
+  limitations: Objet de schema `tickets`. Les montants sont des entiers en centimes, TTC. Les dates et heures sont en heure LOCALE du magasin (fuseau dans raw__stores__pos#stores.timezone), pas en UTC. Environ 50 % des tickets sont anonymes (loyalty_card_id vide) ; aucun e-mail n'est present, il vient uniquement de raw__loyalty_members__pos. Les retours sont des tickets de type return avec montants negatifs. Un seul moyen de paiement est porte par ticket (mixed si plusieurs).
+
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la source caisse (POS).
+    project: retail-data-prod
+    dataset: raw_pos
+
+team:
+  name: team-pos
+  description: Equipe proprietaire des contrats et de l'ingestion de la caisse.
+  members:
+    - username: "@org/team-pos"
+      role: owner
+
+support:
+  - channel: data-pos
+    tool: email
+    scope: issues
+    url: mailto:data-pos@retail.example
+    description: Questions et incidents sur les donnees de caisse.
+
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: tickets
+    driver: analytics
+    description: Une ingestion complete par jour (export de fin de journee des caisses).
+  - property: latency
+    value: 12
+    unit: h
+    element: tickets.updated_at_local
+    driver: analytics
+    description: Donnees disponibles au plus tard 12 heures apres la modification en caisse.
+  - property: retention
+    value: 3
+    unit: y
+    element: tickets
+    description: Historique conserve 3 ans.
+
+schema:
+  - name: tickets
+    physicalName: tickets
+    physicalType: table
+    description: Objet `tickets` - tickets de caisse (ventes et retours), une ligne par ticket.
+    dataGranularityDescription: Une ligne par ticket de caisse.
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table ne doit jamais etre vide apres une ingestion.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE ticket_type = 'sale' AND total_amount_cents < 0
+        mustBe: 0
+        dimension: accuracy
+        severity: error
+        description: Aucune vente avec un total negatif (les retours sont de type return).
+    properties:
+      - name: ticket_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant technique du ticket dans la caisse (unique tous magasins confondus).
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        unique: true
+        classification: internal
+        examples: [9000123456]
+        quality:
+          - type: library
+            metric: duplicateValues
+            mustBe: 0
+            dimension: uniqueness
+            severity: error
+      - name: ticket_number
+        physicalType: STRING
+        logicalType: string
+        description: Numero de ticket imprime, propre a la caisse et au magasin.
+        required: true
+        classification: internal
+        examples: ["0042-000187"]
+      - name: store_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant du magasin (cle vers raw__stores__pos, objet stores).
+        required: true
+        classification: internal
+      - name: register_id
+        physicalType: STRING
+        logicalType: string
+        description: Identifiant de la caisse physique dans le magasin.
+        classification: internal
+      - name: cashier_id
+        physicalType: STRING
+        logicalType: string
+        description: Identifiant interne du vendeur ou de la vendeuse en caisse (donnee RH, pas un client).
+        classification: confidential
+        tags: [pseudonymized]
+      - name: ticket_type
+        physicalType: STRING
+        logicalType: string
+        description: Type de ticket - sale (vente) ou return (retour ou avoir, montants negatifs).
+        required: true
+        classification: internal
+        enum:
+          - value: sale
+          - value: return
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues: [sale, return]
+            mustBe: 0
+            dimension: conformity
+            severity: warning
+            description: Detecte l'apparition d'une nouvelle valeur cote caisse.
+      - name: ticket_datetime_local
+        physicalType: DATETIME
+        logicalType: timestamp
+        description: Date et heure d'encaissement du ticket, en heure LOCALE du magasin (sans fuseau, pas en UTC).
+        required: true
+        classification: internal
+        quality:
+          - type: library
+            metric: nullValues
+            mustBe: 0
+            dimension: completeness
+            severity: error
+      - name: updated_at_local
+        physicalType: DATETIME
+        logicalType: timestamp
+        description: Date et heure de derniere modification du ticket en caisse, en heure LOCALE du magasin.
+        required: true
+        classification: internal
+      - name: loyalty_card_id
+        physicalType: STRING
+        logicalType: string
+        description: Identifiant de la carte fidelite presentee (cle vers raw__loyalty_members__pos, objet loyalty_members). Vide pour un ticket anonyme (environ 50 % des tickets).
+        classification: confidential
+        tags: [pseudonymized]
+      - name: original_ticket_id
+        physicalType: INT64
+        logicalType: integer
+        description: Pour un retour - identifiant du ticket de vente d'origine (cle vers tickets.ticket_id) quand l'achat a eu lieu en magasin. Vide pour une vente ou un retour sans ticket.
+        classification: internal
+      - name: original_web_order_id
+        physicalType: INT64
+        logicalType: integer
+        description: Pour un retour cross-canal (achat web rendu en magasin) - identifiant de la commande Shopify d'origine (raw__orders__shopify, objet orders, id). Vide sinon.
+        classification: confidential
+      - name: payment_method
+        physicalType: STRING
+        logicalType: string
+        description: Moyen de paiement du ticket.
+        required: true
+        classification: internal
+        enum:
+          - value: card
+          - value: cash
+          - value: voucher
+          - value: gift_card
+          - value: cheque
+          - value: mixed
+          - value: other
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues: [card, cash, voucher, gift_card, cheque, mixed, other]
+            mustBe: 0
+            dimension: conformity
+            severity: warning
+            description: Detecte l'apparition d'une nouvelle valeur cote caisse.
+      - name: currency
+        physicalType: STRING
+        logicalType: string
+        description: Code devise ISO 4217 du ticket (EUR), qui s'applique a tous les montants.
+        required: true
+        classification: internal
+        examples: [EUR]
+        logicalTypeOptions:
+          minLength: 3
+          maxLength: 3
+      - name: total_amount_cents
+        physicalType: INT64
+        logicalType: integer
+        description: Montant total TTC du ticket apres remises, en centimes d'euro (entier). Negatif pour un retour.
+        required: true
+        classification: internal
+        criticalDataElement: true
+        quality:
+          - type: library
+            metric: nullValues
+            mustBe: 0
+            dimension: completeness
+            severity: error
+      - name: total_tax_cents
+        physicalType: INT64
+        logicalType: integer
+        description: Montant total de TVA contenu dans le total TTC, en centimes d'euro (entier).
+        required: true
+        classification: internal
+      - name: total_discount_cents
+        physicalType: INT64
+        logicalType: integer
+        description: Somme des remises accordees sur le ticket, en centimes d'euro (entier, positif). 0 si aucune remise.
+        required: true
+        classification: internal
+      - name: items_count
+        physicalType: INT64
+        logicalType: integer
+        description: Nombre total d'articles (somme des quantites) du ticket.
+        classification: internal
+      - name: _loaded_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+      - name: _source_file
+        physicalType: STRING
+        logicalType: string
+        description: URI du fichier de depot dont la ligne est issue (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: URI du fichier de depot renseignee par l'ingestion.

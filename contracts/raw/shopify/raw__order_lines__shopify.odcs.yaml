@@ -1,0 +1,232 @@
+# Objet de schema : order_lines. Cles : order_lines.id, order_lines.order_id (-> raw__orders__shopify#orders.id), order_lines.sku, order_lines.variant_id.
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__order_lines__shopify
+name: raw__order_lines__shopify
+version: 1.0.0
+status: active
+domain: shopify
+tags:
+- raw
+- shopify
+description:
+  purpose: Lignes de commande du site e-commerce Shopify (objet de schema order_lines), une ligne par article commande, telles que livrees par l'API Admin REST (aucune transformation metier).
+  usage: Source des contrats customer (affinites produit, panier, categories achetees). Ne pas exposer directement aux consommateurs metier. A joindre a raw__orders__shopify via order_id.
+  limitations: Les montants sont dans la devise de la commande, sans conversion (la devise est portee par raw__orders__shopify). Les remises globales de commande ne sont reparties que via discount_allocations. Les lignes des commandes de test sont conservees. Aucune donnee de categorie produit.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  description: Dataset BigQuery de la source Shopify.
+  project: retail-data-prod
+  dataset: raw_shopify
+team:
+  name: team-shopify
+  description: Equipe proprietaire des contrats et de l'ingestion Shopify.
+  members:
+  - username: '@org/team-shopify'
+    role: owner
+support:
+- channel: data-shopify
+  tool: email
+  scope: issues
+  url: mailto:data-shopify@retail.example
+  description: Questions et incidents sur les donnees Shopify.
+slaProperties:
+- property: frequency
+  value: 1
+  unit: d
+  element: order_lines
+  driver: analytics
+  description: Une ingestion complete par jour.
+- property: latency
+  value: 6
+  unit: h
+  element: order_lines._loaded_at
+  driver: analytics
+  description: Donnees disponibles au plus tard 6 heures apres la modification dans Shopify.
+- property: retention
+  value: 3
+  unit: y
+  element: order_lines
+  description: Historique conserve 3 ans.
+schema:
+- name: order_lines
+  physicalName: order_lines
+  physicalType: table
+  description: Lignes de commande Shopify (objet line_items de l'API Admin REST), une ligne par article commande.
+  dataGranularityDescription: Une ligne par article de commande.
+  quality:
+  - type: library
+    metric: rowCount
+    mustBeGreaterThan: 0
+    dimension: completeness
+    severity: error
+    description: La table ne doit jamais etre vide apres une ingestion.
+  - type: sql
+    query: SELECT COUNT(*) FROM ${table} WHERE quantity < 0
+    mustBe: 0
+    dimension: accuracy
+    severity: error
+    description: Aucune quantite negative.
+  properties:
+  - name: id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant technique de la ligne de commande (line_item) dans Shopify.
+    required: true
+    classification: internal
+    unique: true
+    primaryKey: true
+    primaryKeyPosition: 1
+    quality:
+    - type: library
+      metric: duplicateValues
+      mustBe: 0
+      dimension: uniqueness
+      severity: error
+  - name: order_id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant de la commande parente (cle vers raw__orders__shopify#orders.id).
+    required: true
+    classification: internal
+    quality:
+    - type: library
+      metric: nullValues
+      mustBe: 0
+      dimension: completeness
+      severity: error
+  - name: product_id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant du produit Shopify. Vide pour un article personnalise saisi en caisse.
+    classification: internal
+  - name: variant_id
+    physicalType: INT64
+    logicalType: integer
+    description: Identifiant de la variante Shopify (taille, couleur). Vide pour un article personnalise.
+    classification: internal
+  - name: sku
+    physicalType: STRING
+    logicalType: string
+    description: Reference article (SKU) de la variante, commune au catalogue magasin. Peut etre vide.
+    classification: internal
+  - name: title
+    physicalType: STRING
+    logicalType: string
+    description: Libelle du produit au moment de la commande.
+    required: true
+    classification: internal
+  - name: variant_title
+    physicalType: STRING
+    logicalType: string
+    description: Libelle de la variante (ex. taille et couleur) au moment de la commande.
+    classification: internal
+  - name: vendor
+    physicalType: STRING
+    logicalType: string
+    description: Marque ou fournisseur du produit.
+    classification: internal
+  - name: quantity
+    physicalType: INT64
+    logicalType: integer
+    description: Quantite commandee de la ligne.
+    required: true
+    classification: internal
+  - name: price
+    physicalType: NUMERIC
+    logicalType: number
+    description: Prix unitaire avant remise, dans la devise de la commande (colonne currency de raw__orders__shopify#orders).
+    required: true
+    classification: internal
+  - name: total_discount
+    physicalType: NUMERIC
+    logicalType: number
+    description: Somme des remises appliquees a la ligne, dans la devise de la commande.
+    required: true
+    classification: internal
+  - name: fulfillable_quantity
+    physicalType: INT64
+    logicalType: integer
+    description: Quantite restant a expedier.
+    classification: internal
+  - name: fulfillment_status
+    physicalType: STRING
+    logicalType: string
+    description: Statut d'expedition de la ligne (fulfilled, partial, null si non expediee).
+    classification: internal
+  - name: taxable
+    physicalType: BOOL
+    logicalType: boolean
+    description: Vrai si la ligne est soumise a taxe.
+    classification: internal
+  - name: gift_card
+    physicalType: BOOL
+    logicalType: boolean
+    description: Vrai si la ligne est une carte cadeau.
+    classification: internal
+  - name: requires_shipping
+    physicalType: BOOL
+    logicalType: boolean
+    description: Vrai si la ligne necessite une expedition (faux pour un article numerique ou une carte cadeau).
+    classification: internal
+  - name: discount_allocations
+    physicalType: ARRAY<STRUCT<amount NUMERIC, discount_application_index INT64>>
+    logicalType: array
+    description: Repartition des remises de la commande sur cette ligne.
+    classification: internal
+    items:
+      logicalType: object
+      physicalType: STRUCT<amount NUMERIC, discount_application_index INT64>
+      properties:
+      - name: amount
+        physicalType: NUMERIC
+        logicalType: number
+        description: Montant de la remise allouee a la ligne, dans la devise de la commande.
+        classification: internal
+      - name: discount_application_index
+        physicalType: INT64
+        logicalType: integer
+        description: Index de la remise dans la liste discount_applications de la commande.
+        classification: internal
+  - name: tax_lines
+    physicalType: ARRAY<STRUCT<title STRING, rate FLOAT64, price NUMERIC>>
+    logicalType: array
+    description: Taxes appliquees a la ligne, une entree par taxe (a plat, sans calcul).
+    classification: internal
+    items:
+      logicalType: object
+      physicalType: STRUCT<title STRING, rate FLOAT64, price NUMERIC>
+      properties:
+      - name: title
+        physicalType: STRING
+        logicalType: string
+        description: Nom de la taxe (ex. TVA).
+        classification: internal
+      - name: rate
+        physicalType: FLOAT64
+        logicalType: number
+        description: Taux de la taxe en fraction (0.2 pour 20 %).
+        classification: internal
+      - name: price
+        physicalType: NUMERIC
+        logicalType: number
+        description: Montant de la taxe, dans la devise de la commande.
+        classification: internal
+  - name: _loaded_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+  - name: _source_file
+    physicalType: STRING
+    logicalType: string
+    description: URI du fichier de depot dont la ligne est issue (champ technique).
+    required: true
+    classification: internal
+    transformLogic: create
+    transformDescription: URI du fichier de depot renseignee par l'ingestion.

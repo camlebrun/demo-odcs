@@ -1,0 +1,225 @@
+# Contrat raw metaads (voir docs/conventions.md).
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__ad_spend__metaads
+name: raw__ad_spend__metaads
+version: 1.0.0
+status: active
+domain: metaads
+tags: [raw, metaads]
+description:
+  purpose: Statistiques publicitaires Meta Ads au grain jour par campagne (depense, impressions, clics, portee, actions), telles que livrees par l'API Insights sans transformation metier.
+  usage: Source des contrats customer pour la depense et la performance media Meta. Les actions et le ROAS plateforme ne servent pas a l'attribution ; l'attribution se fait ailleurs. Ne pas exposer directement aux consommateurs metier.
+  limitations: La depense est dans la devise du compte (account_currency), sans conversion. actions, action_values et purchase_roas sont des mesures plateforme NON dedupliquees, qui peuvent compter une meme vente que d'autres canaux. Meta recalcule les jours recents (fenetre d'attribution), donc les jours passes peuvent changer. La portee (reach) n'est pas additive. Aucun UTM ni mapping vers un canal.
+
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la source Meta Ads.
+    project: retail-data-prod
+    dataset: raw_metaads
+
+team:
+  name: team-metaads
+  description: Equipe proprietaire des contrats et de l'ingestion Meta Ads.
+  members:
+    - username: "@org/team-metaads"
+      role: owner
+
+support:
+  - channel: data-metaads
+    tool: email
+    scope: issues
+    url: mailto:data-metaads@retail.example
+    description: Questions et incidents sur les donnees Meta Ads.
+
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: ad_spend
+    driver: analytics
+    description: Une ingestion par jour.
+  - property: latency
+    value: 12
+    unit: h
+    element: ad_spend.date_start
+    driver: analytics
+    description: Donnees disponibles au plus tard 12 heures apres la fin de la journee de la plateforme.
+  - property: retention
+    value: 3
+    unit: y
+    element: ad_spend
+    description: Historique conserve 3 ans.
+
+schema:
+  - name: ad_spend
+    physicalName: ad_spend
+    physicalType: table
+    description: Objet logique ad_spend (reference par raw__ad_spend__metaads#ad_spend.<property>). statistiques Meta Ads par jour et par campagne.
+    dataGranularityDescription: Une ligne par jour (date_start), campagne (campaign_id) et compte (ad_account_id).
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table ne doit jamais etre vide apres une ingestion.
+      - type: sql
+        query: SELECT COUNT(*) FROM (SELECT date_start, campaign_id, ad_account_id FROM ${table} GROUP BY 1, 2, 3 HAVING COUNT(*) > 1)
+        mustBe: 0
+        dimension: uniqueness
+        severity: error
+        description: Une seule ligne par jour, campagne et compte.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE spend < 0 OR clicks < 0
+        mustBe: 0
+        dimension: accuracy
+        severity: error
+        description: Aucune depense ni clic negatif.
+    properties:
+      - name: date_start
+        physicalType: DATE
+        logicalType: date
+        description: Jour des statistiques (debut de la periode d'insight, grain journalier), dans le fuseau du compte publicitaire.
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        classification: internal
+        examples: ['2026-03-15']
+      - name: date_stop
+        physicalType: DATE
+        logicalType: date
+        description: Fin de la periode d'insight ; egale a date_start au grain journalier.
+        required: true
+        classification: internal
+      - name: ad_account_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant du compte publicitaire Meta, sans le prefixe act_.
+        primaryKey: true
+        primaryKeyPosition: 3
+        required: true
+        classification: internal
+      - name: campaign_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de la campagne Meta (cle vers raw__campaigns__metaads#campaigns.campaign_id).
+        primaryKey: true
+        primaryKeyPosition: 2
+        required: true
+        classification: internal
+      - name: account_currency
+        physicalType: STRING
+        logicalType: string
+        description: Code devise ISO 4217 du compte publicitaire, qui s'applique a spend et aux valeurs de action_values.
+        required: true
+        classification: internal
+        logicalTypeOptions:
+          minLength: 3
+          maxLength: 3
+        examples: [EUR]
+      - name: spend
+        physicalType: NUMERIC
+        logicalType: number
+        description: Montant depense du jour, en unite de la devise du compte (decimal, par exemple 12.34 EUR), sans conversion.
+        required: true
+        classification: internal
+        criticalDataElement: true
+        quality:
+          - type: library
+            metric: nullValues
+            mustBe: 0
+            dimension: completeness
+            severity: error
+      - name: impressions
+        physicalType: INT64
+        logicalType: integer
+        description: Nombre d'impressions du jour.
+        required: true
+        classification: internal
+      - name: clicks
+        physicalType: INT64
+        logicalType: integer
+        description: Nombre de clics du jour (tous clics, champ clicks de Meta).
+        required: true
+        classification: internal
+      - name: reach
+        physicalType: INT64
+        logicalType: integer
+        description: Nombre de personnes uniques atteintes sur la periode. Non additif entre jours ni entre campagnes.
+        classification: internal
+      - name: actions
+        physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
+        logicalType: array
+        description: Actions attribuees par Meta (achats, ajouts au panier, etc.), une entree par type d'action. Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
+        classification: internal
+        items:
+          logicalType: object
+          physicalType: STRUCT<action_type STRING, value NUMERIC>
+          properties:
+            - name: action_type
+              physicalType: STRING
+              logicalType: string
+              description: Type d'action Meta (purchase, omni_purchase, add_to_cart, link_click, etc.).
+              classification: internal
+            - name: value
+              physicalType: NUMERIC
+              logicalType: number
+              description: Nombre d'actions du type, selon la fenetre d'attribution par defaut de Meta.
+              classification: internal
+      - name: action_values
+        physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
+        logicalType: array
+        description: Valeur monetaire des actions attribuees par Meta, une entree par type d'action, dans la devise account_currency. Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
+        classification: internal
+        items:
+          logicalType: object
+          physicalType: STRUCT<action_type STRING, value NUMERIC>
+          properties:
+            - name: action_type
+              physicalType: STRING
+              logicalType: string
+              description: Type d'action Meta (purchase, omni_purchase, add_to_cart, link_click, etc.).
+              classification: internal
+            - name: value
+              physicalType: NUMERIC
+              logicalType: number
+              description: Valeur monetaire des actions du type, dans la devise account_currency.
+              classification: internal
+      - name: purchase_roas
+        physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
+        logicalType: array
+        description: ROAS achat calcule par Meta (valeur des achats divisee par la depense). Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
+        classification: internal
+        items:
+          logicalType: object
+          physicalType: STRUCT<action_type STRING, value NUMERIC>
+          properties:
+            - name: action_type
+              physicalType: STRING
+              logicalType: string
+              description: Type d'action Meta (purchase, omni_purchase, add_to_cart, link_click, etc.).
+              classification: internal
+            - name: value
+              physicalType: NUMERIC
+              logicalType: number
+              description: Ratio ROAS plateforme du type d'action, sans unite.
+              classification: internal
+      - name: _loaded_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+      - name: _source_file
+        physicalType: STRING
+        logicalType: string
+        description: URI du fichier de depot dont la ligne est issue (champ technique, y compris pour une ingestion par API).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: URI du fichier de depot renseignee par l'ingestion.

@@ -1,0 +1,172 @@
+# Contrat raw googleads (voir docs/conventions.md).
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__ad_spend__googleads
+name: raw__ad_spend__googleads
+version: 1.0.0
+status: active
+domain: googleads
+tags: [raw, googleads]
+description:
+  purpose: Statistiques publicitaires Google Ads au grain jour par campagne (cout, impressions, clics, conversions), telles que livrees par l'export standard sans transformation metier.
+  usage: Source des contrats customer pour la depense et la performance media Google Ads. Les conversions plateforme ne servent pas a l'attribution ; l'attribution se fait ailleurs. Ne pas exposer directement aux consommateurs metier.
+  limitations: Le cout est en micros (metrics_cost_micros) dans la devise du compte (currency_code), sans conversion. Les conversions et leur valeur sont des mesures plateforme NON dedupliquees, qui peuvent compter une meme vente que d'autres canaux. Les corrections retroactives de Google Ads (clics invalides, conversions tardives) modifient les jours passes. Aucun UTM ni mapping vers un canal.
+
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la source Google Ads.
+    project: retail-data-prod
+    dataset: raw_googleads
+
+team:
+  name: team-googleads
+  description: Equipe proprietaire des contrats et de l'ingestion Google Ads.
+  members:
+    - username: "@org/team-googleads"
+      role: owner
+
+support:
+  - channel: data-googleads
+    tool: email
+    scope: issues
+    url: mailto:data-googleads@retail.example
+    description: Questions et incidents sur les donnees Google Ads.
+
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: ad_spend
+    driver: analytics
+    description: Une ingestion par jour.
+  - property: latency
+    value: 12
+    unit: h
+    element: ad_spend.segments_date
+    driver: analytics
+    description: Donnees disponibles au plus tard 12 heures apres la fin de la journee de la plateforme.
+  - property: retention
+    value: 3
+    unit: y
+    element: ad_spend
+    description: Historique conserve 3 ans.
+
+schema:
+  - name: ad_spend
+    physicalName: ad_spend
+    physicalType: table
+    description: Objet logique ad_spend (reference par raw__ad_spend__googleads#ad_spend.<property>). statistiques Google Ads par jour et par campagne.
+    dataGranularityDescription: Une ligne par jour (segments_date), campagne (campaign_id) et compte (customer_id), eventuellement par reseau.
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table ne doit jamais etre vide apres une ingestion.
+      - type: sql
+        query: SELECT COUNT(*) FROM (SELECT segments_date, campaign_id, customer_id, IFNULL(segments_ad_network_type, '') AS n FROM ${table} GROUP BY 1, 2, 3, 4 HAVING COUNT(*) > 1)
+        mustBe: 0
+        dimension: uniqueness
+        severity: error
+        description: Une seule ligne par jour, campagne, compte et reseau.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE metrics_cost_micros < 0 OR metrics_clicks > metrics_impressions
+        mustBe: 0
+        dimension: accuracy
+        severity: error
+        description: Aucun cout negatif et jamais plus de clics que d'impressions.
+    properties:
+      - name: segments_date
+        physicalType: DATE
+        logicalType: date
+        description: Jour des statistiques, dans le fuseau horaire du compte Google Ads.
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        classification: internal
+        examples: ['2026-03-15']
+      - name: campaign_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de la campagne Google Ads (cle vers raw__campaigns__googleads#campaigns.campaign_id).
+        primaryKey: true
+        primaryKeyPosition: 2
+        required: true
+        classification: internal
+      - name: customer_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant du compte Google Ads, sans tirets.
+        primaryKey: true
+        primaryKeyPosition: 3
+        required: true
+        classification: internal
+      - name: segments_ad_network_type
+        physicalType: STRING
+        logicalType: string
+        description: Reseau publicitaire de diffusion (SEARCH, CONTENT, YOUTUBE_WATCH, MIXED, etc.). Vide si la ligne n'est pas segmentee par reseau.
+        classification: internal
+      - name: metrics_cost_micros
+        physicalType: INT64
+        logicalType: integer
+        description: Cout du jour en micros de la devise du compte (1 000 000 micros = 1 unite de devise). A diviser par 1 000 000 pour obtenir le montant ; aucune conversion ici.
+        required: true
+        classification: internal
+        criticalDataElement: true
+        quality:
+          - type: library
+            metric: nullValues
+            mustBe: 0
+            dimension: completeness
+            severity: error
+      - name: currency_code
+        physicalType: STRING
+        logicalType: string
+        description: Code devise ISO 4217 du compte Google Ads (customer.currency_code), qui s'applique a metrics_cost_micros.
+        required: true
+        classification: internal
+        logicalTypeOptions:
+          minLength: 3
+          maxLength: 3
+        examples: [EUR]
+      - name: metrics_impressions
+        physicalType: INT64
+        logicalType: integer
+        description: Nombre d'impressions du jour.
+        required: true
+        classification: internal
+      - name: metrics_clicks
+        physicalType: INT64
+        logicalType: integer
+        description: Nombre de clics du jour.
+        required: true
+        classification: internal
+      - name: metrics_conversions
+        physicalType: FLOAT64
+        logicalType: number
+        description: Conversions du jour selon Google Ads (valeur fractionnaire possible avec l'attribution basee sur les donnees). Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
+        classification: internal
+      - name: metrics_conversions_value
+        physicalType: FLOAT64
+        logicalType: number
+        description: Valeur des conversions du jour selon Google Ads, dans la devise currency_code. Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
+        classification: internal
+      - name: _loaded_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+      - name: _source_file
+        physicalType: STRING
+        logicalType: string
+        description: URI du fichier de depot dont la ligne est issue (champ technique, y compris pour une ingestion par API).
+        required: true
+        classification: internal
+        transformLogic: create
+        transformDescription: URI du fichier de depot renseignee par l'ingestion.
