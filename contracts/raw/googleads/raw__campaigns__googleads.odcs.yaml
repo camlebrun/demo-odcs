@@ -81,7 +81,7 @@ schema:
         primaryKeyPosition: 1
         required: true
         unique: true
-        classification: internal
+        classification: C1
         quality:
           - type: library
             metric: duplicateValues
@@ -94,30 +94,30 @@ schema:
         logicalType: integer
         description: Identifiant du compte Google Ads (customer.id) qui porte la campagne, sans tirets.
         required: true
-        classification: internal
+        classification: C1
       - name: campaign_name
         physicalType: STRING
         logicalType: string
         description: Nom de la campagne saisi dans Google Ads, tel quel.
         required: true
-        classification: internal
+        classification: C1
       - name: campaign_advertising_channel_type
         physicalType: STRING
         logicalType: string
         description: Type de canal publicitaire de la campagne (SEARCH, SHOPPING, PERFORMANCE_MAX, DISPLAY, VIDEO, DEMAND_GEN, etc.).
         required: true
-        classification: internal
+        classification: C1
       - name: campaign_advertising_channel_sub_type
         physicalType: STRING
         logicalType: string
         description: Sous-type du canal publicitaire (par exemple SHOPPING_SMART_ADS). Vide quand il n'y en a pas.
-        classification: internal
+        classification: C1
       - name: campaign_status
         physicalType: STRING
         logicalType: string
         description: Statut de la campagne dans Google Ads.
         required: true
-        classification: internal
+        classification: C1
         enum:
           - value: ENABLED
           - value: PAUSED
@@ -135,23 +135,23 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Type de strategie d'encheres (MAXIMIZE_CONVERSIONS, TARGET_ROAS, MANUAL_CPC, etc.).
-        classification: internal
+        classification: C1
       - name: campaign_budget_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du budget partage ou dedie de la campagne (campaign_budget.id).
-        classification: internal
+        classification: C1
       - name: campaign_budget_amount_micros
         physicalType: INT64
         logicalType: integer
         description: Budget quotidien en micros de la devise du compte (1 000 000 micros = 1 unite de devise), tel que livre par Google Ads.
-        classification: internal
+        classification: C1
       - name: currency_code
         physicalType: STRING
         logicalType: string
         description: Code devise ISO 4217 du compte Google Ads, qui s'applique au budget.
         required: true
-        classification: internal
+        classification: C1
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
@@ -160,18 +160,18 @@ schema:
         physicalType: DATE
         logicalType: date
         description: Date de debut de la campagne, dans le fuseau du compte. Vide si non renseignee.
-        classification: internal
+        classification: C1
       - name: campaign_end_date
         physicalType: DATE
         logicalType: date
         description: Date de fin planifiee de la campagne, dans le fuseau du compte. Vide si la campagne n'a pas de fin.
-        classification: internal
+        classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -179,6 +179,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique, y compris pour une ingestion par API).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.

@@ -81,7 +81,7 @@ schema:
         primaryKeyPosition: 1
         required: true
         unique: true
-        classification: internal
+        classification: C1
         examples: [450789469]
         quality:
           - type: library
@@ -94,19 +94,19 @@ schema:
         logicalType: string
         description: Numero de commande affiche au client, avec prefixe (ex. #1001).
         required: true
-        classification: internal
+        classification: C1
         examples: ["#1001"]
       - name: order_number
         physicalType: INT64
         logicalType: integer
         description: Numero de commande sequentiel sans prefixe.
         required: true
-        classification: internal
+        classification: C1
       - name: email
         physicalType: STRING
         logicalType: string
         description: Adresse e-mail saisie a la commande. Peut etre vide (commande creee en caisse Shopify ou sans e-mail).
-        classification: restricted
+        classification: C3
         tags: [pii]
         logicalTypeOptions:
           format: email
@@ -114,52 +114,52 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Numero de telephone saisi a la commande, au format fourni par le client.
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: customer_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du client Shopify (cle vers raw__customers__shopify). Vide pour une commande invite.
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
       - name: created_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de creation de la commande, en UTC.
         required: true
-        classification: internal
+        classification: C1
       - name: updated_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de derniere modification de la commande, en UTC.
         required: true
-        classification: internal
+        classification: C1
       - name: processed_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de validation du paiement par le client, en UTC.
-        classification: internal
+        classification: C1
       - name: closed_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de cloture de la commande, en UTC. Vide tant que la commande est ouverte.
-        classification: internal
+        classification: C1
       - name: cancelled_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure d'annulation de la commande, en UTC. Vide si la commande n'est pas annulee.
-        classification: internal
+        classification: C1
       - name: cancel_reason
         physicalType: STRING
         logicalType: string
         description: Motif d'annulation fourni par Shopify (customer, fraud, inventory, declined, other). Vide si non annulee.
-        classification: internal
+        classification: C1
       - name: financial_status
         physicalType: STRING
         logicalType: string
         description: Statut de paiement de la commande.
         required: true
-        classification: internal
+        classification: C1
         enum:
           - value: pending
           - value: authorized
@@ -181,13 +181,13 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Statut d'expedition (fulfilled, partial, restocked). Vide si rien n'a ete expedie.
-        classification: internal
+        classification: C1
       - name: currency
         physicalType: STRING
         logicalType: string
         description: Code devise ISO 4217 de la boutique, qui s'applique a tous les montants de la ligne.
         required: true
-        classification: internal
+        classification: C1
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
@@ -197,25 +197,25 @@ schema:
         logicalType: number
         description: Montant des articles apres remises, hors livraison, dans la devise currency.
         required: true
-        classification: internal
+        classification: C1
       - name: total_discounts
         physicalType: NUMERIC
         logicalType: number
         description: Somme des remises appliquees a la commande.
         required: true
-        classification: internal
+        classification: C1
       - name: total_tax
         physicalType: NUMERIC
         logicalType: number
         description: Somme des taxes de la commande.
         required: true
-        classification: internal
+        classification: C1
       - name: total_price
         physicalType: NUMERIC
         logicalType: number
         description: Montant total paye par le client (articles, livraison, taxes, remises), dans la devise currency.
         required: true
-        classification: internal
+        classification: C1
         criticalDataElement: true
         quality:
           - type: library
@@ -227,18 +227,18 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Canal d'origine de la commande (web, pos, shopify_draft_order, application tierce).
-        classification: internal
+        classification: C1
       - name: test
         physicalType: BOOL
         logicalType: boolean
         description: Vrai pour une commande de test, a exclure des analyses.
         required: true
-        classification: internal
+        classification: C1
       - name: discount_codes
         physicalType: ARRAY<STRUCT<code STRING, amount NUMERIC, type STRING>>
         logicalType: array
         description: Codes de reduction utilises sur la commande.
-        classification: internal
+        classification: C1
         items:
           logicalType: object
           physicalType: STRUCT<code STRING, amount NUMERIC, type STRING>
@@ -247,23 +247,23 @@ schema:
               physicalType: STRING
               logicalType: string
               description: Code de reduction saisi par le client.
-              classification: internal
+              classification: C1
             - name: amount
               physicalType: NUMERIC
               logicalType: number
               description: Montant de la remise liee au code, dans la devise currency.
-              classification: internal
+              classification: C1
             - name: type
               physicalType: STRING
               logicalType: string
               description: Type de remise (fixed_amount, percentage, shipping).
-              classification: internal
+              classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -271,6 +271,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.

@@ -80,7 +80,7 @@ schema:
         primaryKeyPosition: 1
         required: true
         unique: true
-        classification: internal
+        classification: C1
         quality:
           - type: library
             metric: duplicateValues
@@ -92,64 +92,64 @@ schema:
         logicalType: integer
         description: Identifiant du ticket parent (cle vers raw__tickets__pos, objet tickets).
         required: true
-        classification: internal
+        classification: C1
       - name: line_number
         physicalType: INT64
         logicalType: integer
         description: Rang de la ligne dans le ticket, a partir de 1.
         required: true
-        classification: internal
+        classification: C1
       - name: store_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du magasin (cle vers raw__stores__pos, objet stores), repete depuis le ticket.
         required: true
-        classification: internal
+        classification: C1
       - name: product_sku
         physicalType: STRING
         logicalType: string
         description: Reference article (SKU) vendue, telle que saisie en caisse.
         required: true
-        classification: internal
+        classification: C1
       - name: product_label
         physicalType: STRING
         logicalType: string
         description: Libelle de l'article affiche en caisse.
-        classification: internal
+        classification: C1
       - name: product_category_code
         physicalType: STRING
         logicalType: string
         description: Code de la famille ou categorie d'article du referentiel caisse.
-        classification: internal
+        classification: C1
       - name: quantity
         physicalType: INT64
         logicalType: integer
         description: Quantite vendue. Negative pour un article retourne.
         required: true
-        classification: internal
+        classification: C1
       - name: unit_price_cents
         physicalType: INT64
         logicalType: integer
         description: Prix unitaire TTC avant remise, en centimes d'euro (entier).
         required: true
-        classification: internal
+        classification: C1
       - name: discount_cents
         physicalType: INT64
         logicalType: integer
         description: Remise appliquee sur la ligne, en centimes d'euro (entier, positif). 0 si aucune remise.
         required: true
-        classification: internal
+        classification: C1
       - name: discount_label
         physicalType: STRING
         logicalType: string
         description: Libelle ou code de la remise appliquee (promotion, soldes, remise vendeur, code). Vide si aucune remise.
-        classification: internal
+        classification: C1
       - name: line_amount_cents
         physicalType: INT64
         logicalType: integer
         description: Montant TTC de la ligne apres remise, en centimes d'euro (entier). Negatif pour un retour.
         required: true
-        classification: internal
+        classification: C1
         criticalDataElement: true
         quality:
           - type: library
@@ -162,31 +162,31 @@ schema:
         logicalType: number
         description: Taux de TVA applique a la ligne, en pourcentage (ex. 20 ou 21 selon le pays).
         required: true
-        classification: internal
+        classification: C1
       - name: vat_amount_cents
         physicalType: INT64
         logicalType: integer
         description: Montant de TVA contenu dans la ligne, en centimes d'euro (entier).
         required: true
-        classification: internal
+        classification: C1
       - name: ticket_datetime_local
         physicalType: DATETIME
         logicalType: timestamp
         description: Date et heure d'encaissement du ticket, en heure LOCALE du magasin (sans fuseau, pas en UTC).
         required: true
-        classification: internal
+        classification: C1
       - name: updated_at_local
         physicalType: DATETIME
         logicalType: timestamp
         description: Date et heure de derniere modification de la ligne en caisse, en heure LOCALE du magasin.
         required: true
-        classification: internal
+        classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -194,6 +194,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.

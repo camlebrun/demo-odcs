@@ -80,7 +80,7 @@ schema:
         primaryKeyPosition: 1
         required: true
         unique: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         quality:
           - type: library
@@ -92,7 +92,7 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Adresse e-mail saisie en caisse lors de l'adhesion. Peut etre vide. Seule source d'e-mail cote caisse.
-        classification: restricted
+        classification: C3
         tags: [pii]
         logicalTypeOptions:
           format: email
@@ -100,49 +100,49 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Numero de telephone saisi en caisse, au format fourni par le client.
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: last_name
         physicalType: STRING
         logicalType: string
         description: Nom de famille du membre.
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: first_name
         physicalType: STRING
         logicalType: string
         description: Prenom du membre.
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: birth_date
         physicalType: DATE
         logicalType: date
         description: Date de naissance du membre. Peut etre vide.
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: address_line
         physicalType: STRING
         logicalType: string
         description: Adresse postale du membre (numero et rue).
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: postal_code
         physicalType: STRING
         logicalType: string
         description: Code postal de l'adresse du membre.
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: city
         physicalType: STRING
         logicalType: string
         description: Ville de l'adresse du membre.
-        classification: restricted
+        classification: C3
         tags: [pii]
       - name: country_code
         physicalType: STRING
         logicalType: string
         description: Code pays ISO 3166-1 alpha-2 de l'adresse du membre (FR, BE).
-        classification: restricted
+        classification: C3
         tags: [pii]
         examples: [FR]
       - name: marketing_opt_in
@@ -150,7 +150,7 @@ schema:
         logicalType: boolean
         description: Vrai si le membre a consenti en caisse a recevoir des communications marketing du programme fidelite.
         required: true
-        classification: internal
+        classification: C1
         quality:
           - type: library
             metric: nullValues
@@ -161,30 +161,30 @@ schema:
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure du dernier recueil ou changement du consentement marketing, en UTC. Vide si jamais recueilli.
-        classification: internal
+        classification: C1
       - name: enrolled_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure d'adhesion au programme fidelite, en UTC.
         required: true
-        classification: internal
+        classification: C1
       - name: enrollment_store_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du magasin ou le membre a adhere (cle vers raw__stores__pos, objet stores).
-        classification: internal
+        classification: C1
       - name: updated_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de derniere modification de la fiche membre, en UTC.
         required: true
-        classification: internal
+        classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -192,6 +192,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.

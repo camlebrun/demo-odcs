@@ -31,7 +31,7 @@ schema:
     physicalType: STRING
     logicalType: string
     description: Champ customer_key.
-    classification: confidential
+    classification: C2
     transformLogic: transform
     transformDescription: Alimente customer_key.
     tags:

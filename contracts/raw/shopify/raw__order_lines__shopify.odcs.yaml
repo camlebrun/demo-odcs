@@ -75,7 +75,7 @@ schema:
     logicalType: integer
     description: Identifiant technique de la ligne de commande (line_item) dans Shopify.
     required: true
-    classification: internal
+    classification: C1
     unique: true
     primaryKey: true
     primaryKeyPosition: 1
@@ -90,7 +90,7 @@ schema:
     logicalType: integer
     description: Identifiant de la commande parente (cle vers raw__orders__shopify#orders.id).
     required: true
-    classification: internal
+    classification: C1
     quality:
     - type: library
       metric: nullValues
@@ -101,81 +101,81 @@ schema:
     physicalType: INT64
     logicalType: integer
     description: Identifiant du produit Shopify. Vide pour un article personnalise saisi en caisse.
-    classification: internal
+    classification: C1
   - name: variant_id
     physicalType: INT64
     logicalType: integer
     description: Identifiant de la variante Shopify (taille, couleur). Vide pour un article personnalise.
-    classification: internal
+    classification: C1
   - name: sku
     physicalType: STRING
     logicalType: string
     description: Reference article (SKU) de la variante, commune au catalogue magasin. Peut etre vide.
-    classification: internal
+    classification: C1
   - name: title
     physicalType: STRING
     logicalType: string
     description: Libelle du produit au moment de la commande.
     required: true
-    classification: internal
+    classification: C1
   - name: variant_title
     physicalType: STRING
     logicalType: string
     description: Libelle de la variante (ex. taille et couleur) au moment de la commande.
-    classification: internal
+    classification: C1
   - name: vendor
     physicalType: STRING
     logicalType: string
     description: Marque ou fournisseur du produit.
-    classification: internal
+    classification: C1
   - name: quantity
     physicalType: INT64
     logicalType: integer
     description: Quantite commandee de la ligne.
     required: true
-    classification: internal
+    classification: C1
   - name: price
     physicalType: NUMERIC
     logicalType: number
     description: Prix unitaire avant remise, dans la devise de la commande (colonne currency de raw__orders__shopify#orders).
     required: true
-    classification: internal
+    classification: C1
   - name: total_discount
     physicalType: NUMERIC
     logicalType: number
     description: Somme des remises appliquees a la ligne, dans la devise de la commande.
     required: true
-    classification: internal
+    classification: C1
   - name: fulfillable_quantity
     physicalType: INT64
     logicalType: integer
     description: Quantite restant a expedier.
-    classification: internal
+    classification: C1
   - name: fulfillment_status
     physicalType: STRING
     logicalType: string
     description: Statut d'expedition de la ligne (fulfilled, partial, null si non expediee).
-    classification: internal
+    classification: C1
   - name: taxable
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si la ligne est soumise a taxe.
-    classification: internal
+    classification: C1
   - name: gift_card
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si la ligne est une carte cadeau.
-    classification: internal
+    classification: C1
   - name: requires_shipping
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si la ligne necessite une expedition (faux pour un article numerique ou une carte cadeau).
-    classification: internal
+    classification: C1
   - name: discount_allocations
     physicalType: ARRAY<STRUCT<amount NUMERIC, discount_application_index INT64>>
     logicalType: array
     description: Repartition des remises de la commande sur cette ligne.
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       physicalType: STRUCT<amount NUMERIC, discount_application_index INT64>
@@ -184,17 +184,17 @@ schema:
         physicalType: NUMERIC
         logicalType: number
         description: Montant de la remise allouee a la ligne, dans la devise de la commande.
-        classification: internal
+        classification: C1
       - name: discount_application_index
         physicalType: INT64
         logicalType: integer
         description: Index de la remise dans la liste discount_applications de la commande.
-        classification: internal
+        classification: C1
   - name: tax_lines
     physicalType: ARRAY<STRUCT<title STRING, rate FLOAT64, price NUMERIC>>
     logicalType: array
     description: Taxes appliquees a la ligne, une entree par taxe (a plat, sans calcul).
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       physicalType: STRUCT<title STRING, rate FLOAT64, price NUMERIC>
@@ -203,23 +203,23 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Nom de la taxe (ex. TVA).
-        classification: internal
+        classification: C1
       - name: rate
         physicalType: FLOAT64
         logicalType: number
         description: Taux de la taxe en fraction (0.2 pour 20 %).
-        classification: internal
+        classification: C1
       - name: price
         physicalType: NUMERIC
         logicalType: number
         description: Montant de la taxe, dans la devise de la commande.
-        classification: internal
+        classification: C1
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
     required: true
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Horodatage de chargement ajoute par l'ingestion.
   - name: meta_source_file
@@ -227,6 +227,6 @@ schema:
     logicalType: string
     description: URI du fichier de depot dont la ligne est issue (champ technique).
     required: true
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: URI du fichier de depot renseignee par l'ingestion.

@@ -213,7 +213,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 1
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.segments_date
@@ -232,7 +232,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 2
         required: true
-        classification: internal
+        classification: C1
         enum:
           - value: google_ads
           - value: meta_ads
@@ -266,7 +266,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 3
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.campaign_id
@@ -287,7 +287,7 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Nom de la campagne tel que saisi dans la plateforme, ou unattributed quand aucune campagne n'est rapprochee.
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__campaigns__googleads#campaigns.campaign_name
@@ -304,7 +304,7 @@ schema:
         logicalType: string
         description: Code devise ISO 4217 de tous les montants de la ligne (toujours EUR dans le lot 1).
         required: true
-        classification: internal
+        classification: C1
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
@@ -319,7 +319,7 @@ schema:
         logicalType: number
         description: Depense publicitaire du mois pour la campagne, en EUR (micros Google Ads divises par 1 000 000, depense Meta decimale). Vaut 0 pour other_web.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.metrics_cost_micros
@@ -341,7 +341,7 @@ schema:
         logicalType: integer
         description: Nombre de nouveaux clients web (premiere commande Shopify identifiee par e-mail) attribues a la campagne en last-click GA4.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__orders__shopify#orders.id
@@ -374,7 +374,7 @@ schema:
         physicalType: NUMERIC
         logicalType: number
         description: Cout d'acquisition d'un nouveau client en EUR, depense divisee par le nombre de nouveaux clients. NULL sans nouveau client.
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.metrics_cost_micros
@@ -412,7 +412,7 @@ schema:
         logicalType: number
         description: CA du premier achat des nouveaux clients, en EUR TTC, avant retours (total_price de la commande).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__orders__shopify#orders.total_price
@@ -446,7 +446,7 @@ schema:
         physicalType: NUMERIC
         logicalType: number
         description: ROAS nouveaux clients, CA du premier achat divise par la depense (sans unite). Calcule sur les commandes Shopify (CA TTC) rapporte a la depense plateforme dont le TTC ou HT n'est pas confirme, donc indicatif ; jamais sur les conversions des plateformes (non dedupliquees). NULL sans depense.
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__orders__shopify#orders.total_price
@@ -484,7 +484,7 @@ schema:
         physicalType: NUMERIC
         logicalType: number
         description: Valeur de cohorte a 90 jours, en EUR TTC - CA net de retours des commandes web des nouveaux clients sur les 90 jours suivant leur premiere commande. NULL tant que la cohorte n'a pas 90 jours de recul.
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__orders__shopify#orders.total_price
@@ -526,7 +526,7 @@ schema:
         logicalType: boolean
         description: Vrai quand tous les nouveaux clients de la ligne ont au moins 90 jours de recul, donc quand cohort_value_90d_amount est renseignee.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__orders__shopify#orders.created_at
@@ -556,7 +556,7 @@ schema:
         logicalType: timestamp
         description: Date et heure du calcul de la ligne, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage du calcul de la ligne.
         customProperties:

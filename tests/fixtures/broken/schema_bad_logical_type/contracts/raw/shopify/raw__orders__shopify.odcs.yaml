@@ -31,37 +31,37 @@ schema:
     physicalType: INT64
     logicalType: integer
     description: Champ id.
-    classification: internal
+    classification: C1
     primaryKey: true
     required: true
   - name: email
     physicalType: STRING
     logicalType: string
     description: Champ email.
-    classification: restricted
+    classification: C3
     tags:
     - pii
   - name: total_price
     physicalType: NUMERIC
     logicalType: decimal
     description: Champ total_price.
-    classification: internal
+    classification: C1
   - name: created_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ created_at.
-    classification: internal
+    classification: C1
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ meta_loaded_at.
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Horodatage de chargement.
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
     description: Champ meta_source_file.
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Fichier de depot.

@@ -191,7 +191,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 1
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.ticket_datetime_local
@@ -220,7 +220,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 2
         required: true
-        classification: internal
+        classification: C1
         enum:
           - value: store
           - value: web
@@ -258,7 +258,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 3
         required: true
-        classification: internal
+        classification: C1
         examples: [WEB]
         transformLogic: transform
         transformSourceObjects:
@@ -284,7 +284,7 @@ schema:
         physicalType: INT64
         logicalType: integer
         description: Identifiant technique du magasin dans la caisse. NULL pour le canal web.
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.store_id
@@ -309,7 +309,7 @@ schema:
         logicalType: string
         description: Code devise ISO 4217 de tous les montants de la ligne (toujours EUR dans le lot 1).
         required: true
-        classification: internal
+        classification: C1
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
@@ -324,7 +324,7 @@ schema:
         logicalType: integer
         description: Nombre de clients identifies distincts ayant au moins une vente dans le mois sur ce canal et ce magasin. Les clients anonymes sont exclus. Non additif entre lignes.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.loyalty_card_id
@@ -363,7 +363,7 @@ schema:
         logicalType: integer
         description: Clients actifs de la ligne dont la premiere vente identifiee, tous canaux confondus, tombe dans le mois.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.ticket_datetime_local
@@ -402,7 +402,7 @@ schema:
         logicalType: integer
         description: Clients actifs de la ligne dont la premiere vente identifiee est anterieure au mois (clients de reachat). Clients actifs = nouveaux + reachat.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.ticket_datetime_local
@@ -441,7 +441,7 @@ schema:
         logicalType: integer
         description: Clients actifs de la ligne ayant achete a la fois en magasin et sur le web sur les 12 mois glissants qui se terminent a la fin du mois.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.loyalty_card_id
@@ -480,7 +480,7 @@ schema:
         logicalType: integer
         description: Nombre de ventes (tickets de vente et commandes Shopify, identifies ou anonymes) du mois sur ce canal et ce magasin. Denominateur du panier moyen.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.ticket_id
@@ -519,7 +519,7 @@ schema:
         logicalType: number
         description: Chiffre d'affaires brut des ventes avant retours, en EUR TTC, clients identifies et anonymes confondus.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.total_amount_cents
@@ -561,7 +561,7 @@ schema:
         logicalType: number
         description: Montant des retours et remboursements du mois, en EUR TTC, exprime en valeur positive (retours caisse, retours en magasin d'achats web, remboursements Shopify).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.total_amount_cents
@@ -603,7 +603,7 @@ schema:
         logicalType: number
         description: Chiffre d'affaires net de retours, en EUR TTC, clients identifies et anonymes confondus. Egal aux ventes brutes moins les retours. Valeur comparee au CA comptable.
         required: true
-        classification: internal
+        classification: C1
         criticalDataElement: true
         transformLogic: transform
         transformSourceObjects:
@@ -646,7 +646,7 @@ schema:
         logicalType: number
         description: Part du CA net de retours rattachee a un client identifie (ticket avec carte fidelite portant un e-mail, ou commande Shopify avec e-mail), en EUR TTC.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.total_amount_cents
@@ -688,7 +688,7 @@ schema:
         logicalType: number
         description: Part du CA net de retours sans client identifiable (tickets sans carte fidelite, carte sans e-mail, commande sans e-mail), en EUR TTC.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.total_amount_cents
@@ -729,7 +729,7 @@ schema:
         physicalType: NUMERIC
         logicalType: number
         description: Part du CA net identifie dans le CA net, en pourcentage de 0 a 100. NULL si le CA net est nul.
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.total_amount_cents
@@ -770,7 +770,7 @@ schema:
         physicalType: NUMERIC
         logicalType: number
         description: Panier moyen en EUR TTC, egal aux ventes brutes divisees par le nombre de ventes (identifiees et anonymes, retours exclus). NULL s'il n'y a aucune vente.
-        classification: internal
+        classification: C1
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.total_amount_cents
@@ -812,7 +812,7 @@ schema:
         logicalType: timestamp
         description: Date et heure du calcul de la ligne, en UTC.
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage du calcul de la ligne.
         customProperties:

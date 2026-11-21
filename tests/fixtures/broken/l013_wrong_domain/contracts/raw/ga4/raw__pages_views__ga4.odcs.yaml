@@ -31,12 +31,12 @@ schema:
     physicalType: STRING
     logicalType: string
     description: Champ event_name.
-    classification: internal
+    classification: C1
   - name: event_params
     physicalType: ARRAY<STRUCT<key STRING>>
     logicalType: array
     description: Champ event_params.
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       properties:
@@ -44,18 +44,18 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Champ key.
-        classification: internal
+        classification: C1
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ meta_loaded_at.
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Horodatage de chargement.
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
     description: Champ meta_source_file.
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Fichier de depot.

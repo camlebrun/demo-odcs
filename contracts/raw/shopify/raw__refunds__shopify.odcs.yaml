@@ -75,7 +75,7 @@ schema:
     logicalType: integer
     description: Identifiant technique du remboursement dans Shopify.
     required: true
-    classification: internal
+    classification: C1
     unique: true
     primaryKey: true
     primaryKeyPosition: 1
@@ -90,7 +90,7 @@ schema:
     logicalType: integer
     description: Identifiant de la commande remboursee (cle vers raw__orders__shopify#orders.id).
     required: true
-    classification: internal
+    classification: C1
     quality:
     - type: library
       metric: nullValues
@@ -102,36 +102,36 @@ schema:
     logicalType: timestamp
     description: Date et heure de creation du remboursement, en UTC.
     required: true
-    classification: internal
+    classification: C1
   - name: processed_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de traitement du remboursement, en UTC.
-    classification: internal
+    classification: C1
   - name: user_id
     physicalType: INT64
     logicalType: integer
     description: Identifiant du collaborateur Shopify ayant cree le remboursement. Vide si automatique.
-    classification: confidential
+    classification: C2
     tags:
     - pseudonymized
   - name: note
     physicalType: STRING
     logicalType: string
     description: Note libre saisie lors du remboursement, susceptible de contenir des donnees personnelles.
-    classification: restricted
+    classification: C3
     tags:
     - pii
   - name: restock
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si les articles sont remis en stock (champ historique, voir restock_type par ligne).
-    classification: internal
+    classification: C1
   - name: refund_line_items
     physicalType: ARRAY<STRUCT<id INT64, line_item_id INT64, location_id INT64, quantity INT64, restock_type STRING, subtotal NUMERIC, total_tax NUMERIC>>
     logicalType: array
     description: Lignes de commande remboursees, avec le lieu de remise en stock (location_id) pour les retours cross-canal.
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       physicalType: STRUCT<id INT64, line_item_id INT64, location_id INT64, quantity INT64, restock_type STRING, subtotal NUMERIC, total_tax NUMERIC>
@@ -140,42 +140,42 @@ schema:
         physicalType: INT64
         logicalType: integer
         description: Identifiant de la ligne de remboursement.
-        classification: internal
+        classification: C1
       - name: line_item_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant de la ligne de commande remboursee (cle vers raw__order_lines__shopify#order_lines.id).
-        classification: internal
+        classification: C1
       - name: location_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du lieu (magasin ou entrepot) ou l'article est remis en stock (retour cross-canal). Vide si non remis en stock.
-        classification: internal
+        classification: C1
       - name: quantity
         physicalType: INT64
         logicalType: integer
         description: Quantite remboursee.
-        classification: internal
+        classification: C1
       - name: restock_type
         physicalType: STRING
         logicalType: string
         description: Type de remise en stock (no_restock, cancel, return, legacy_restock).
-        classification: internal
+        classification: C1
       - name: subtotal
         physicalType: NUMERIC
         logicalType: number
         description: Montant hors taxe rembourse pour la ligne, dans la devise de la transaction.
-        classification: internal
+        classification: C1
       - name: total_tax
         physicalType: NUMERIC
         logicalType: number
         description: Taxe remboursee pour la ligne, dans la devise de la transaction.
-        classification: internal
+        classification: C1
   - name: transactions
     physicalType: ARRAY<STRUCT<id INT64, kind STRING, gateway STRING, status STRING, amount NUMERIC, currency STRING>>
     logicalType: array
     description: Transactions de remboursement envoyees au moyen de paiement.
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       physicalType: STRUCT<id INT64, kind STRING, gateway STRING, status STRING, amount NUMERIC, currency STRING>
@@ -184,37 +184,37 @@ schema:
         physicalType: INT64
         logicalType: integer
         description: Identifiant de la transaction de remboursement.
-        classification: internal
+        classification: C1
       - name: kind
         physicalType: STRING
         logicalType: string
         description: Nature de la transaction (refund).
-        classification: internal
+        classification: C1
       - name: gateway
         physicalType: STRING
         logicalType: string
         description: Passerelle de paiement utilisee.
-        classification: internal
+        classification: C1
       - name: status
         physicalType: STRING
         logicalType: string
         description: Statut de la transaction (success, pending, failure, error).
-        classification: internal
+        classification: C1
       - name: amount
         physicalType: NUMERIC
         logicalType: number
         description: Montant rembourse, dans la devise currency.
-        classification: internal
+        classification: C1
       - name: currency
         physicalType: STRING
         logicalType: string
         description: Code devise ISO 4217 de la transaction.
-        classification: internal
+        classification: C1
   - name: order_adjustments
     physicalType: ARRAY<STRUCT<id INT64, kind STRING, amount NUMERIC, tax_amount NUMERIC, reason STRING>>
     logicalType: array
     description: Ajustements hors articles (remboursement de livraison, ecart de remboursement).
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       physicalType: STRUCT<id INT64, kind STRING, amount NUMERIC, tax_amount NUMERIC, reason STRING>
@@ -223,38 +223,38 @@ schema:
         physicalType: INT64
         logicalType: integer
         description: Identifiant de l'ajustement.
-        classification: internal
+        classification: C1
       - name: kind
         physicalType: STRING
         logicalType: string
         description: Nature de l'ajustement (shipping_refund, refund_discrepancy).
-        classification: internal
+        classification: C1
       - name: amount
         physicalType: NUMERIC
         logicalType: number
         description: Montant de l'ajustement (negatif quand il est rembourse).
-        classification: internal
+        classification: C1
       - name: tax_amount
         physicalType: NUMERIC
         logicalType: number
         description: Taxe liee a l'ajustement.
-        classification: internal
+        classification: C1
       - name: reason
         physicalType: STRING
         logicalType: string
         description: Motif de l'ajustement.
-        classification: internal
+        classification: C1
   - name: admin_graphql_api_id
     physicalType: STRING
     logicalType: string
     description: Identifiant global (GID) du remboursement dans l'API GraphQL Admin.
-    classification: internal
+    classification: C1
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
     required: true
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Horodatage de chargement ajoute par l'ingestion.
   - name: meta_source_file
@@ -262,6 +262,6 @@ schema:
     logicalType: string
     description: URI du fichier de depot dont la ligne est issue (champ technique).
     required: true
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: URI du fichier de depot renseignee par l'ingestion.

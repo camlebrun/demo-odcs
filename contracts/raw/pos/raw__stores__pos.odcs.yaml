@@ -80,7 +80,7 @@ schema:
         primaryKeyPosition: 1
         required: true
         unique: true
-        classification: internal
+        classification: C1
         examples: [12]
         quality:
           - type: library
@@ -94,20 +94,20 @@ schema:
         description: Code court du magasin utilise en exploitation.
         required: true
         unique: true
-        classification: internal
+        classification: C1
         examples: ["FR-LYO-01"]
       - name: store_name
         physicalType: STRING
         logicalType: string
         description: Nom commercial du magasin.
         required: true
-        classification: internal
+        classification: C1
       - name: country_code
         physicalType: STRING
         logicalType: string
         description: Code pays ISO 3166-1 alpha-2 du magasin - FR ou BE.
         required: true
-        classification: internal
+        classification: C1
         enum:
           - value: FR
           - value: BE
@@ -124,30 +124,30 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Adresse du magasin (numero et rue).
-        classification: internal
+        classification: C1
       - name: postal_code
         physicalType: STRING
         logicalType: string
         description: Code postal du magasin.
-        classification: internal
+        classification: C1
       - name: city
         physicalType: STRING
         logicalType: string
         description: Ville du magasin.
-        classification: internal
+        classification: C1
       - name: timezone
         physicalType: STRING
         logicalType: string
         description: Fuseau horaire IANA du magasin (Europe/Paris, Europe/Brussels), a utiliser pour convertir les heures locales en UTC.
         required: true
-        classification: internal
+        classification: C1
         examples: [Europe/Paris]
       - name: currency
         physicalType: STRING
         logicalType: string
         description: Code devise ISO 4217 du magasin (EUR).
         required: true
-        classification: internal
+        classification: C1
         examples: [EUR]
         logicalTypeOptions:
           minLength: 3
@@ -156,30 +156,30 @@ schema:
         physicalType: DATE
         logicalType: date
         description: Date d'ouverture du magasin (heure locale).
-        classification: internal
+        classification: C1
       - name: closing_date
         physicalType: DATE
         logicalType: date
         description: Date de fermeture definitive du magasin. Vide si le magasin est ouvert.
-        classification: internal
+        classification: C1
       - name: is_active
         physicalType: BOOL
         logicalType: boolean
         description: Vrai si le magasin est actif dans la caisse.
         required: true
-        classification: internal
+        classification: C1
       - name: updated_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de derniere modification de la fiche magasin, en UTC.
         required: true
-        classification: internal
+        classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -187,6 +187,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.

@@ -142,7 +142,7 @@ IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
 - `SHA256` renvoie des `BYTES` ; `TO_HEX` produit la chaîne.
 - Email `NULL` ou vide (après `TRIM`) : `customer_key` vaut `NULL`. On ne hache jamais la chaîne vide, sinon tous les clients sans e-mail partageraient la même clé.
 - Aucune normalisation supplémentaire (pas de suppression de `+tag`, pas de traitement du domaine) : ce que la règle ne dit pas n'est pas fait.
-- Tout champ nommé `customer_key` dans un customer reprend cette expression à l'identique (même colonne aux deux emplacements de l'expression). Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `confidential`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
+- Tout champ nommé `customer_key` dans un customer reprend cette expression à l'identique (même colonne aux deux emplacements de l'expression). Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `C2`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
 
 ## 5. Versionnement et breaking changes
 
@@ -177,18 +177,18 @@ Un contrat `deprecated` reste publié au moins une version MAJOR avant `retired`
 
 ### Classification et tags PII (L010, L014)
 
-`classification` (chaîne libre dans ODCS, restreinte ici), obligatoire sur chaque property de premier niveau :
+`classification` (chaîne libre dans ODCS, restreinte ici à l'échelle de confidentialité C0 à C3), obligatoire sur chaque property de premier niveau :
 
 | Valeur | Usage |
 |---|---|
-| `public` | publiable sans restriction |
-| `internal` | donnée d'entreprise non personnelle (défaut) |
-| `confidential` | donnée sensible pour le business ou identifiant pseudonymisé (`customer_key`, `customer_id`) |
-| `restricted` | donnée personnelle directe (e-mail, téléphone, nom, adresse) |
+| `C0` | public : publiable sans restriction |
+| `C1` | interne : donnée d'entreprise non personnelle (défaut) |
+| `C2` | confidentiel : donnée sensible pour le business ou identifiant pseudonymisé (`customer_key`, `customer_id`) |
+| `C3` | restreint : donnée personnelle directe (e-mail, téléphone, nom, adresse) |
 
-Tags de property : `pii` (donnée personnelle directe), `pseudonymized` (identifiant haché ou technique rattachable à une personne). Règle PII : `classification: restricted` **et** `tags: [pii]` vont toujours ensemble ; l'un sans l'autre est une erreur (L010). Le contenu d'un champ texte libre susceptible de contenir des données personnelles (note client, commentaire) est traité comme `pii`.
+Tags de property : `pii` (donnée personnelle directe), `pseudonymized` (identifiant haché ou technique rattachable à une personne). Règle PII : `classification: C3` **et** `tags: [pii]` vont toujours ensemble ; l'un sans l'autre est une erreur (L010). Le contenu d'un champ texte libre susceptible de contenir des données personnelles (note client, commentaire) est traité comme `pii`.
 
-Un champ customer dérivé d'une PII n'hérite pas automatiquement de la classification : l'auteur et le relecteur décident (le hachage de `customer_key` la fait passer à `confidential`, vérifié par L016). Dans une table dont le grain est le client (`customer_key`), tous les champs comportementaux rattachés à la clé sont `confidential` avec le tag `pseudonymized`. Cette revue est dans la checklist de PR.
+Un champ customer dérivé d'une PII n'hérite pas automatiquement de la classification : l'auteur et le relecteur décident (le hachage de `customer_key` la fait passer à `C2`, vérifié par L016). Dans une table dont le grain est le client (`customer_key`), tous les champs comportementaux rattachés à la clé sont `C2` avec le tag `pseudonymized`. Cette revue est dans la checklist de PR.
 
 ## 7. SLA et support
 

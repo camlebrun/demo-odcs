@@ -31,7 +31,7 @@ schema:
     physicalType: STRING
     logicalType: string
     description: Champ customer_key.
-    classification: confidential
+    classification: C2
     transformLogic: transform
     transformDescription: Alimente customer_key.
     tags:
@@ -45,7 +45,7 @@ schema:
     physicalType: NUMERIC
     logicalType: number
     description: Champ order_total.
-    classification: internal
+    classification: C1
     transformLogic: copy
     transformDescription: Alimente order_total.
     transformSourceObjects:
@@ -57,7 +57,7 @@ schema:
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ first_order_at.
-    classification: internal
+    classification: C1
     transformLogic: transform
     transformDescription: Alimente first_order_at.
     transformSourceObjects:
@@ -69,7 +69,7 @@ schema:
     physicalType: STRING
     logicalType: string
     description: Champ last_param_key.
-    classification: internal
+    classification: C1
     transformLogic: transform
     transformDescription: Alimente last_param_key.
     transformSourceObjects:
@@ -81,7 +81,7 @@ schema:
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ computed_at.
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Alimente computed_at.
     customProperties:

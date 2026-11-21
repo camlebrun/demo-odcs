@@ -217,7 +217,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 1
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         logicalTypeOptions:
           minLength: 64
@@ -268,7 +268,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 2
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         enum:
           - value: buyers_90d
@@ -292,7 +292,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 3
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: create
         transformDescription: Date du jour de calcul dans le fuseau Europe/Paris.
@@ -304,7 +304,7 @@ schema:
         logicalType: boolean
         description: Vrai si le signal de consentement marketing le plus recent du client (Shopify accepts_marketing ou opt-in fidelite en caisse) est un consentement. Toujours vrai dans cette table, qui ne contient que des consentants.
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: transform
         transformSourceObjects:
@@ -323,7 +323,7 @@ schema:
         logicalType: string
         description: Source du signal de consentement retenu - shopify (accepts_marketing) ou pos (opt-in fidelite en caisse).
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         enum:
           - value: shopify
@@ -344,7 +344,7 @@ schema:
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure du signal de consentement retenu, en UTC. Peut etre vide si la source n'a pas horodate le consentement.
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: transform
         transformSourceObjects:
@@ -360,7 +360,7 @@ schema:
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de la derniere vente du client, tous canaux, en UTC (heure de caisse convertie avec le fuseau du magasin). Vide pour un client qui n'a jamais achete.
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: transform
         transformSourceObjects:
@@ -401,7 +401,7 @@ schema:
         logicalType: integer
         description: Nombre de ventes du client sur les 365 derniers jours, tous canaux.
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: transform
         transformSourceObjects:
@@ -442,7 +442,7 @@ schema:
         logicalType: number
         description: CA net de retours du client sur les 365 derniers jours, en EUR TTC, tous canaux. Sert au classement du segment top_customers.
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: transform
         transformSourceObjects:
@@ -485,7 +485,7 @@ schema:
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de la derniere consultation de fiche produit (view_item) rattachee au client, en UTC. Renseignee uniquement pour le segment product_viewers_no_purchase, vide sinon.
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: transform
         transformSourceObjects:
@@ -516,7 +516,7 @@ schema:
         logicalType: timestamp
         description: Date et heure du calcul de la ligne, en UTC.
         required: true
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
         transformLogic: create
         transformDescription: Horodatage du calcul de la ligne.

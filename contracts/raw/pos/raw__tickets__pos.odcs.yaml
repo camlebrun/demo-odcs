@@ -80,7 +80,7 @@ schema:
         primaryKeyPosition: 1
         required: true
         unique: true
-        classification: internal
+        classification: C1
         examples: [9000123456]
         quality:
           - type: library
@@ -93,31 +93,31 @@ schema:
         logicalType: string
         description: Numero de ticket imprime, propre a la caisse et au magasin.
         required: true
-        classification: internal
+        classification: C1
         examples: ["0042-000187"]
       - name: store_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du magasin (cle vers raw__stores__pos, objet stores).
         required: true
-        classification: internal
+        classification: C1
       - name: register_id
         physicalType: STRING
         logicalType: string
         description: Identifiant de la caisse physique dans le magasin.
-        classification: internal
+        classification: C1
       - name: cashier_id
         physicalType: STRING
         logicalType: string
         description: Identifiant interne du vendeur ou de la vendeuse en caisse (donnee RH, pas un client).
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
       - name: ticket_type
         physicalType: STRING
         logicalType: string
         description: Type de ticket - sale (vente) ou return (retour ou avoir, montants negatifs).
         required: true
-        classification: internal
+        classification: C1
         enum:
           - value: sale
           - value: return
@@ -135,7 +135,7 @@ schema:
         logicalType: timestamp
         description: Date et heure d'encaissement du ticket, en heure LOCALE du magasin (sans fuseau, pas en UTC).
         required: true
-        classification: internal
+        classification: C1
         quality:
           - type: library
             metric: nullValues
@@ -147,30 +147,30 @@ schema:
         logicalType: timestamp
         description: Date et heure de derniere modification du ticket en caisse, en heure LOCALE du magasin.
         required: true
-        classification: internal
+        classification: C1
       - name: loyalty_card_id
         physicalType: STRING
         logicalType: string
         description: Identifiant de la carte fidelite presentee (cle vers raw__loyalty_members__pos, objet loyalty_members). Vide pour un ticket anonyme (environ 50 % des tickets).
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
       - name: original_ticket_id
         physicalType: INT64
         logicalType: integer
         description: Pour un retour - identifiant du ticket de vente d'origine (cle vers tickets.ticket_id) quand l'achat a eu lieu en magasin. Vide pour une vente ou un retour sans ticket.
-        classification: internal
+        classification: C1
       - name: original_web_order_id
         physicalType: INT64
         logicalType: integer
         description: Pour un retour cross-canal (achat web rendu en magasin) - identifiant de la commande Shopify d'origine (raw__orders__shopify, objet orders, id). Vide sinon.
-        classification: confidential
+        classification: C2
         tags: [pseudonymized]
       - name: payment_method
         physicalType: STRING
         logicalType: string
         description: Moyen de paiement du ticket.
         required: true
-        classification: internal
+        classification: C1
         enum:
           - value: card
           - value: cash
@@ -193,7 +193,7 @@ schema:
         logicalType: string
         description: Code devise ISO 4217 du ticket (EUR), qui s'applique a tous les montants.
         required: true
-        classification: internal
+        classification: C1
         examples: [EUR]
         logicalTypeOptions:
           minLength: 3
@@ -203,7 +203,7 @@ schema:
         logicalType: integer
         description: Montant total TTC du ticket apres remises, en centimes d'euro (entier). Negatif pour un retour.
         required: true
-        classification: internal
+        classification: C1
         criticalDataElement: true
         quality:
           - type: library
@@ -216,24 +216,24 @@ schema:
         logicalType: integer
         description: Montant total de TVA contenu dans le total TTC, en centimes d'euro (entier).
         required: true
-        classification: internal
+        classification: C1
       - name: total_discount_cents
         physicalType: INT64
         logicalType: integer
         description: Somme des remises accordees sur le ticket, en centimes d'euro (entier, positif). 0 si aucune remise.
         required: true
-        classification: internal
+        classification: C1
       - name: items_count
         physicalType: INT64
         logicalType: integer
         description: Nombre total d'articles (somme des quantites) du ticket.
-        classification: internal
+        classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -241,6 +241,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.

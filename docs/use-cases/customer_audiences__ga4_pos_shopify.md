@@ -39,7 +39,7 @@ Google Customer Match et Meta Custom Audiences.
 
 Consentement = `accepts_marketing` Shopify + opt-in fidélité en caisse (`marketing_opt_in`). Le signal horodaté le plus récent l'emporte ; sans signal connu, le client est exclu (cas des commandes invité Shopify). Règle qualité : aucune ligne avec `is_marketing_consented` différent de vrai.
 
-Seule `customer_key` (hash SHA-256 de l'e-mail normalisé) est exposée, jamais l'e-mail en clair. Tous les champs de la table (rattachés à un client) sont `confidential` avec le tag `pseudonymized` : une clé hachée et les données qui lui sont jointes restent des données personnelles. Le consentement porte sur l'e-mail : son usage pour le ciblage publicitaire reste une décision juridique du propriétaire.
+Seule `customer_key` (hash SHA-256 de l'e-mail normalisé) est exposée, jamais l'e-mail en clair. Tous les champs de la table (rattachés à un client) sont `C2` avec le tag `pseudonymized` : une clé hachée et les données qui lui sont jointes restent des données personnelles. Le consentement porte sur l'e-mail : son usage pour le ciblage publicitaire reste une décision juridique du propriétaire.
 
 ## Limite du lien GA4 vers client identifié
 

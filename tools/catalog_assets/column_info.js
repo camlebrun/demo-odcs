@@ -61,9 +61,10 @@
   function list(items) {
     return items.length ? '<ul class="cp-list">' + items.map(function (i) { return "<li>" + i + "</li>"; }).join("") + "</ul>" : '<span class="cp-note">Aucun</span>';
   }
+  var LEVEL = { C0: "public", C1: "interne", C2: "confidentiel", C3: "restreint" };
   function sens(c) {
     var m = c.meta || {}, t = c.tags || [], h = "";
-    if (m.classification) h += badge(m.classification, m.classification === "restricted" ? "hi" : m.classification === "confidential" ? "mid" : "");
+    if (m.classification) h += badge(LEVEL[m.classification] ? m.classification + " · " + LEVEL[m.classification] : m.classification, m.classification === "C3" ? "hi" : m.classification === "C2" ? "mid" : "");
     if (t.indexOf("pii") >= 0) h += badge("PII", "hi");
     if (t.indexOf("pseudonymized") >= 0) h += badge("pseudonymisé", "mid");
     if (t.indexOf("pii_potential") >= 0) h += badge("PII potentielle", "mid");
@@ -96,28 +97,47 @@
     }).map(function (e) { return esc(dir === "up" ? e.source : e.target); });
   }
 
-  window.cpColumnHtml = function (model, name) {
-    var n = data().nodes[model], c = n && n.columns && n.columns[name];
-    if (!c) return "";
-    var m = c.meta || {}, h = "";
-    var flags = sens(c);
-    if (m.primaryKey) flags += badge("clé primaire" + (m.primaryKeyPosition ? " " + m.primaryKeyPosition : ""));
-    if (flags) h += "<div>" + flags + "</div>";
-    h += acc("Types", kv([["Type logique", esc(c.contractType)], ["Type physique", esc(c.dataType)]]), false);
-    if (m.transformDescription) h += '<div class="cp-note">' + esc(m.transformDescription) + "</div>";
-    if (m.transformExpression) h += acc("SQL de transformation", sql(m.transformExpression, "BigQuery"), false);
+  function expertBlock(model, name, c, m) {
     var ex = kv([
       ["transformLogic", esc(m.transformLogic)], ["lineageType", esc(c.lineageType)], ["classification", esc(m.classification)],
       ["obligatoire", m.required ? "oui" : ""], ["unique", m.unique ? "oui" : ""], ["tags", esc((c.tags || []).join(", "))]
     ]);
-    ex += '<div><b>Sources</b></div>' + list(from(model, name));
-    ex += '<div><b>Utilisé par</b></div>' + list(to(model, name));
+    ex += "<div><b>Sources</b></div>" + list(from(model, name));
+    ex += "<div><b>Utilisé par</b></div>" + list(to(model, name));
     if (c.tests && c.tests.length) ex += "<div><b>Contrôles qualité</b></div>" + tests(c.tests);
     var rest = {};
     Object.keys(m).forEach(function (k) { if (["transformExpression", "transformDescription"].indexOf(k) < 0) rest[k] = m[k]; });
     ex += '<pre class="cp-json">' + esc(JSON.stringify(rest, null, 2)) + "</pre>";
-    h += '<div class="cp-expert-only">' + ex + "</div>";
-    return '<div class="cp-col">' + h + "</div>";
+    return '<div class="cp-expert-only">' + ex + "</div>";
+  }
+  function typesLine(c) {
+    return kv([["Type logique", esc(c.contractType)], ["Type physique", esc(c.dataType)]]);
+  }
+  function flagsOf(c) {
+    var m = c.meta || {}, f = sens(c);
+    if (m.primaryKey) f += badge("clé primaire" + (m.primaryKeyPosition ? " " + m.primaryKeyPosition : ""));
+    return f ? "<div>" + f + "</div>" : "";
+  }
+
+  /* Fiche de colonne du panneau lateral : type et classification seulement. */
+  window.cpColumnHtml = function (model, name) {
+    var n = data().nodes[model], c = n && n.columns && n.columns[name];
+    if (!c) return "";
+    return '<div class="cp-col">' + flagsOf(c) + typesLine(c) + expertBlock(model, name, c, c.meta || {}) + "</div>";
+  };
+
+  /* Ligne depliee de l'onglet Columns : types, classification, transformation (description et SQL). */
+  window.cpColumnTabHtml = function (model, name) {
+    var n = data().nodes[model], c = n && n.columns && n.columns[name];
+    if (!c) return "";
+    var m = c.meta || {}, h = flagsOf(c);
+    h += '<div class="cp-h">Types</div>' + typesLine(c);
+    if (m.transformDescription || m.transformExpression) {
+      h += '<div class="cp-h">Transformation</div>';
+      if (m.transformDescription) h += "<div>" + esc(m.transformDescription) + "</div>";
+      if (m.transformExpression) h += sql(m.transformExpression, "SQL BigQuery");
+    }
+    return '<div class="cp-col cp-tab">' + h + expertBlock(model, name, c, m) + "</div>";
   };
 
   window.cpNodeHtml = function (model) {
@@ -136,7 +156,7 @@
     if (up.length || down.length) h += acc("Alimenté par et alimente", "<b>Alimenté par</b>" + list(up) + "<b>Alimente</b>" + list(down), false);
     var s = Object.keys(n.columns).filter(function (k) {
       var c = n.columns[k], mm = c.meta || {}, t = c.tags || [];
-      return mm.classification === "restricted" || t.indexOf("pii") >= 0 || t.indexOf("pseudonymized") >= 0 || t.indexOf("pii_potential") >= 0;
+      return mm.classification === "C3" || mm.classification === "C2" || t.indexOf("pii") >= 0 || t.indexOf("pseudonymized") >= 0 || t.indexOf("pii_potential") >= 0;
     });
     if (s.length) h += acc("Colonnes sensibles (" + s.length + ")", list(s.map(function (k) { return esc(k) + " " + sens(n.columns[k]); })), false);
     var cp = m.customProperties || {}, ex = "";

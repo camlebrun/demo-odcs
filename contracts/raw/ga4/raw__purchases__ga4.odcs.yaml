@@ -75,19 +75,19 @@ schema:
     logicalType: string
     description: Date de l'evenement au format AAAAMMJJ, dans le fuseau du compte GA4 (pas en UTC).
     required: true
-    classification: internal
+    classification: C1
   - name: event_timestamp
     physicalType: INT64
     logicalType: integer
     description: Horodatage de l'evenement en microsecondes depuis l'epoque Unix, en UTC.
     required: true
-    classification: internal
+    classification: C1
   - name: event_name
     physicalType: STRING
     logicalType: string
     description: 'Nom de l''evenement GA4 : purchase.'
     required: true
-    classification: internal
+    classification: C1
     quality:
     - type: library
       metric: invalidValues
@@ -102,7 +102,7 @@ schema:
     physicalType: ARRAY<STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>>>
     logicalType: array
     description: 'Parametres de l''evenement, liste cle/valeur (REPEATED RECORD). On y lit notamment ga_session_id (int_value), ga_session_number (int_value), page_location, page_referrer et page_title (string_value), session_engaged, engagement_time_msec. Attention : page_location et page_referrer (URL) peuvent contenir un e-mail ou un identifiant dans la query string, ces valeurs sont a traiter comme PII potentielle.'
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       physicalType: STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>>
@@ -111,200 +111,200 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Nom du parametre (ex. ga_session_id, page_location).
-        classification: internal
+        classification: C1
       - name: value
         physicalType: STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>
         logicalType: object
         description: 'Valeur du parametre : un seul des champs est renseigne selon le type.'
-        classification: internal
+        classification: C1
         properties:
         - name: string_value
           physicalType: STRING
           logicalType: string
           description: Valeur texte du parametre.
-          classification: internal
+          classification: C1
         - name: int_value
           physicalType: INT64
           logicalType: integer
           description: Valeur entiere du parametre.
-          classification: internal
+          classification: C1
         - name: float_value
           physicalType: FLOAT64
           logicalType: number
           description: Valeur decimale simple precision du parametre.
-          classification: internal
+          classification: C1
         - name: double_value
           physicalType: FLOAT64
           logicalType: number
           description: Valeur decimale double precision du parametre.
-          classification: internal
+          classification: C1
     tags:
     - pii_potential
   - name: event_previous_timestamp
     physicalType: INT64
     logicalType: integer
     description: Horodatage de l'evenement precedent du meme nom pour l'utilisateur, en microsecondes UTC.
-    classification: internal
+    classification: C1
   - name: event_bundle_sequence_id
     physicalType: INT64
     logicalType: integer
     description: Numero de sequence du lot d'evenements envoye avec cet evenement.
-    classification: internal
+    classification: C1
   - name: user_pseudo_id
     physicalType: STRING
     logicalType: string
     description: Identifiant pseudonyme de l'appareil ou du navigateur genere par GA4 (cookie). Peut etre vide quand le consentement analytics est refuse.
-    classification: confidential
+    classification: C2
     tags:
     - pseudonymized
   - name: user_id
     physicalType: STRING
     logicalType: string
     description: Identifiant utilisateur envoye par le site apres connexion. Vide pour un visiteur non connecte.
-    classification: confidential
+    classification: C2
     tags:
     - pseudonymized
   - name: user_first_touch_timestamp
     physicalType: INT64
     logicalType: integer
     description: Date de premiere visite de l'utilisateur, en microsecondes UTC.
-    classification: internal
+    classification: C1
   - name: privacy_info
     physicalType: STRUCT<analytics_storage STRING, ads_storage STRING, uses_transient_token STRING>
     logicalType: object
     description: Etat du consentement (Consent Mode) au moment de l'evenement.
-    classification: internal
+    classification: C1
     properties:
     - name: analytics_storage
       physicalType: STRING
       logicalType: string
       description: Consentement au stockage analytics (Yes, No).
-      classification: internal
+      classification: C1
     - name: ads_storage
       physicalType: STRING
       logicalType: string
       description: Consentement au stockage publicitaire (Yes, No).
-      classification: internal
+      classification: C1
     - name: uses_transient_token
       physicalType: STRING
       logicalType: string
       description: Indique l'usage d'un jeton transitoire quand le consentement est refuse (Yes, No).
-      classification: internal
+      classification: C1
   - name: device
     physicalType: STRUCT<category STRING, mobile_brand_name STRING, operating_system STRING, browser STRING, language STRING>
     logicalType: object
     description: Appareil du visiteur.
-    classification: internal
+    classification: C1
     properties:
     - name: category
       physicalType: STRING
       logicalType: string
       description: Categorie d'appareil (desktop, mobile, tablet).
-      classification: internal
+      classification: C1
     - name: mobile_brand_name
       physicalType: STRING
       logicalType: string
       description: Marque de l'appareil mobile.
-      classification: internal
+      classification: C1
     - name: operating_system
       physicalType: STRING
       logicalType: string
       description: Systeme d'exploitation.
-      classification: internal
+      classification: C1
     - name: browser
       physicalType: STRING
       logicalType: string
       description: Navigateur.
-      classification: internal
+      classification: C1
     - name: language
       physicalType: STRING
       logicalType: string
       description: Langue du navigateur.
-      classification: internal
+      classification: C1
   - name: geo
     physicalType: STRUCT<continent STRING, country STRING, region STRING, city STRING>
     logicalType: object
     description: Localisation approximative deduite de l'adresse IP (non conservee).
-    classification: internal
+    classification: C1
     properties:
     - name: continent
       physicalType: STRING
       logicalType: string
       description: Continent.
-      classification: internal
+      classification: C1
     - name: country
       physicalType: STRING
       logicalType: string
       description: Pays, en nom anglais.
-      classification: internal
+      classification: C1
     - name: region
       physicalType: STRING
       logicalType: string
       description: Region.
-      classification: internal
+      classification: C1
     - name: city
       physicalType: STRING
       logicalType: string
       description: Ville approximative.
-      classification: internal
+      classification: C1
   - name: traffic_source
     physicalType: STRUCT<name STRING, medium STRING, source STRING>
     logicalType: object
     description: Source de la premiere acquisition de l'utilisateur (first touch), pas de la session en cours.
-    classification: internal
+    classification: C1
     properties:
     - name: name
       physicalType: STRING
       logicalType: string
       description: Nom de la campagne de premiere acquisition.
-      classification: internal
+      classification: C1
     - name: medium
       physicalType: STRING
       logicalType: string
       description: Canal de premiere acquisition (organic, cpc, email, referral).
-      classification: internal
+      classification: C1
     - name: source
       physicalType: STRING
       logicalType: string
       description: Source de premiere acquisition (google, facebook).
-      classification: internal
+      classification: C1
   - name: collected_traffic_source
     physicalType: STRUCT<manual_source STRING, manual_medium STRING, manual_campaign_name STRING, gclid STRING>
     logicalType: object
     description: Source de trafic collectee avec l'evenement (parametres UTM et identifiants publicitaires).
-    classification: internal
+    classification: C1
     properties:
     - name: manual_source
       physicalType: STRING
       logicalType: string
       description: Source manuelle (utm_source).
-      classification: internal
+      classification: C1
     - name: manual_medium
       physicalType: STRING
       logicalType: string
       description: Canal manuel (utm_medium).
-      classification: internal
+      classification: C1
     - name: manual_campaign_name
       physicalType: STRING
       logicalType: string
       description: Nom de campagne manuel (utm_campaign).
-      classification: internal
+      classification: C1
     - name: gclid
       physicalType: STRING
       logicalType: string
       description: Identifiant de clic Google Ads.
-      classification: internal
+      classification: C1
   - name: ecommerce
     physicalType: STRUCT<transaction_id STRING, purchase_revenue FLOAT64, purchase_revenue_in_usd FLOAT64, total_item_quantity INT64, unique_items INT64>
     logicalType: object
     description: Donnees e-commerce de l'evenement.
-    classification: internal
+    classification: C1
     properties:
     - name: transaction_id
       physicalType: STRING
       logicalType: string
       description: 'Identifiant de transaction envoye par le site : c''est l''identifiant de commande Shopify (pont entre navigation web et achat, a rapprocher de raw__orders__shopify#orders.id ou orders.name selon le format envoye par le site). '
-      classification: internal
+      classification: C1
       quality:
       - type: sql
         query: SELECT COUNT(*) FROM (SELECT ecommerce.transaction_id FROM ${table} GROUP BY 1 HAVING COUNT(*) > 1)
@@ -316,27 +316,27 @@ schema:
       physicalType: FLOAT64
       logicalType: number
       description: Revenu de l'achat, dans la devise du site (EUR).
-      classification: internal
+      classification: C1
     - name: purchase_revenue_in_usd
       physicalType: FLOAT64
       logicalType: number
       description: Revenu de l'achat converti en dollars par GA4.
-      classification: internal
+      classification: C1
     - name: total_item_quantity
       physicalType: INT64
       logicalType: integer
       description: Nombre total d'articles de l'evenement.
-      classification: internal
+      classification: C1
     - name: unique_items
       physicalType: INT64
       logicalType: integer
       description: Nombre d'articles distincts de l'evenement.
-      classification: internal
+      classification: C1
   - name: items
     physicalType: ARRAY<STRUCT<item_id STRING, item_name STRING, item_brand STRING, item_variant STRING, item_category STRING, item_category2 STRING, price FLOAT64, quantity INT64, item_revenue FLOAT64, coupon STRING, index INT64>>
     logicalType: array
     description: Articles lies a l'evenement (REPEATED RECORD), renseignes pour view_item et purchase.
-    classification: internal
+    classification: C1
     items:
       logicalType: object
       physicalType: STRUCT<item_id STRING, item_name STRING, item_brand STRING, item_variant STRING, item_category STRING, item_category2 STRING, price FLOAT64, quantity INT64, item_revenue FLOAT64, coupon STRING, index INT64>
@@ -345,73 +345,73 @@ schema:
         physicalType: STRING
         logicalType: string
         description: Identifiant de l'article envoye par le site (en pratique le SKU ou l'identifiant produit).
-        classification: internal
+        classification: C1
       - name: item_name
         physicalType: STRING
         logicalType: string
         description: Nom de l'article.
-        classification: internal
+        classification: C1
       - name: item_brand
         physicalType: STRING
         logicalType: string
         description: Marque de l'article.
-        classification: internal
+        classification: C1
       - name: item_variant
         physicalType: STRING
         logicalType: string
         description: Variante de l'article.
-        classification: internal
+        classification: C1
       - name: item_category
         physicalType: STRING
         logicalType: string
         description: Categorie principale de l'article.
-        classification: internal
+        classification: C1
       - name: item_category2
         physicalType: STRING
         logicalType: string
         description: Deuxieme niveau de categorie.
-        classification: internal
+        classification: C1
       - name: price
         physicalType: FLOAT64
         logicalType: number
         description: Prix unitaire de l'article, dans la devise ecommerce.
-        classification: internal
+        classification: C1
       - name: quantity
         physicalType: INT64
         logicalType: integer
         description: Quantite de l'article.
-        classification: internal
+        classification: C1
       - name: item_revenue
         physicalType: FLOAT64
         logicalType: number
         description: Revenu de l'article (renseigne pour les achats).
-        classification: internal
+        classification: C1
       - name: coupon
         physicalType: STRING
         logicalType: string
         description: Code promotionnel applique a l'article.
-        classification: internal
+        classification: C1
       - name: index
         physicalType: INT64
         logicalType: integer
         description: Position de l'article dans la liste.
-        classification: internal
+        classification: C1
   - name: stream_id
     physicalType: STRING
     logicalType: string
     description: Identifiant du flux de donnees GA4.
-    classification: internal
+    classification: C1
   - name: platform
     physicalType: STRING
     logicalType: string
     description: Plateforme du flux (WEB, IOS, ANDROID).
-    classification: internal
+    classification: C1
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
     required: true
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: Horodatage de chargement ajoute par l'ingestion.
   - name: meta_source_file
@@ -419,7 +419,7 @@ schema:
     logicalType: string
     description: URI du fichier de depot dont la ligne est issue (champ technique).
     required: true
-    classification: internal
+    classification: C1
     transformLogic: create
     transformDescription: URI du fichier de depot renseignee par l'ingestion.
 customProperties:

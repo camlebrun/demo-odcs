@@ -107,7 +107,67 @@ def _patch_model_info(html: str) -> str:
     return html[:n] + card + html[n:]
 
 
+def _patch_columns_tab(html: str) -> str:
+    """Onglet Columns : transformation et types dans la ligne depliee, bouton Mode expert."""
+    m = re.search(
+        r'R\.jsxs\("div",\{children:\[R\.jsx\("div",\{className:"text-xs font-semibold text-muted-foreground uppercase mb-1",children:"Description"\}\),'
+        r'R\.jsx\("div",\{className:"text-sm prose prose-sm dark:prose-invert max-w-none break-words",children:([\w$]+)\.description\?'
+        r'R\.jsx\([\w$]+,\{remarkPlugins:\[[\w$]+\],children:\1\.description\}\):R\.jsx\("span",\{className:"text-muted-foreground italic",'
+        r'children:"No description available"\}\)\}\)\]\}\)',
+        html,
+    )
+    if not m:
+        raise TemplateMismatch("ligne depliee de l'onglet Columns introuvable")
+    col = m.group(1)
+    head = re.findall(r"function [\w$]+\(\{selectedModelId:([\w$]+),", html[: m.start()])
+    if not head:
+        raise TemplateMismatch("composant de l'onglet Columns introuvable")
+    model = head[-1]
+    extra = f',R.jsx("div",{{dangerouslySetInnerHTML:{{__html:window.cpColumnTabHtml({model},{col}.columnName)}}}})'
+    html = html[: m.end()] + extra + html[m.end() :]
+
+    anchor = 'R.jsx("div",{className:"mb-4",children:R.jsxs("div",{className:"relative max-w-sm",children:[R.jsx(v6,'
+    if html.count(anchor) != 1:
+        raise TemplateMismatch("barre de recherche de l'onglet Columns introuvable")
+    toggle = (
+        'R.jsx("div",{className:"flex justify-end mb-2",children:R.jsx("button",{className:"cp-expert-toggle",'
+        'title:"Afficher les propriétés techniques",onClick:()=>window.cpToggleExpert(),children:"Mode expert"})}),'
+    )
+    return html.replace(anchor, toggle + anchor)
+
+
+def _remove_code_views(html: str) -> str:
+    """Pas de vue code : ni onglet "Code", ni bascule modele / code du panneau lateral."""
+    html = _resub(html, r'[\w$]+&&R\.jsx\([\w$]+,\{value:"code",className:"text-xs",children:"Code"\}\)', "null")
+    return _resub(
+        html,
+        r'[\w$]+&&[\w$]+&&R\.jsx\("div",\{className:"absolute top-0 left-0 w-full flex justify-center pt-2 z-40 bg-card rounded-t-lg",'
+        r'children:R\.jsx\([\w$]+,\{value:[\w$]+,onValueChange:[\w$]+=>[\w$]+\([\w$]+\),options:\[\{value:"info",icon:[\w$]+\},\{value:"code",icon:[\w$]+\}\]\}\)\}\)',
+        "null",
+    )
+
+
+def _drop_lineage_warning(html: str) -> str:
+    """Retire la bulle "Column lineage unavailable" des noeuds : fausse pour un contrat raw (pas de source amont)."""
+    key = "Column lineage unavailable"
+    k = html.find(key)
+    start_marker = 'R.jsx($c,{children:R.jsxs(Kc,{children:[R.jsx(Jc,{asChild:!0,children:R.jsx("div",{className:"absolute -top-3 -left-3'
+    a = html.rfind(start_marker, 0, k) if k >= 0 else -1
+    end_marker = 'to fix this."]})})]})]})})'
+    b = html.find(end_marker, k) if k >= 0 else -1
+    if a < 0 or b < 0 or html.count(key) != 1:
+        raise TemplateMismatch("bulle de lineage indisponible introuvable")
+    guard = re.search(r"\w+&&$", html[max(0, a - 12) : a])
+    if not guard:
+        raise TemplateMismatch("condition de la bulle de lineage introuvable")
+    a -= len(guard.group(0))
+    return html[:a] + "null" + html[b + len(end_marker) :]
+
+
 def patch_template(html: str) -> str:
+    # 0. Bulle d'avertissement "Column lineage unavailable" (fausse pour un raw).
+    html = _drop_lineage_warning(html)
+
     # 1. Encarts "Try this feature on Colibri Cloud" : Recent Commits, Saved Views, ERD.
     html = _cut(
         html,
@@ -142,18 +202,6 @@ def patch_template(html: str) -> str:
     )
     html = _sub(html, "No dependent models found for this column.", "No dependent contracts found for this column.")
     html = _sub(html, "Error generating dbt command:", "Error copying contract id:")
-    html = _between(
-        html,
-        '["This model is missing from the catalog.',
-        '" and re-upload to fix this."]',
-        '"This contract is not described in the catalog."',
-    )
-    html = _between(
-        html,
-        '["This model has no compiled SQL',
-        '" to fix this."]',
-        '"This contract declares no field-level lineage."',
-    )
     html = _sub(html, "https://schemas.getdbt.com/dbt/manifest/v12.json", "odcs-v3.2.0")
     html = _sub(html, "<title>Colibri Data</title>", "<title>Catalogue de données</title>", 1)
 
@@ -165,6 +213,8 @@ def patch_template(html: str) -> str:
 
     # 4. Panneau natif "Model info" : infos du contrat, types, SQL de transformation, mode expert.
     html = _patch_model_info(html)
+    html = _patch_columns_tab(html)
+    html = _remove_code_views(html)
     css = (ASSETS / "column_info.css").read_text(encoding="utf-8")
     js = (ASSETS / "column_info.js").read_text(encoding="utf-8")
     return _sub(html, "</head>", f"<style>{css}</style><script>{js}</script></head>", 1)

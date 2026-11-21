@@ -86,7 +86,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 1
         required: true
-        classification: internal
+        classification: C1
         examples: ['2026-03-15']
       - name: campaign_id
         physicalType: INT64
@@ -95,7 +95,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 2
         required: true
-        classification: internal
+        classification: C1
       - name: customer_id
         physicalType: INT64
         logicalType: integer
@@ -103,18 +103,18 @@ schema:
         primaryKey: true
         primaryKeyPosition: 3
         required: true
-        classification: internal
+        classification: C1
       - name: segments_ad_network_type
         physicalType: STRING
         logicalType: string
         description: Reseau publicitaire de diffusion (SEARCH, CONTENT, YOUTUBE_WATCH, MIXED, etc.). Vide si la ligne n'est pas segmentee par reseau.
-        classification: internal
+        classification: C1
       - name: metrics_cost_micros
         physicalType: INT64
         logicalType: integer
         description: Cout du jour en micros de la devise du compte (1 000 000 micros = 1 unite de devise). A diviser par 1 000 000 pour obtenir le montant ; aucune conversion ici.
         required: true
-        classification: internal
+        classification: C1
         criticalDataElement: true
         quality:
           - type: library
@@ -127,7 +127,7 @@ schema:
         logicalType: string
         description: Code devise ISO 4217 du compte Google Ads (customer.currency_code), qui s'applique a metrics_cost_micros.
         required: true
-        classification: internal
+        classification: C1
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
@@ -137,29 +137,29 @@ schema:
         logicalType: integer
         description: Nombre d'impressions du jour.
         required: true
-        classification: internal
+        classification: C1
       - name: metrics_clicks
         physicalType: INT64
         logicalType: integer
         description: Nombre de clics du jour.
         required: true
-        classification: internal
+        classification: C1
       - name: metrics_conversions
         physicalType: FLOAT64
         logicalType: number
         description: Conversions du jour selon Google Ads (valeur fractionnaire possible avec l'attribution basee sur les donnees). Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
-        classification: internal
+        classification: C1
       - name: metrics_conversions_value
         physicalType: FLOAT64
         logicalType: number
         description: Valeur des conversions du jour selon Google Ads, dans la devise currency_code. Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
-        classification: internal
+        classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -167,6 +167,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique, y compris pour une ingestion par API).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.

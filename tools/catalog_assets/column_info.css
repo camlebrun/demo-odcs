@@ -29,3 +29,5 @@ html.cp-expert .cp-expert-only{display:flex;flex-direction:column;gap:6px;border
 .cp-json{margin:0;padding:6px;border-radius:6px;overflow:auto;max-height:160px;font:11px/1.4 ui-monospace,Menlo,monospace;background:hsl(var(--muted)/.4)}
 .cp-k{color:#7a3fd1;font-weight:600}.cp-f{color:#0b6cb8}.cp-s{color:#14693a}.cp-n{color:#b4570a}.cp-c{color:hsl(var(--muted-foreground));font-style:italic}
 .dark .cp-k{color:#c3a6ff}.dark .cp-f{color:#7cc0ff}.dark .cp-s{color:#7fd9a0}.dark .cp-n{color:#ffb86b}
+.cp-h{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:600;margin-top:4px}
+.cp-tab{margin-top:16px;gap:10px;font-size:13px}

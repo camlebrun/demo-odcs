@@ -1,2 +1,2 @@
 L010
-sans classification 'restricted'
+sans classification 'C3'

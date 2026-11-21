@@ -11,13 +11,13 @@ Regles (code dans la sortie) :
   L007 coherence de transformLogic (map / transform / create) et des sources
   L008 transformLogic et transformDescription presents sur tout champ customer
   L009 tokens du nom customer == sources reellement referencees, tries
-  L010 PII : tag `pii` ET classification `restricted`
+  L010 PII : tag `pii` ET classification `C3`
   L011 map : renommage ou cast trivial uniquement
   L012 customer_key conforme a la regle canonique
   L013 metadonnees (apiVersion, status, version, domain, servers, team, support)
   L014 documentation et classification des properties
   L015 nommage des properties (snake_case, suffixes _at/_date/_amount/_eur/is_/has_ vs type physique)
-  L016 customer_key : classification confidential et tag pseudonymized
+  L016 customer_key : classification C2 et tag pseudonymized
   L017 description du contrat (purpose, usage, limitations) et des objets : 350 caracteres maximum (5 lignes)
 
 Code retour 1 s'il y a au moins une erreur.
@@ -37,9 +37,9 @@ RAW_COUNTS = {"shopify": 4, "pos": 4, "ga4": 2, "googleads": 2, "metaads": 2}
 CUSTOMER_COUNT = 3
 SOURCES = tuple(RAW_COUNTS)
 STATUSES = ("proposed", "draft", "active", "deprecated", "retired")
-CLASSIFICATIONS = ("public", "internal", "confidential", "restricted")
+CLASSIFICATIONS = ("C0", "C1", "C2", "C3")  # confidentialite : public, interne, confidentiel, restreint
 PII_TAG = "pii"
-PII_CLASSIFICATION = "restricted"
+PII_CLASSIFICATION = "C3"
 TECH_FIELDS = ("meta_loaded_at", "meta_source_file")
 LOGICS = ("map", "transform", "create")
 API_VERSION = "v3.2.0"
@@ -341,8 +341,8 @@ def check_customer_key_class(c: Contract) -> list[Err]:
         if p.node.get("name") != "customer_key":
             continue
         where = f"{c.rel} {p.path}"
-        if p.node.get("classification") != "confidential" or "pseudonymized" not in (p.node.get("tags") or []):
-            errs.append(Err("L016", where, "customer_key doit etre confidential avec le tag pseudonymized"))
+        if p.node.get("classification") != "C2" or "pseudonymized" not in (p.node.get("tags") or []):
+            errs.append(Err("L016", where, "customer_key doit etre C2 avec le tag pseudonymized"))
     return errs
 
 

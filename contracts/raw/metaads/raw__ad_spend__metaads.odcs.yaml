@@ -86,14 +86,14 @@ schema:
         primaryKey: true
         primaryKeyPosition: 1
         required: true
-        classification: internal
+        classification: C1
         examples: ['2026-03-15']
       - name: date_stop
         physicalType: DATE
         logicalType: date
         description: Fin de la periode d'insight ; egale a date_start au grain journalier.
         required: true
-        classification: internal
+        classification: C1
       - name: ad_account_id
         physicalType: INT64
         logicalType: integer
@@ -101,7 +101,7 @@ schema:
         primaryKey: true
         primaryKeyPosition: 3
         required: true
-        classification: internal
+        classification: C1
       - name: campaign_id
         physicalType: INT64
         logicalType: integer
@@ -109,13 +109,13 @@ schema:
         primaryKey: true
         primaryKeyPosition: 2
         required: true
-        classification: internal
+        classification: C1
       - name: account_currency
         physicalType: STRING
         logicalType: string
         description: Code devise ISO 4217 du compte publicitaire, qui s'applique a spend et aux valeurs de action_values.
         required: true
-        classification: internal
+        classification: C1
         logicalTypeOptions:
           minLength: 3
           maxLength: 3
@@ -125,7 +125,7 @@ schema:
         logicalType: number
         description: Montant depense du jour, en unite de la devise du compte (decimal, par exemple 12.34 EUR), sans conversion.
         required: true
-        classification: internal
+        classification: C1
         criticalDataElement: true
         quality:
           - type: library
@@ -138,23 +138,23 @@ schema:
         logicalType: integer
         description: Nombre d'impressions du jour.
         required: true
-        classification: internal
+        classification: C1
       - name: clicks
         physicalType: INT64
         logicalType: integer
         description: Nombre de clics du jour (tous clics, champ clicks de Meta).
         required: true
-        classification: internal
+        classification: C1
       - name: reach
         physicalType: INT64
         logicalType: integer
         description: Nombre de personnes uniques atteintes sur la periode. Non additif entre jours ni entre campagnes.
-        classification: internal
+        classification: C1
       - name: actions
         physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
         logicalType: array
         description: Actions attribuees par Meta (achats, ajouts au panier, etc.), une entree par type d'action. Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
-        classification: internal
+        classification: C1
         items:
           logicalType: object
           physicalType: STRUCT<action_type STRING, value NUMERIC>
@@ -163,17 +163,17 @@ schema:
               physicalType: STRING
               logicalType: string
               description: Type d'action Meta (purchase, omni_purchase, add_to_cart, link_click, etc.).
-              classification: internal
+              classification: C1
             - name: value
               physicalType: NUMERIC
               logicalType: number
               description: Nombre d'actions du type, selon la fenetre d'attribution par defaut de Meta.
-              classification: internal
+              classification: C1
       - name: action_values
         physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
         logicalType: array
         description: Valeur monetaire des actions attribuees par Meta, une entree par type d'action, dans la devise account_currency. Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
-        classification: internal
+        classification: C1
         items:
           logicalType: object
           physicalType: STRUCT<action_type STRING, value NUMERIC>
@@ -182,17 +182,17 @@ schema:
               physicalType: STRING
               logicalType: string
               description: Type d'action Meta (purchase, omni_purchase, add_to_cart, link_click, etc.).
-              classification: internal
+              classification: C1
             - name: value
               physicalType: NUMERIC
               logicalType: number
               description: Valeur monetaire des actions du type, dans la devise account_currency.
-              classification: internal
+              classification: C1
       - name: purchase_roas
         physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
         logicalType: array
         description: ROAS achat calcule par Meta (valeur des achats divisee par la depense). Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
-        classification: internal
+        classification: C1
         items:
           logicalType: object
           physicalType: STRUCT<action_type STRING, value NUMERIC>
@@ -201,18 +201,18 @@ schema:
               physicalType: STRING
               logicalType: string
               description: Type d'action Meta (purchase, omni_purchase, add_to_cart, link_click, etc.).
-              classification: internal
+              classification: C1
             - name: value
               physicalType: NUMERIC
               logicalType: number
               description: Ratio ROAS plateforme du type d'action, sans unite.
-              classification: internal
+              classification: C1
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
         description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: Horodatage de chargement ajoute par l'ingestion.
       - name: meta_source_file
@@ -220,6 +220,6 @@ schema:
         logicalType: string
         description: URI du fichier de depot dont la ligne est issue (champ technique, y compris pour une ingestion par API).
         required: true
-        classification: internal
+        classification: C1
         transformLogic: create
         transformDescription: URI du fichier de depot renseignee par l'ingestion.
