@@ -89,29 +89,49 @@ schema:
             dimension: uniqueness
             severity: error
         examples: [20123456789]
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_id
+        transformDescription: Recopie du champ campaign_id de l'objet campaign de l'API Google Ads, sans transformation.
       - name: customer_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du compte Google Ads (customer.id) qui porte la campagne, sans tirets.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.customer_id
+        transformDescription: Recopie du champ customer_id de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_name
         physicalType: STRING
         logicalType: string
         description: Nom de la campagne saisi dans Google Ads, tel quel.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_name
+        transformDescription: Recopie du champ campaign_name de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_advertising_channel_type
         physicalType: STRING
         logicalType: string
         description: Type de canal publicitaire de la campagne (SEARCH, SHOPPING, PERFORMANCE_MAX, DISPLAY, VIDEO, DEMAND_GEN, etc.).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_advertising_channel_type
+        transformDescription: Recopie du champ campaign_advertising_channel_type de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_advertising_channel_sub_type
         physicalType: STRING
         logicalType: string
         description: Sous-type du canal publicitaire (par exemple SHOPPING_SMART_ADS). Vide quand il n'y en a pas.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_advertising_channel_sub_type
+        transformDescription: Recopie du champ campaign_advertising_channel_sub_type de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_status
         physicalType: STRING
         logicalType: string
@@ -131,21 +151,37 @@ schema:
             dimension: conformity
             severity: warning
             description: Detecte l'apparition d'un nouveau statut cote Google Ads.
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_status
+        transformDescription: Recopie du champ campaign_status de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_bidding_strategy_type
         physicalType: STRING
         logicalType: string
         description: Type de strategie d'encheres (MAXIMIZE_CONVERSIONS, TARGET_ROAS, MANUAL_CPC, etc.).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_bidding_strategy_type
+        transformDescription: Recopie du champ campaign_bidding_strategy_type de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_budget_id
         physicalType: INT64
         logicalType: integer
         description: Identifiant du budget partage ou dedie de la campagne (campaign_budget.id).
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_budget_id
+        transformDescription: Recopie du champ campaign_budget_id de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_budget_amount_micros
         physicalType: INT64
         logicalType: integer
         description: Budget quotidien en micros de la devise du compte (1 000 000 micros = 1 unite de devise), tel que livre par Google Ads.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_budget_amount_micros
+        transformDescription: Recopie du champ campaign_budget_amount_micros de l'objet campaign de l'API Google Ads, sans transformation.
       - name: currency_code
         physicalType: STRING
         logicalType: string
@@ -156,16 +192,28 @@ schema:
           minLength: 3
           maxLength: 3
         examples: [EUR]
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.currency_code
+        transformDescription: Recopie du champ currency_code de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_start_date
         physicalType: DATE
         logicalType: date
         description: Date de debut de la campagne, dans le fuseau du compte. Vide si non renseignee.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_start_date
+        transformDescription: Recopie du champ campaign_start_date de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_end_date
         physicalType: DATE
         logicalType: date
         description: Date de fin planifiee de la campagne, dans le fuseau du compte. Vide si la campagne n'a pas de fin.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_end_date
+        transformDescription: Recopie du champ campaign_end_date de l'objet campaign de l'API Google Ads, sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -173,7 +221,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -181,4 +229,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).
