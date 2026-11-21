@@ -46,9 +46,9 @@ make catalog-open   # installe ce qu'il faut, génère dist/catalog/index.html e
 make catalog        # génère sans ouvrir
 ```
 
-Démo publique : https://demo-odcs.camillelebrun.fr, hébergée sur Cloudflare (Worker statique, plan gratuit). Miroir GitHub Pages : https://camlebrun.github.io/demo-odcs/ (`.github/workflows/pages.yml`, déployé à chaque push sur `main`). La licence MIT de dbt-colibri est jointe à la page (`THIRD_PARTY_LICENSES.txt`).
+Démo publique : https://demo-odcs.camillelebrun.fr, hébergée sur Cloudflare Pages (projet `demo-odcs`, plan gratuit, aussi sur https://demo-odcs.pages.dev). Miroir GitHub Pages : https://camlebrun.github.io/demo-odcs/ (`.github/workflows/pages.yml`, déployé à chaque push sur `main`). La licence MIT de dbt-colibri est jointe à la page (`THIRD_PARTY_LICENSES.txt`).
 
-Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrangler deploy`, voir `wrangler.jsonc` ; nécessite `wrangler login`).
+Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrangler pages deploy`, voir `wrangler.jsonc` ; nécessite `wrangler login`).
 
 Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le « Mode expert » affiche les propriétés techniques (transformLogic, sources, classification, contrôles qualité avec leur SQL, YAML).
 

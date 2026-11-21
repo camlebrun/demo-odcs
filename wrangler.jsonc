@@ -1,13 +1,9 @@
 {
-  // Publication du catalogue (dist/catalog) sur Cloudflare : Worker statique + domaine personnalisé.
-  // Cloudflare crée l'enregistrement DNS et le certificat du domaine au déploiement.
-  // Générer d'abord : make catalog ; puis déployer : make publish
+  // Publication du catalogue (dist/catalog) sur Cloudflare Pages (projet demo-odcs, plan gratuit).
+  // Domaine personnalisé demo-odcs.camillelebrun.fr : à rattacher au projet dans le tableau de bord
+  // (Workers & Pages > demo-odcs > Custom domains) ; Cloudflare crée alors le DNS et le certificat.
+  // Générer et publier : make publish
   "name": "demo-odcs",
   "compatibility_date": "2026-11-01",
-  "assets": {
-    "directory": "./dist/catalog"
-  },
-  "routes": [
-    { "pattern": "demo-odcs.camillelebrun.fr", "custom_domain": true }
-  ]
+  "pages_build_output_dir": "./dist/catalog"
 }
