@@ -1,7 +1,7 @@
 name: pages
 
 # Publie le catalogue de données sur GitHub Pages à chaque push sur main.
-# Domaine personnalisé : réglage du dépôt (Settings > Pages), pas un fichier CNAME.
+# Miroir de la démo : le domaine demo-odcs.camillelebrun.fr est servi par Cloudflare (make publish).
 on:
   push:
     branches: [main]

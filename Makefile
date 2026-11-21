@@ -2,7 +2,7 @@
 VENV   ?= .venv
 PYTHON ?= $(if $(wildcard $(VENV)/bin/python),$(VENV)/bin/python,python3)
 
-.PHONY: install install-catalog catalog catalog-open schema lineage lineage-wip test check check-wip
+.PHONY: install install-catalog catalog catalog-open publish schema lineage lineage-wip test check check-wip
 
 install:
 	python3 -m venv $(VENV)
@@ -18,6 +18,10 @@ install-catalog: install
 catalog:
 	@test -x $(VENV)/bin/python && $(VENV)/bin/python -c "import dbt_colibri" 2>/dev/null || $(MAKE) install-catalog
 	$(VENV)/bin/python tools/build_catalog.py $(ARGS)
+
+# Publie le catalogue sur Cloudflare (domaine demo-odcs.camillelebrun.fr, voir wrangler.jsonc).
+publish: catalog
+	wrangler deploy
 
 # Idem et ouvre le catalogue dans le navigateur.
 catalog-open: ARGS=--open
