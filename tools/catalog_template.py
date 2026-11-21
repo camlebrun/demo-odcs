@@ -151,8 +151,9 @@ def _bigquery_info(html: str) -> str:
     """Overview : le bloc "Model Information" (database, materialization, type de modele...) devient le schema BigQuery."""
     html = _sub(html, 'children:"Model Information"})', 'children:"Schéma BigQuery"})', 1)
     # Colonne de gauche : projet puis table. Colonne de droite : dataset.
+    # Database = project_id.dataset.table (relationName) : l'interface ne recoit pas le champ `database`.
     html = _sub(html, 'mb-1",children:"Database"}),R.jsx("div",{className:"text-sm font-medium",children:be?.split(".")[0]||"N/A"})',
-                'mb-1",children:"Projet"}),R.jsx("div",{className:"text-sm font-medium",children:s?.database||"N/A"})', 1)
+                'mb-1",children:"Database"}),R.jsx("div",{className:"text-sm font-medium break-all",children:s?.relationName||"N/A"})', 1)
     html = _sub(html, 'mb-1",children:"Materialization"}),R.jsx("div",{className:"text-sm font-medium capitalize",children:Oe})',
                 'mb-1",children:"Table"}),R.jsx("div",{className:"text-sm font-medium",children:(s?.relationName||"").split(".").pop()||"N/A"})', 1)
     html = _sub(html, 'mb-1",children:"Schema"}),', 'mb-1",children:"Dataset"}),', 1)

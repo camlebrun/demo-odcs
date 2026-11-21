@@ -104,14 +104,16 @@
   window.cpColumnTabHtml = function (model, name) {
     var n = data().nodes[model], c = n && n.columns && n.columns[name];
     if (!c) return "";
-    var m = c.meta || {}, h = flagsOf(c);
-    h += '<div class="cp-h">Types</div>' + typesLine(c);
+    var m = c.meta || {}, x = '<div class="cp-h">Types</div>' + typesLine(c);
     if (m.transformDescription || m.transformExpression) {
-      h += '<div class="cp-h">Transformation</div>';
-      if (m.transformDescription) h += "<div>" + esc(m.transformDescription) + "</div>";
-      if (m.transformExpression) h += sql(m.transformExpression, "SQL BigQuery");
+      x += '<div class="cp-h">Transformation</div>';
+      if (m.transformDescription) x += "<div>" + esc(m.transformDescription) + "</div>";
+      if (m.transformExpression) x += sql(m.transformExpression, "SQL BigQuery");
     }
-    return '<div class="cp-col cp-tab">' + h + expertBlock(model, name, c, m) + "</div>";
+    /* Types et transformation (SQL) : visibles uniquement en mode expert. La classification reste visible. */
+    var ex = x + (kv([["transformLogic", esc(m.transformLogic)], ["lineageType", esc(c.lineageType)]]) || "");
+    if (c.tests && c.tests.length) ex += "<div><b>Contrôles qualité</b></div>" + tests(c.tests);
+    return '<div class="cp-col cp-tab">' + flagsOf(c) + '<div class="cp-expert-only">' + ex + "</div></div>";
   };
 
   window.cpNodeHtml = function (model) {
