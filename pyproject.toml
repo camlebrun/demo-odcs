@@ -9,6 +9,10 @@ dependencies = [
   "pytest>=8.0",
 ]
 
+[project.optional-dependencies]
+# Catalogue : dashboard statique dbt-colibri (MIT). Version epinglee, utilisee comme moteur de rendu.
+catalog = ["dbt-colibri==0.3.6"]
+
 [tool.setuptools]
 py-modules = []
 

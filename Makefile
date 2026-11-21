@@ -2,7 +2,15 @@
 VENV   ?= .venv
 PYTHON ?= $(if $(wildcard $(VENV)/bin/python),$(VENV)/bin/python,python3)
 
-.PHONY: install schema lineage lineage-wip test check check-wip
+.PHONY: install install-catalog catalog schema lineage lineage-wip test check check-wip
+
+# Catalogue de donnees (dbt-colibri) : dependance optionnelle, hors make check.
+install-catalog: install
+	$(VENV)/bin/python -m pip install -e ".[catalog]"
+
+# Genere dist/catalog/index.html + colibri-manifest.json depuis les contrats.
+catalog:
+	$(PYTHON) tools/build_catalog.py
 
 install:
 	python3 -m venv $(VENV)
