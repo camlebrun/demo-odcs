@@ -42,7 +42,7 @@ slaProperties:
 - property: latency
   value: 6
   unit: h
-  element: order_lines._loaded_at
+  element: order_lines.meta_loaded_at
   driver: analytics
   description: Donnees disponibles au plus tard 6 heures apres la modification dans Shopify.
 - property: retention
@@ -214,7 +214,7 @@ schema:
         logicalType: number
         description: Montant de la taxe, dans la devise de la commande.
         classification: internal
-  - name: _loaded_at
+  - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
@@ -222,7 +222,7 @@ schema:
     classification: internal
     transformLogic: create
     transformDescription: Horodatage de chargement ajoute par l'ingestion.
-  - name: _source_file
+  - name: meta_source_file
     physicalType: STRING
     logicalType: string
     description: URI du fichier de depot dont la ligne est issue (champ technique).

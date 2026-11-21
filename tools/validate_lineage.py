@@ -7,7 +7,7 @@ Regles (code dans la sortie) :
   L003 references transformSourceObjects (contrat, objet, property, chemins imbriques)
   L004 couches : un customer ne reference que des raw
   L005 cycle dans le graphe de references
-  L006 un raw ne porte aucun transform* (sauf _loaded_at / _source_file en create)
+  L006 un raw ne porte aucun transform* (sauf meta_loaded_at / meta_source_file en create)
   L007 coherence de transformLogic (map / transform / create) et des sources
   L008 transformLogic et transformDescription presents sur tout champ customer
   L009 tokens du nom customer == sources reellement referencees, tries
@@ -37,7 +37,7 @@ STATUSES = ("proposed", "draft", "active", "deprecated", "retired")
 CLASSIFICATIONS = ("public", "internal", "confidential", "restricted")
 PII_TAG = "pii"
 PII_CLASSIFICATION = "restricted"
-TECH_FIELDS = ("_loaded_at", "_source_file")
+TECH_FIELDS = ("meta_loaded_at", "meta_source_file")
 LOGICS = ("map", "transform", "create")
 API_VERSION = "v3.2.0"
 

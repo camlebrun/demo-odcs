@@ -275,7 +275,7 @@ schema:
       classification: restricted
       tags: *id001
     tags: *id001
-  - name: _loaded_at
+  - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de chargement de la ligne dans BigQuery, en UTC (champ technique).
@@ -283,7 +283,7 @@ schema:
     classification: internal
     transformLogic: create
     transformDescription: Horodatage de chargement ajoute par l'ingestion.
-  - name: _source_file
+  - name: meta_source_file
     physicalType: STRING
     logicalType: string
     description: URI du fichier de depot dont la ligne est issue (champ technique).

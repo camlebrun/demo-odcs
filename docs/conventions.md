@@ -75,7 +75,7 @@ Les contraintes de structure (champs inconnus refusés par `unevaluatedPropertie
 
 ## 3. Conventions de nommage des properties
 
-- snake_case minuscule, ASCII, sans accent. Commence par une lettre, sauf les champs techniques `_loaded_at` et `_source_file`.
+- snake_case minuscule, ASCII, sans accent. Commence par une lettre. Tout champ technique ou de métadonnée (ingestion, calcul, fichier source) porte le préfixe `meta_` (ex. `meta_loaded_at`, `meta_source_file`, `meta_computed_at`) et aucun nom ne commence par `_`. Les dates issues de la source (`created_at`, `updated_at`...) gardent leur nom.
 - **Raw** : on garde le nom de la source converti en snake_case, on ne renomme pas.
 - **Customer** (noms que l'on contrôle) :
   - timestamps : suffixe `_at` (`first_order_at`), type `TIMESTAMP`, toujours en UTC ;
@@ -85,7 +85,7 @@ Les contraintes de structure (champs inconnus refusés par `unevaluatedPropertie
   - compteurs : préfixe `nb_` ou suffixe `_count` ; pourcentages : suffixe `_pct` (0 à 100) ;
   - identifiants : suffixe `_id` (technique, issu de la source) ou `_key` (clé construite par le dépôt, voir `customer_key`).
 - Types : `logicalType` ODCS (`string`, `integer`, `number`, `boolean`, `timestamp`, `date`, `array`, `object`) **et** `physicalType` BigQuery (`STRING`, `INT64`, `NUMERIC`, `BOOL`, `TIMESTAMP`, `DATE`, `ARRAY<...>`, `STRUCT<...>`, `JSON`) renseignés sur chaque property.
-- Champs techniques présents sur chaque table raw : `_loaded_at` (TIMESTAMP UTC, chargement dans BigQuery) et `_source_file` (STRING, URI du fichier de dépôt d'origine, y compris pour une ingestion par API). Ils portent `transformLogic: create` et `transformDescription`, sans source.
+- Champs techniques présents sur chaque table raw : `meta_loaded_at` (TIMESTAMP UTC, chargement dans BigQuery) et `meta_source_file` (STRING, URI du fichier de dépôt d'origine, y compris pour une ingestion par API). Ils portent `transformLogic: create` et `transformDescription`, sans source.
 
 ## 4. Lineage (customer uniquement)
 
@@ -127,7 +127,7 @@ Autres règles :
 - tout champ customer de premier niveau a `transformLogic` et `transformDescription` (L008) ;
 - toutes les références doivent exister : contrat, objet de schéma, property, y compris chemins imbriqués (L003) ;
 - pas de cycle (L005), un customer ne référence que des raw (L004) ;
-- un raw ne porte aucun `transform*`, sauf `_loaded_at` et `_source_file` en `create` (L006).
+- un raw ne porte aucun `transform*`, sauf `meta_loaded_at` et `meta_source_file` en `create` (L006).
 
 ### Règle `customer_key` (définie ici, une seule fois) (L012)
 

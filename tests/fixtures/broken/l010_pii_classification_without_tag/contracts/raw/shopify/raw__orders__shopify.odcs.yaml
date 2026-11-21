@@ -49,17 +49,17 @@ schema:
     logicalType: timestamp
     description: Champ created_at.
     classification: internal
-  - name: _loaded_at
+  - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
-    description: Champ _loaded_at.
+    description: Champ meta_loaded_at.
     classification: internal
     transformLogic: create
     transformDescription: Horodatage de chargement.
-  - name: _source_file
+  - name: meta_source_file
     physicalType: STRING
     logicalType: string
-    description: Champ _source_file.
+    description: Champ meta_source_file.
     classification: internal
     transformLogic: create
     transformDescription: Fichier de depot.
