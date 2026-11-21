@@ -88,6 +88,10 @@ schema:
         required: true
         classification: C1
         examples: ['2026-03-15']
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.segments_date
+        transformDescription: Recopie du champ segments_date de l'objet campaign de l'API Google Ads, sans transformation.
       - name: campaign_id
         physicalType: INT64
         logicalType: integer
@@ -96,6 +100,10 @@ schema:
         primaryKeyPosition: 2
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.campaign_id
+        transformDescription: Recopie du champ campaign_id de l'objet campaign de l'API Google Ads, sans transformation.
       - name: customer_id
         physicalType: INT64
         logicalType: integer
@@ -104,11 +112,19 @@ schema:
         primaryKeyPosition: 3
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.customer_id
+        transformDescription: Recopie du champ customer_id de l'objet campaign de l'API Google Ads, sans transformation.
       - name: segments_ad_network_type
         physicalType: STRING
         logicalType: string
         description: Reseau publicitaire de diffusion (SEARCH, CONTENT, YOUTUBE_WATCH, MIXED, etc.). Vide si la ligne n'est pas segmentee par reseau.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.segments_ad_network_type
+        transformDescription: Recopie du champ segments_ad_network_type de l'objet campaign de l'API Google Ads, sans transformation.
       - name: metrics_cost_micros
         physicalType: INT64
         logicalType: integer
@@ -122,6 +138,10 @@ schema:
             mustBe: 0
             dimension: completeness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.metrics_cost_micros
+        transformDescription: Recopie du champ metrics_cost_micros de l'objet campaign de l'API Google Ads, sans transformation.
       - name: currency_code
         physicalType: STRING
         logicalType: string
@@ -132,28 +152,48 @@ schema:
           minLength: 3
           maxLength: 3
         examples: [EUR]
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.currency_code
+        transformDescription: Recopie du champ currency_code de l'objet campaign de l'API Google Ads, sans transformation.
       - name: metrics_impressions
         physicalType: INT64
         logicalType: integer
         description: Nombre d'impressions du jour.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.metrics_impressions
+        transformDescription: Recopie du champ metrics_impressions de l'objet campaign de l'API Google Ads, sans transformation.
       - name: metrics_clicks
         physicalType: INT64
         logicalType: integer
         description: Nombre de clics du jour.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.metrics_clicks
+        transformDescription: Recopie du champ metrics_clicks de l'objet campaign de l'API Google Ads, sans transformation.
       - name: metrics_conversions
         physicalType: FLOAT64
         logicalType: number
         description: Conversions du jour selon Google Ads (valeur fractionnaire possible avec l'attribution basee sur les donnees). Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.metrics_conversions
+        transformDescription: Recopie du champ metrics_conversions de l'objet campaign de l'API Google Ads, sans transformation.
       - name: metrics_conversions_value
         physicalType: FLOAT64
         logicalType: number
         description: Valeur des conversions du jour selon Google Ads, dans la devise currency_code. Mesure plateforme NON dedupliquee entre canaux, ne sert pas a l'attribution.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - googleads_api#campaign.metrics_conversions_value
+        transformDescription: Recopie du champ metrics_conversions_value de l'objet campaign de l'API Google Ads, sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -161,7 +201,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -169,4 +209,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

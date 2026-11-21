@@ -81,6 +81,10 @@ schema:
       severity: error
     tags:
     - pseudonymized
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.id
+    transformDescription: Recopie du champ id de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: email
     physicalType: STRING
     logicalType: string
@@ -90,6 +94,10 @@ schema:
       format: email
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.email
+    transformDescription: Recopie du champ email de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: phone
     physicalType: STRING
     logicalType: string
@@ -97,6 +105,10 @@ schema:
     classification: C3
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.phone
+    transformDescription: Recopie du champ phone de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: first_name
     physicalType: STRING
     logicalType: string
@@ -104,6 +116,10 @@ schema:
     classification: C3
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.first_name
+    transformDescription: Recopie du champ first_name de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: last_name
     physicalType: STRING
     logicalType: string
@@ -111,18 +127,30 @@ schema:
     classification: C3
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.last_name
+    transformDescription: Recopie du champ last_name de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: created_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de creation du compte client, en UTC.
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.created_at
+    transformDescription: Recopie du champ created_at de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: updated_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de derniere modification du client, en UTC.
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.updated_at
+    transformDescription: Recopie du champ updated_at de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: state
     physicalType: STRING
     logicalType: string
@@ -147,47 +175,83 @@ schema:
       dimension: conformity
       severity: warning
       description: Detecte l'apparition d'un nouvel etat cote Shopify.
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.state
+    transformDescription: Recopie du champ state de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: accepts_marketing
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si le client a accepte de recevoir des communications marketing par e-mail (consentement declare dans Shopify).
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.accepts_marketing
+    transformDescription: Recopie du champ accepts_marketing de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: accepts_marketing_updated_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de derniere modification du consentement marketing, en UTC.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.accepts_marketing_updated_at
+    transformDescription: Recopie du champ accepts_marketing_updated_at de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: marketing_opt_in_level
     physicalType: STRING
     logicalType: string
     description: Niveau de consentement marketing (single_opt_in, confirmed_opt_in, unknown).
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.marketing_opt_in_level
+    transformDescription: Recopie du champ marketing_opt_in_level de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: verified_email
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si l'adresse e-mail a ete verifiee.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.verified_email
+    transformDescription: Recopie du champ verified_email de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: tax_exempt
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si le client est exonere de taxe.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.tax_exempt
+    transformDescription: Recopie du champ tax_exempt de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: currency
     physicalType: STRING
     logicalType: string
     description: Code devise ISO 4217 de la derniere commande du client.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.currency
+    transformDescription: Recopie du champ currency de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: orders_count
     physicalType: INT64
     logicalType: integer
     description: Nombre de commandes du client selon Shopify a la date d'extraction.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.orders_count
+    transformDescription: Recopie du champ orders_count de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: total_spent
     physicalType: NUMERIC
     logicalType: number
     description: Montant cumule depense par le client selon Shopify, dans la devise currency. Indicatif, non recalcule.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.total_spent
+    transformDescription: Recopie du champ total_spent de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: last_order_id
     physicalType: INT64
     logicalType: integer
@@ -195,11 +259,19 @@ schema:
     classification: C2
     tags:
     - pseudonymized
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.last_order_id
+    transformDescription: Recopie du champ last_order_id de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: tags
     physicalType: STRING
     logicalType: string
     description: Etiquettes libres attachees au client, separees par des virgules.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.tags
+    transformDescription: Recopie du champ tags de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: note
     physicalType: STRING
     logicalType: string
@@ -207,6 +279,10 @@ schema:
     classification: C3
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.note
+    transformDescription: Recopie du champ note de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: default_address
     physicalType: STRUCT<id INT64, name STRING, company STRING, address1 STRING, address2 STRING, zip STRING, city STRING, province STRING, country STRING, country_code STRING, phone STRING>
     logicalType: object
@@ -292,6 +368,10 @@ schema:
       - pii
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Customer.default_address
+    transformDescription: Recopie du champ default_address de l'objet Customer de l'API Admin Shopify, sans transformation.
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
@@ -299,7 +379,7 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+    transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
@@ -307,4 +387,4 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: URI du fichier de depot renseignee par l'ingestion.
+    transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

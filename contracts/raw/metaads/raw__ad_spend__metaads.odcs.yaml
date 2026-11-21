@@ -88,12 +88,20 @@ schema:
         required: true
         classification: C1
         examples: ['2026-03-15']
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.date_start
+        transformDescription: Recopie du champ date_start de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: date_stop
         physicalType: DATE
         logicalType: date
         description: Fin de la periode d'insight ; egale a date_start au grain journalier.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.date_stop
+        transformDescription: Recopie du champ date_stop de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: ad_account_id
         physicalType: INT64
         logicalType: integer
@@ -102,6 +110,10 @@ schema:
         primaryKeyPosition: 3
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.ad_account_id
+        transformDescription: Recopie du champ ad_account_id de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: campaign_id
         physicalType: INT64
         logicalType: integer
@@ -110,6 +122,10 @@ schema:
         primaryKeyPosition: 2
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.campaign_id
+        transformDescription: Recopie du champ campaign_id de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: account_currency
         physicalType: STRING
         logicalType: string
@@ -120,6 +136,10 @@ schema:
           minLength: 3
           maxLength: 3
         examples: [EUR]
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.account_currency
+        transformDescription: Recopie du champ account_currency de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: spend
         physicalType: NUMERIC
         logicalType: number
@@ -133,23 +153,39 @@ schema:
             mustBe: 0
             dimension: completeness
             severity: error
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.spend
+        transformDescription: Recopie du champ spend de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: impressions
         physicalType: INT64
         logicalType: integer
         description: Nombre d'impressions du jour.
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.impressions
+        transformDescription: Recopie du champ impressions de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: clicks
         physicalType: INT64
         logicalType: integer
         description: Nombre de clics du jour (tous clics, champ clicks de Meta).
         required: true
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.clicks
+        transformDescription: Recopie du champ clicks de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: reach
         physicalType: INT64
         logicalType: integer
         description: Nombre de personnes uniques atteintes sur la periode. Non additif entre jours ni entre campagnes.
         classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.reach
+        transformDescription: Recopie du champ reach de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: actions
         physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
         logicalType: array
@@ -169,6 +205,10 @@ schema:
               logicalType: number
               description: Nombre d'actions du type, selon la fenetre d'attribution par defaut de Meta.
               classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.actions
+        transformDescription: Recopie du champ actions de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: action_values
         physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
         logicalType: array
@@ -188,6 +228,10 @@ schema:
               logicalType: number
               description: Valeur monetaire des actions du type, dans la devise account_currency.
               classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.action_values
+        transformDescription: Recopie du champ action_values de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: purchase_roas
         physicalType: ARRAY<STRUCT<action_type STRING, value NUMERIC>>
         logicalType: array
@@ -207,6 +251,10 @@ schema:
               logicalType: number
               description: Ratio ROAS plateforme du type d'action, sans unite.
               classification: C1
+        transformLogic: map
+        transformSourceObjects:
+          - metaads_api#insights.purchase_roas
+        transformDescription: Recopie du champ purchase_roas de l'objet insights de l'API Meta Marketing, sans transformation.
       - name: meta_loaded_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -214,7 +262,7 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: Horodatage de chargement ajoute par l'ingestion.
+        transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
       - name: meta_source_file
         physicalType: STRING
         logicalType: string
@@ -222,4 +270,4 @@ schema:
         required: true
         classification: C1
         transformLogic: create
-        transformDescription: URI du fichier de depot renseignee par l'ingestion.
+        transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

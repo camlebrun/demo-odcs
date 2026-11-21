@@ -76,12 +76,20 @@ schema:
     description: Date de l'evenement au format AAAAMMJJ, dans le fuseau du compte GA4 (pas en UTC).
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_date
+    transformDescription: Recopie du champ event_date de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: event_timestamp
     physicalType: INT64
     logicalType: integer
     description: Horodatage de l'evenement en microsecondes depuis l'epoque Unix, en UTC.
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_timestamp
+    transformDescription: Recopie du champ event_timestamp de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: event_name
     physicalType: STRING
     logicalType: string
@@ -99,6 +107,10 @@ schema:
       dimension: conformity
       severity: error
       description: La table ne contient que les evenements attendus.
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_name
+    transformDescription: Recopie du champ event_name de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: event_params
     physicalType: ARRAY<STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>>>
     logicalType: array
@@ -141,16 +153,28 @@ schema:
           classification: C1
     tags:
     - pii_potential
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_params
+    transformDescription: Recopie du champ event_params de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: event_previous_timestamp
     physicalType: INT64
     logicalType: integer
     description: Horodatage de l'evenement precedent du meme nom pour l'utilisateur, en microsecondes UTC.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_previous_timestamp
+    transformDescription: Recopie du champ event_previous_timestamp de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: event_bundle_sequence_id
     physicalType: INT64
     logicalType: integer
     description: Numero de sequence du lot d'evenements envoye avec cet evenement.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_bundle_sequence_id
+    transformDescription: Recopie du champ event_bundle_sequence_id de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: user_pseudo_id
     physicalType: STRING
     logicalType: string
@@ -158,6 +182,10 @@ schema:
     classification: C2
     tags:
     - pseudonymized
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.user_pseudo_id
+    transformDescription: Recopie du champ user_pseudo_id de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: user_id
     physicalType: STRING
     logicalType: string
@@ -165,11 +193,19 @@ schema:
     classification: C2
     tags:
     - pseudonymized
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.user_id
+    transformDescription: Recopie du champ user_id de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: user_first_touch_timestamp
     physicalType: INT64
     logicalType: integer
     description: Date de premiere visite de l'utilisateur, en microsecondes UTC.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.user_first_touch_timestamp
+    transformDescription: Recopie du champ user_first_touch_timestamp de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: privacy_info
     physicalType: STRUCT<analytics_storage STRING, ads_storage STRING, uses_transient_token STRING>
     logicalType: object
@@ -191,6 +227,10 @@ schema:
       logicalType: string
       description: Indique l'usage d'un jeton transitoire quand le consentement est refuse (Yes, No).
       classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.privacy_info
+    transformDescription: Recopie du champ privacy_info de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: device
     physicalType: STRUCT<category STRING, mobile_brand_name STRING, operating_system STRING, browser STRING, language STRING>
     logicalType: object
@@ -222,6 +262,10 @@ schema:
       logicalType: string
       description: Langue du navigateur.
       classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.device
+    transformDescription: Recopie du champ device de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: geo
     physicalType: STRUCT<continent STRING, country STRING, region STRING, city STRING>
     logicalType: object
@@ -248,6 +292,10 @@ schema:
       logicalType: string
       description: Ville approximative.
       classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.geo
+    transformDescription: Recopie du champ geo de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: traffic_source
     physicalType: STRUCT<name STRING, medium STRING, source STRING>
     logicalType: object
@@ -269,6 +317,10 @@ schema:
       logicalType: string
       description: Source de premiere acquisition (google, facebook).
       classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.traffic_source
+    transformDescription: Recopie du champ traffic_source de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: collected_traffic_source
     physicalType: STRUCT<manual_source STRING, manual_medium STRING, manual_campaign_name STRING, gclid STRING>
     logicalType: object
@@ -295,6 +347,10 @@ schema:
       logicalType: string
       description: Identifiant de clic Google Ads.
       classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.collected_traffic_source
+    transformDescription: Recopie du champ collected_traffic_source de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: ecommerce
     physicalType: STRUCT<transaction_id STRING, purchase_revenue FLOAT64, purchase_revenue_in_usd FLOAT64, total_item_quantity INT64, unique_items INT64>
     logicalType: object
@@ -326,6 +382,10 @@ schema:
       logicalType: integer
       description: Nombre d'articles distincts de l'evenement.
       classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.ecommerce
+    transformDescription: Recopie du champ ecommerce de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: items
     physicalType: ARRAY<STRUCT<item_id STRING, item_name STRING, item_brand STRING, item_variant STRING, item_category STRING, item_category2 STRING, price FLOAT64, quantity INT64, item_revenue FLOAT64, coupon STRING, index INT64>>
     logicalType: array
@@ -390,16 +450,28 @@ schema:
         logicalType: integer
         description: Position de l'article dans la liste.
         classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.items
+    transformDescription: Recopie du champ items de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: stream_id
     physicalType: STRING
     logicalType: string
     description: Identifiant du flux de donnees GA4.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.stream_id
+    transformDescription: Recopie du champ stream_id de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: platform
     physicalType: STRING
     logicalType: string
     description: Plateforme du flux (WEB, IOS, ANDROID).
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.platform
+    transformDescription: Recopie du champ platform de l'objet events de l'export BigQuery GA4, sans transformation.
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
@@ -407,7 +479,7 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+    transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
@@ -415,7 +487,7 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: URI du fichier de depot renseignee par l'ingestion.
+    transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).
 customProperties:
 - property: details
   value: Export limite par quotas (1 million d'evenements par jour en version standard). Sessions reconstruites via event_params (ga_session_id) et user_pseudo_id. event_date dans le fuseau du compte, event_timestamp en UTC.

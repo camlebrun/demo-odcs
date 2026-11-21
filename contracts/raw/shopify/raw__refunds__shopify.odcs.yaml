@@ -85,6 +85,10 @@ schema:
       mustBe: 0
       dimension: uniqueness
       severity: error
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.id
+    transformDescription: Recopie du champ id de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: order_id
     physicalType: INT64
     logicalType: integer
@@ -97,17 +101,29 @@ schema:
       mustBe: 0
       dimension: completeness
       severity: error
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.order_id
+    transformDescription: Recopie du champ order_id de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: created_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de creation du remboursement, en UTC.
     required: true
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.created_at
+    transformDescription: Recopie du champ created_at de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: processed_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Date et heure de traitement du remboursement, en UTC.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.processed_at
+    transformDescription: Recopie du champ processed_at de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: user_id
     physicalType: INT64
     logicalType: integer
@@ -115,6 +131,10 @@ schema:
     classification: C2
     tags:
     - pseudonymized
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.user_id
+    transformDescription: Recopie du champ user_id de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: note
     physicalType: STRING
     logicalType: string
@@ -122,11 +142,19 @@ schema:
     classification: C3
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.note
+    transformDescription: Recopie du champ note de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: restock
     physicalType: BOOL
     logicalType: boolean
     description: Vrai si les articles sont remis en stock (champ historique, voir restock_type par ligne).
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.restock
+    transformDescription: Recopie du champ restock de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: refund_line_items
     physicalType: ARRAY<STRUCT<id INT64, line_item_id INT64, location_id INT64, quantity INT64, restock_type STRING, subtotal NUMERIC, total_tax NUMERIC>>
     logicalType: array
@@ -171,6 +199,10 @@ schema:
         logicalType: number
         description: Taxe remboursee pour la ligne, dans la devise de la transaction.
         classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.refund_line_items
+    transformDescription: Recopie du champ refund_line_items de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: transactions
     physicalType: ARRAY<STRUCT<id INT64, kind STRING, gateway STRING, status STRING, amount NUMERIC, currency STRING>>
     logicalType: array
@@ -210,6 +242,10 @@ schema:
         logicalType: string
         description: Code devise ISO 4217 de la transaction.
         classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.transactions
+    transformDescription: Recopie du champ transactions de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: order_adjustments
     physicalType: ARRAY<STRUCT<id INT64, kind STRING, amount NUMERIC, tax_amount NUMERIC, reason STRING>>
     logicalType: array
@@ -244,11 +280,19 @@ schema:
         logicalType: string
         description: Motif de l'ajustement.
         classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.order_adjustments
+    transformDescription: Recopie du champ order_adjustments de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: admin_graphql_api_id
     physicalType: STRING
     logicalType: string
     description: Identifiant global (GID) du remboursement dans l'API GraphQL Admin.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Refund.admin_graphql_api_id
+    transformDescription: Recopie du champ admin_graphql_api_id de l'objet Refund de l'API Admin Shopify, sans transformation.
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
@@ -256,7 +300,7 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: Horodatage de chargement ajoute par l'ingestion.
+    transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
@@ -264,4 +308,4 @@ schema:
     required: true
     classification: C1
     transformLogic: create
-    transformDescription: URI du fichier de depot renseignee par l'ingestion.
+    transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).
