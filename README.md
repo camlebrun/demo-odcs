@@ -5,13 +5,13 @@ Data contracts [ODCS v3.2.0](https://github.com/bitol-io/open-data-contract-stan
 ## Périmètre du lot 1 : 17 contrats
 
 - **14 contrats raw**, un par table source, nommés `raw__<table>__<source>` : shopify (4), pos (4), ga4 (2), googleads (2), metaads (2).
-- **3 contrats customer**, nommés `<purpose>__<sources triées>` : `customer_kpis__pos_shopify`, `customer_audiences__ga4_pos_shopify`, `customer_acquisition__ga4_googleads_metaads_shopify`. Ils ne référencent que des raw.
+- **3 contrats customer**, rangés par flux métier (`acquisition/`, `audiences/`, `sales/`) : `acquisition_monthly`, `audiences`, `kpis_monthly`. Ils ne référencent que des raw.
 
 ## Structure
 
 ```
 contracts/raw/<source>/       contrats raw (un dossier par source = un domaine)
-contracts/customer/           contrats customer
+contracts/customer/<flux>/    contrats customer (un dossier par flux métier)
 schema/                       JSON Schema officiel ODCS v3.2.0 (non modifié)
 docs/conventions.md           conventions de nommage, lineage, versionnement, PII
 docs/use-cases/               fiches de cadrage des 3 produits customer

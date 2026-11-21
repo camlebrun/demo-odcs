@@ -1,8 +1,8 @@
-# Contrat customer : audiences marketing quotidiennes (clients consentants). Voir docs/use-cases/customer_audiences__ga4_pos_shopify.md.
+# Contrat customer : audiences marketing quotidiennes (clients consentants). Voir docs/use-cases/audiences.md.
 apiVersion: v3.2.0
 kind: DataContract
-id: customer_audiences__ga4_pos_shopify
-name: customer_audiences__ga4_pos_shopify
+id: audiences
+name: audiences
 version: 1.0.0
 status: active
 domain: customer

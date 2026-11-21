@@ -1,12 +1,12 @@
 apiVersion: v3.2.0
 kind: DataContract
-id: customer_audiences__shopify
-name: customer_audiences__shopify
+id: audiences
+name: audiences
 version: 1.0.0
 status: active
 domain: customer
 description:
-  purpose: Contrat de test customer_audiences__shopify.
+  purpose: Contrat de test audiences.
 servers:
 - server: bigquery_prod
   type: bigquery
@@ -37,7 +37,7 @@ schema:
     tags:
     - pseudonymized
     transformSourceObjects:
-    - customer_kpis__ga4_shopify#customer_kpis.customer_key
+    - kpis_monthly#customer_kpis.customer_key
     customProperties:
     - property: transformExpression
       value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))

@@ -3,14 +3,14 @@
 
 Regles (code dans la sortie) :
   L001 decompte (14 raw dont 4/4/2/2/2 par source, 3 customer) ; desactivable avec --no-count
-  L002 nommage raw / customer, id == name == nom de fichier, dossier == domaine
+  L002 nommage raw / customer, id == name == nom de fichier, dossier source == domaine (raw)
   L003 references transformSourceObjects (contrat, objet, property, chemins imbriques)
   L004 couches : un customer ne reference que des raw
   L005 cycle dans le graphe de references
   L006 un raw ne porte aucun transform* (sauf meta_loaded_at / meta_source_file en create)
   L007 coherence de transformLogic (map / transform / create) et des sources
   L008 transformLogic et transformDescription presents sur tout champ customer
-  L009 tokens du nom customer == sources reellement referencees, tries
+  L009 un contrat customer vit dans contracts/customer/<flux>/ avec <flux> parmi acquisition, audiences, sales
   L010 PII : tag `pii` ET classification `C3`
   L011 map : renommage ou cast trivial uniquement
   L012 customer_key conforme a la regle canonique
@@ -36,6 +36,7 @@ from common import REPO_ROOT, find_contracts, load_yaml
 RAW_COUNTS = {"shopify": 4, "pos": 4, "ga4": 2, "googleads": 2, "metaads": 2}
 CUSTOMER_COUNT = 3
 SOURCES = tuple(RAW_COUNTS)
+FLOWS = ("acquisition", "audiences", "sales")  # flux metier : un sous-dossier de contracts/customer/ par flux
 STATUSES = ("proposed", "draft", "active", "deprecated", "retired")
 CLASSIFICATIONS = ("C0", "C1", "C2", "C3")  # confidentialite : public, interne, confidentiel, restreint
 PII_TAG = "pii"
@@ -47,7 +48,7 @@ DESCRIPTION_MAX = 350  # caracteres : 5 lignes dans le catalogue
 
 SNAKE = r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*"
 RAW_RE = re.compile(rf"^raw__(?P<table>{SNAKE})__(?P<source>[a-z0-9]+)$")
-CUSTOMER_RE = re.compile(rf"^(?P<purpose>{SNAKE})__(?P<tokens>[a-z0-9]+(?:_[a-z0-9]+)*)$")
+CUSTOMER_RE = re.compile(rf"^{SNAKE}$")
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 REF_RE = re.compile(r"^(?P<contract>[^#\s]+)#(?P<obj>[^.\s#]+)\.(?P<path>[^\s#]+)$")
 
@@ -86,17 +87,11 @@ class Contract:
     rel: str
     data: dict
     layer: str  # raw | customer | other
-    folder: str  # source pour raw, "customer" pour customer
+    folder: str  # source pour raw, flux metier pour customer
 
     @property
     def cid(self):
         return self.data.get("id")
-
-    @property
-    def suffix(self) -> str | None:
-        """Token apres le dernier `__` de l'id (source pour un raw)."""
-        cid = self.cid
-        return cid.rsplit("__", 1)[-1] if isinstance(cid, str) and "__" in cid else None
 
 
 @dataclass
@@ -113,8 +108,8 @@ def load_contracts(root: Path) -> tuple[list[Contract], list[Err]]:
         parts = p.relative_to(root / "contracts").parts
         if len(parts) == 3 and parts[0] == "raw":
             layer, folder = "raw", parts[1]
-        elif len(parts) == 2 and parts[0] == "customer":
-            layer, folder = "customer", "customer"
+        elif len(parts) == 3 and parts[0] == "customer":
+            layer, folder = "customer", parts[1]
         else:
             layer, folder = "other", ""
         try:
@@ -209,7 +204,7 @@ def check_naming(c: Contract) -> list[Err]:
     stem = c.path.name[: -len(".odcs.yaml")]
     cid, name = c.cid, c.data.get("name")
     if c.layer == "other":
-        return [Err("L002", c.rel, "emplacement invalide: attendu contracts/raw/<source>/ ou contracts/customer/")]
+        return [Err("L002", c.rel, "emplacement invalide: attendu contracts/raw/<source>/ ou contracts/customer/<flux>/")]
     if cid != stem:
         errs.append(Err("L002", c.rel, f"id '{cid}' different du nom de fichier '{stem}'"))
     if name != cid:
@@ -227,16 +222,8 @@ def check_naming(c: Contract) -> list[Err]:
     else:
         if cid.startswith("raw__"):
             errs.append(Err("L002", c.rel, "un contrat customer ne peut pas porter le prefixe raw__"))
-        m = CUSTOMER_RE.match(cid)
-        if not m or cid.count("__") != 1:
-            errs.append(Err("L002", c.rel, f"id '{cid}' ne respecte pas <purpose>__<sources triees>"))
-        else:
-            tokens = m["tokens"].split("_")
-            unknown = [t for t in tokens if t not in SOURCES]
-            if unknown:
-                errs.append(Err("L002", c.rel, f"token(s) de source inconnu(s): {', '.join(unknown)}"))
-            elif tokens != sorted(tokens) or len(set(tokens)) != len(tokens):
-                errs.append(Err("L002", c.rel, f"tokens de sources non tries alphabetiquement ou dupliques: {'_'.join(tokens)} (attendu {'_'.join(sorted(set(tokens)))})"))
+        if not CUSTOMER_RE.match(cid) or "__" in cid:
+            errs.append(Err("L002", c.rel, f"id '{cid}' ne respecte pas <objet> en snake_case, sans '__'"))
     return errs
 
 
@@ -252,7 +239,7 @@ def check_metadata(c: Contract) -> list[Err]:
         errs.append(Err("L013", c.rel, f"status '{d.get('status')}' hors de {', '.join(STATUSES)}"))
     if not isinstance(d.get("version"), str) or not SEMVER_RE.match(d["version"]):
         errs.append(Err("L013", c.rel, f"version '{d.get('version')}' n'est pas du semver MAJOR.MINOR.PATCH"))
-    expected_domain = c.folder
+    expected_domain = c.folder if c.layer == "raw" else "customer"
     if d.get("domain") != expected_domain:
         errs.append(Err("L013", c.rel, f"domain '{d.get('domain')}' (attendu '{expected_domain}')"))
     expected_dataset = f"raw_{c.folder}" if c.layer == "raw" else "customer"
@@ -427,15 +414,10 @@ def check_customer_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list
     return errs, referenced
 
 
-def check_tokens(c: Contract, referenced: set[str], by_id: dict[str, Contract]) -> list[Err]:
-    m = CUSTOMER_RE.match(c.cid) if isinstance(c.cid, str) else None
-    if not m:
+def check_flow_folder(c: Contract) -> list[Err]:
+    if c.folder in FLOWS:
         return []
-    tokens = m["tokens"].split("_")
-    used = sorted({by_id[r].suffix for r in referenced if r in by_id and by_id[r].layer == "raw" and by_id[r].suffix})
-    if tokens != used:
-        return [Err("L009", c.rel, f"tokens du nom [{', '.join(tokens)}] differents des sources referencees [{', '.join(used)}]")]
-    return []
+    return [Err("L009", c.rel, f"flux '{c.folder}' inconnu : dossier attendu parmi {', '.join(FLOWS)}")]
 
 
 def find_cycles(graph: dict[str, set[str]]) -> list[list[str]]:
@@ -479,7 +461,7 @@ def run(root: Path, count: bool = True) -> list[Err]:
         elif c.layer == "customer":
             errs, referenced = check_customer_fields(c, by_id)
             errors += errs
-            errors += check_tokens(c, referenced, by_id)
+            errors += check_flow_folder(c)
             if isinstance(c.cid, str):
                 graph[c.cid] = referenced
     for cycle in find_cycles(graph):

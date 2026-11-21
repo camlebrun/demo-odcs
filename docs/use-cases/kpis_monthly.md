@@ -1,6 +1,6 @@
-# Use case : indicateurs clients mensuels omnicanal (`customer_kpis__pos_shopify`)
+# Use case : indicateurs clients mensuels omnicanal (`kpis_monthly`)
 
-Contrat : `contracts/customer/customer_kpis__pos_shopify.odcs.yaml` (table `customer.customer_kpis_monthly`).
+Contrat : `contracts/customer/kpis_monthly.odcs.yaml` (table `customer.customer_kpis_monthly`).
 
 ## Sponsor
 

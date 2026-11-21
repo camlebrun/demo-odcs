@@ -1,12 +1,12 @@
 apiVersion: v3.2.0
 kind: DataContract
-id: customer_kpis__shopify_ga4
-name: customer_kpis__shopify_ga4
+id: kpis__shopify
+name: kpis__shopify
 version: 1.0.0
 status: active
 domain: customer
 description:
-  purpose: Contrat de test customer_kpis__ga4_shopify.
+  purpose: Contrat de test kpis_monthly.
 servers:
 - server: bigquery_prod
   type: bigquery

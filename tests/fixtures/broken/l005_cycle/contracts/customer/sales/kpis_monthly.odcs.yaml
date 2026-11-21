@@ -1,12 +1,12 @@
 apiVersion: v3.2.0
 kind: DataContract
-id: customer_kpis__ga4_shopify
-name: customer_kpis__ga4_shopify
+id: kpis_monthly
+name: kpis_monthly
 version: 1.0.0
 status: active
 domain: customer
 description:
-  purpose: Contrat de test customer_kpis__ga4_shopify.
+  purpose: Contrat de test kpis_monthly.
 servers:
 - server: bigquery_prod
   type: bigquery
@@ -49,7 +49,7 @@ schema:
     transformLogic: map
     transformDescription: Alimente order_total.
     transformSourceObjects:
-    - customer_audiences__shopify#audiences.customer_key
+    - audiences#audiences.customer_key
     customProperties:
     - property: transformExpression
       value: total_price

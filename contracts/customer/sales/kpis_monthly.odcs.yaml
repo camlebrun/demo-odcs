@@ -1,8 +1,8 @@
-# Contrat customer : indicateurs clients mensuels omnicanal (caisse + Shopify). Voir docs/use-cases/customer_kpis__pos_shopify.md.
+# Contrat customer : indicateurs clients mensuels omnicanal (caisse + Shopify). Voir docs/use-cases/kpis_monthly.md.
 apiVersion: v3.2.0
 kind: DataContract
-id: customer_kpis__pos_shopify
-name: customer_kpis__pos_shopify
+id: kpis_monthly
+name: kpis_monthly
 version: 1.0.0
 status: active
 domain: customer

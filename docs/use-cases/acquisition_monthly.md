@@ -1,6 +1,6 @@
-# Use case : acquisition de nouveaux clients par campagne (`customer_acquisition__ga4_googleads_metaads_shopify`)
+# Use case : acquisition de nouveaux clients par campagne (`acquisition_monthly`)
 
-Contrat : `contracts/customer/customer_acquisition__ga4_googleads_metaads_shopify.odcs.yaml` (table `customer.customer_acquisition_monthly`).
+Contrat : `contracts/customer/acquisition_monthly.odcs.yaml` (table `customer.customer_acquisition_monthly`).
 
 ## Sponsor
 

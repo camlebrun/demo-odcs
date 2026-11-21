@@ -13,7 +13,7 @@ def test_manifest_has_one_node_per_contract():
     assert set(m["nodes"]) == {
         "raw__orders__shopify",
         "raw__pages_views__ga4",
-        "customer_kpis__ga4_shopify",
+        "kpis_monthly",
     }
     assert m["metadata"]["total_model_count"] == 3
 
@@ -23,7 +23,7 @@ def test_column_edges_follow_transform_source_objects():
     col_edges = [e for e in m["lineage"]["edges"] if e["targetColumn"]]
     assert col_edges, "le customer du fixture declare du lineage"
     for e in col_edges:
-        assert e["target"] == "customer_kpis__ga4_shopify"
+        assert e["target"] == "kpis_monthly"
         assert e["sourceColumn"] in m["nodes"][e["source"]]["columns"]
         assert e["targetColumn"] in m["nodes"][e["target"]]["columns"]
         assert m["nodes"][e["target"]]["columns"][e["targetColumn"]]["hasLineage"] is True

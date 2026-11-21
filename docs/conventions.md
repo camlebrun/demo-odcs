@@ -10,7 +10,7 @@ Standard : [Open Data Contract Standard (ODCS) v3.2.0](https://github.com/bitol-
 
 ```
 contracts/raw/<source>/raw__<table>__<source>.odcs.yaml
-contracts/customer/<purpose>__<sources>.odcs.yaml
+contracts/customer/<flux>/<objet>.odcs.yaml
 ```
 
 Sources du lot 1 : `shopify`, `pos`, `ga4`, `googleads`, `metaads`. Un fichier par contrat, nommé `<id>.odcs.yaml`.
@@ -25,9 +25,9 @@ Sources du lot 1 : `shopify`, `pos`, `ga4`, `googleads`, `metaads`. Un fichier p
 
 ### Customer (L002, L009)
 
-- id `<purpose>__<sources>` ; `<purpose>` en snake_case sans `__`.
-- `<sources>` : tokens des sources référencées, **triés alphabétiquement**, séparés par `_` : `customer_acquisition__ga4_googleads_metaads_shopify`.
-- Les tokens du nom doivent correspondre **exactement** à l'ensemble des sources (domaines des raw) réellement référencées dans le lineage (L009). Ajouter ou retirer une source dans le lineage impose de renommer le contrat, donc c'est un breaking change (voir section 5).
+- Un sous-dossier par flux métier sous `contracts/customer/` : `acquisition`, `audiences`, `sales` (L009). Un nouveau flux s'ajoute à `FLOWS` dans `tools/validate_lineage.py`.
+- id `<objet>` en snake_case sans `__` : `acquisition_monthly` (`acquisition/`), `audiences` (`audiences/`), `kpis_monthly` (`sales/`). Les sources ne figurent pas dans le nom : elles sont portées par le lineage.
+- `domain: customer` et dataset `customer` pour tous les flux.
 - Un customer ne référence que des raw (L004), jamais un autre customer.
 
 ### Domaines, équipes, datasets
@@ -160,7 +160,7 @@ Chaque contrat porte sa version semver dans `version` (démarrage à `1.0.0` en 
 - passage d'une property en `required: true` alors que la table peut contenir des NULL, ou toute contrainte plus stricte sur les valeurs (`enum`, `logicalTypeOptions`) ;
 - changement de sémantique d'une property (unité, fuseau, devise, règle de calcul, `transformExpression` modifiant le résultat) ;
 - changement de clé primaire ;
-- changement du jeu de sources d'un customer (donc de son nom) ;
+- changement du jeu de sources d'un customer ;
 - dégradation d'un SLA (`slaProperties`) ;
 - passage en `deprecated` ou `retired`.
 

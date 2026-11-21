@@ -1,6 +1,6 @@
-# Use case : audiences marketing consentantes (`customer_audiences__ga4_pos_shopify`)
+# Use case : audiences marketing consentantes (`audiences`)
 
-Contrat : `contracts/customer/customer_audiences__ga4_pos_shopify.odcs.yaml` (table `customer.customer_audiences`).
+Contrat : `contracts/customer/audiences.odcs.yaml` (table `customer.customer_audiences`).
 
 ## Sponsor
 

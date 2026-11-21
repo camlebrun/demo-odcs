@@ -1,8 +1,8 @@
-# Contrat customer : acquisition de nouveaux clients web par campagne paid media. Voir docs/use-cases/customer_acquisition__ga4_googleads_metaads_shopify.md.
+# Contrat customer : acquisition de nouveaux clients web par campagne paid media. Voir docs/use-cases/acquisition_monthly.md.
 apiVersion: v3.2.0
 kind: DataContract
-id: customer_acquisition__ga4_googleads_metaads_shopify
-name: customer_acquisition__ga4_googleads_metaads_shopify
+id: acquisition_monthly
+name: acquisition_monthly
 version: 1.0.0
 status: active
 domain: customer
