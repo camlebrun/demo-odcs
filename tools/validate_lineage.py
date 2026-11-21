@@ -16,6 +16,8 @@ Regles (code dans la sortie) :
   L012 customer_key conforme a la regle canonique
   L013 metadonnees (apiVersion, status, version, domain, servers, team, support)
   L014 documentation et classification des properties
+  L015 nommage des properties (snake_case, suffixes _at/_date/_amount/_eur/is_/has_ vs type physique)
+  L016 customer_key : classification confidential et tag pseudonymized
 
 Code retour 1 s'il y a au moins une erreur.
 """
@@ -289,6 +291,53 @@ def check_docs(c: Contract) -> list[Err]:
     return errs
 
 
+PROP_NAME_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+# Suffixes ou prefixes de nom customer imposant un type physique BigQuery (docs/conventions.md, section 3).
+CUSTOMER_TYPE_RULES = (
+    ("suffix", "_at", ("TIMESTAMP",)),
+    ("suffix", "_date", ("DATE",)),
+    ("suffix", "_amount", ("NUMERIC",)),
+    ("suffix", "_eur", ("NUMERIC",)),
+    ("prefix", "is_", ("BOOL",)),
+    ("prefix", "has_", ("BOOL",)),
+)
+
+
+def check_property_names(c: Contract) -> list[Err]:
+    errs: list[Err] = []
+    if c.layer == "other":
+        return errs
+    for p in all_props(c):
+        name = str(p.node.get("name", ""))
+        where = f"{c.rel} {p.path}"
+        if not PROP_NAME_RE.match(name):
+            errs.append(Err("L015", where, f"nom '{name}' : snake_case minuscule ASCII, commence par une lettre"))
+            continue
+        if c.layer != "customer" or not p.top:
+            continue
+        ptype = str(p.node.get("physicalType", "")).upper()
+        for kind, token, types in CUSTOMER_TYPE_RULES:
+            hit = name.endswith(token) if kind == "suffix" else name.startswith(token)
+            if hit and ptype not in types:
+                errs.append(Err("L015", where, f"'{name}' impose physicalType {'/'.join(types)} (trouve '{ptype}')"))
+        if name.startswith("meta_") and p.node.get("transformLogic") != "create":
+            errs.append(Err("L015", where, f"'{name}' : un champ meta_ est un champ technique en transformLogic create"))
+    return errs
+
+
+def check_customer_key_class(c: Contract) -> list[Err]:
+    errs: list[Err] = []
+    if c.layer != "customer":
+        return errs
+    for p in all_props(c):
+        if p.node.get("name") != "customer_key":
+            continue
+        where = f"{c.rel} {p.path}"
+        if p.node.get("classification") != "confidential" or "pseudonymized" not in (p.node.get("tags") or []):
+            errs.append(Err("L016", where, "customer_key doit etre confidential avec le tag pseudonymized"))
+    return errs
+
+
 def check_pii(c: Contract) -> list[Err]:
     errs = []
     for p in all_props(c):
@@ -415,6 +464,8 @@ def run(root: Path, count: bool = True) -> list[Err]:
         errors += check_metadata(c)
         errors += check_docs(c)
         errors += check_pii(c)
+        errors += check_property_names(c)
+        errors += check_customer_key_class(c)
         if c.layer == "raw":
             errors += check_raw_transform(c)
         elif c.layer == "customer":
