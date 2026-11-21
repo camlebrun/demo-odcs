@@ -10,6 +10,7 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 - Règles L015 (nommage des properties) et L016 (`customer_key` pseudonymisé).
 
 ### Modifié
+- Customer : un sous-dossier par flux métier (`acquisition/`, `audiences/`, `sales/`) et noms courts (`acquisition_monthly`, `audiences`, `kpis_monthly`) sans les sources ; L009 vérifie désormais le dossier de flux.
 - Raw : chaque champ de premier niveau porte `transformLogic` (`map`, `create` pour `meta_*`), `transformSourceObjects` (champ de la source externe) et `transformDescription` ; la règle L006 est inversée en conséquence.
 - Champs techniques préfixés `meta_` : `meta_loaded_at`, `meta_source_file`, `meta_computed_at`. Aucun nom ne commence par `_`.
 - GA4 : `raw__purchases__ga4` et `raw__pages_views__ga4` pointent des vues filtrées (`purchase_events`, `page_view_events`).

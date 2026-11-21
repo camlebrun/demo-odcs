@@ -1,0 +1,43 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: audiences
+name: audiences
+version: 1.0.0
+status: active
+domain: customer
+description:
+  purpose: Contrat de test audiences.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: customer
+team:
+  name: team-customer
+  members:
+  - username: '@org/team-customer'
+    role: owner
+support:
+- channel: data-customer
+  tool: email
+  url: mailto:data-customer@retail.example
+schema:
+- name: audiences
+  physicalType: table
+  description: Audiences.
+  properties:
+  - name: customer_key
+    physicalType: STRING
+    logicalType: string
+    description: Champ customer_key.
+    classification: C2
+    transformLogic: transform
+    transformDescription: Alimente customer_key.
+    tags:
+    - pseudonymized
+    transformSourceObjects:
+    - kpis_monthly#customer_kpis.customer_key
+    customProperties:
+    - property: transformExpression
+      value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
