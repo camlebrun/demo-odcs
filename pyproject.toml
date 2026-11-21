@@ -1,0 +1,17 @@
+[project]
+name = "data-contracts"
+version = "0.1.0"
+description = "Data contracts ODCS v3.2.0 du data mesh (lot 1) et outillage de validation"
+requires-python = ">=3.12"
+dependencies = [
+  "pyyaml>=6.0",
+  "jsonschema>=4.21",
+  "pytest>=8.0",
+]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tools"]

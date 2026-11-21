@@ -1,0 +1,67 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__orders__shopify
+name: raw__orders__shopify
+version: 1.0.0
+status: active
+domain: shopify
+description:
+  purpose: Contrat de test raw__orders__shopify.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: raw_shopify
+team:
+  name: team-shopify
+  members:
+  - username: '@org/team-shopify'
+    role: owner
+support:
+- channel: data-shopify
+  tool: email
+  url: mailto:data-shopify@retail.example
+schema:
+- name: orders
+  physicalType: table
+  description: Commandes.
+  properties:
+  - name: id
+    physicalType: INT64
+    logicalType: integer
+    description: Champ id.
+    classification: internal
+    primaryKey: true
+    required: true
+  - name: email
+    physicalType: STRING
+    logicalType: string
+    description: Champ email.
+    classification: restricted
+    tags:
+    - pii
+  - name: total_price
+    physicalType: NUMERIC
+    logicalType: number
+    description: Champ total_price.
+    classification: internal
+  - name: created_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Champ created_at.
+    classification: internal
+  - name: _loaded_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Champ _loaded_at.
+    classification: internal
+    transformLogic: create
+    transformDescription: Horodatage de chargement.
+  - name: _source_file
+    physicalType: STRING
+    logicalType: string
+    description: Champ _source_file.
+    classification: internal
+    transformLogic: create
+    transformDescription: Fichier de depot.

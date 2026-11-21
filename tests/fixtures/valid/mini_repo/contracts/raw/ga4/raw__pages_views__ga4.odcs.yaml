@@ -1,0 +1,61 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__pages_views__ga4
+name: raw__pages_views__ga4
+version: 1.0.0
+status: active
+domain: ga4
+description:
+  purpose: Contrat de test raw__pages_views__ga4.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: raw_ga4
+team:
+  name: team-ga4
+  members:
+  - username: '@org/team-ga4'
+    role: owner
+support:
+- channel: data-ga4
+  tool: email
+  url: mailto:data-ga4@retail.example
+schema:
+- name: events
+  physicalType: table
+  description: Evenements GA4.
+  properties:
+  - name: event_name
+    physicalType: STRING
+    logicalType: string
+    description: Champ event_name.
+    classification: internal
+  - name: event_params
+    physicalType: ARRAY<STRUCT<key STRING>>
+    logicalType: array
+    description: Champ event_params.
+    classification: internal
+    items:
+      logicalType: object
+      properties:
+      - name: key
+        physicalType: STRING
+        logicalType: string
+        description: Champ key.
+        classification: internal
+  - name: _loaded_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Champ _loaded_at.
+    classification: internal
+    transformLogic: create
+    transformDescription: Horodatage de chargement.
+  - name: _source_file
+    physicalType: STRING
+    logicalType: string
+    description: Champ _source_file.
+    classification: internal
+    transformLogic: create
+    transformDescription: Fichier de depot.

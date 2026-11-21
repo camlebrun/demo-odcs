@@ -1,0 +1,89 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: customer_kpis__ga4_shopify
+name: customer_kpis__ga4_shopify
+version: 1.0.0
+status: active
+domain: customer
+description:
+  purpose: Contrat de test customer_kpis__ga4_shopify.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: customer
+team:
+  name: team-customer
+  members:
+  - username: '@org/team-customer'
+    role: owner
+support:
+- channel: data-customer
+  tool: email
+  url: mailto:data-customer@retail.example
+schema:
+- name: customer_kpis
+  physicalType: table
+  description: Indicateurs client.
+  properties:
+  - name: customer_key
+    physicalType: STRING
+    logicalType: string
+    description: Champ customer_key.
+    classification: confidential
+    transformLogic: transform
+    transformDescription: Alimente customer_key.
+    tags:
+    - pseudonymized
+    transformSourceObjects:
+    - raw__orders__shopify#orders.email
+    customProperties:
+    - property: transformExpression
+      value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
+  - name: order_total
+    physicalType: NUMERIC
+    logicalType: number
+    description: Champ order_total.
+    classification: internal
+    transformLogic: map
+    transformDescription: Alimente order_total.
+    transformSourceObjects:
+    - raw__orders__shopify#orders.total_price
+    customProperties:
+    - property: transformExpression
+      value: total_price
+  - name: first_order_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Champ first_order_at.
+    classification: internal
+    transformLogic: transform
+    transformDescription: Alimente first_order_at.
+    transformSourceObjects:
+    - raw__orders__shopify#orders.created_at
+    customProperties:
+    - property: transformExpression
+      value: MIN(created_at)
+  - name: last_param_key
+    physicalType: STRING
+    logicalType: string
+    description: Champ last_param_key.
+    classification: internal
+    transformLogic: transform
+    transformDescription: Alimente last_param_key.
+    transformSourceObjects:
+    - raw__pages_views__ga4#events.event_params.key
+    customProperties:
+    - property: transformExpression
+      value: MAX(key)
+  - name: computed_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Champ computed_at.
+    classification: internal
+    transformLogic: create
+    transformDescription: Alimente computed_at.
+    customProperties:
+    - property: transformExpression
+      value: CURRENT_TIMESTAMP()

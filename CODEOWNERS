@@ -1,0 +1,17 @@
+# Une equipe proprietaire par domaine. Remplacer @org par l'organisation GitHub reelle.
+/contracts/raw/shopify/     @org/team-shopify
+/contracts/raw/pos/         @org/team-pos
+/contracts/raw/ga4/         @org/team-ga4
+/contracts/raw/googleads/   @org/team-googleads
+/contracts/raw/metaads/     @org/team-metaads
+/contracts/customer/        @org/team-customer
+
+# Standard, conventions et outillage.
+/docs/                      @org/data-platform
+/tools/                     @org/data-platform
+/tests/                     @org/data-platform
+/schema/                    @org/data-platform
+/Makefile                   @org/data-platform
+/pyproject.toml             @org/data-platform
+/.github/                   @org/data-platform
+/CODEOWNERS                 @org/data-platform
