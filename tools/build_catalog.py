@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,7 +56,7 @@ def _tests(quality, prefix: str) -> list[dict]:
                 "namespace": "odcs",
                 "config": {"severity": rule.get("severity"), "warn_if": None, "error_if": None},
                 "kwargs": {k: v for k, v in rule.items() if k not in ("severity",)},
-                "compiled_code": rule.get("query"),
+                "compiled_code": None,  # jamais de code compile dans le catalogue ; la requete reste dans kwargs.query
             }
         )
     return out

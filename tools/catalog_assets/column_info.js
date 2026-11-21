@@ -74,7 +74,7 @@
       var k = t.kwargs || {};
       return "<div><b>" + esc(t.name) + "</b> " + badge(k.dimension || "contrôle") + (t.config && t.config.severity ? badge(t.config.severity) : "") +
         (k.description ? '<div class="cp-note">' + esc(k.description) + "</div>" : "") +
-        (t.compiled_code ? sql(t.compiled_code, "Requête de contrôle") : "") + "</div>";
+        (k.query ? sql(k.query, "Requête de contrôle") : "") + "</div>";
     }).join("");
   }
   function from(id, col) {
