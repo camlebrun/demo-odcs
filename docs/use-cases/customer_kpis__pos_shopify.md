@@ -23,7 +23,7 @@ Convention web : le canal web n'a pas de magasin, `store_code` vaut `WEB` et `st
 ## SLA
 
 - Mise à jour quotidienne, latence J+1.
-- Mois figé à M+3 jours ouvrés : avant le gel, un mois peut encore bouger (retours, remboursements tardifs).
+- Mois figé à M+3 jours **ouvrés** (3 jours ouvrés, pas calendaires) : avant le gel, un mois peut encore bouger (retours, remboursements tardifs).
 - Historique conservé 3 ans.
 
 ## Consommateurs
@@ -32,7 +32,7 @@ Power BI comex.
 
 ## Définitions des métriques
 
-Tous les montants sont en EUR décimal **TTC**. Les mois sont calculés en date locale (magasin pour la caisse, Europe/Paris pour le web).
+Tous les montants sont en EUR décimal **TTC**. Les mois sont calculés sur la date locale du magasin pour la caisse (sans conversion de fuseau) et en Europe/Paris pour le web (Shopify est en UTC).
 
 | Champ | Définition |
 |---|---|
@@ -48,13 +48,13 @@ Tous les montants sont en EUR décimal **TTC**. Les mois sont calculés en date 
 | `identified_revenue_share_pct` | Part du CA identifié, de 0 à 100. |
 | `avg_basket_amount` | Ventes brutes / nombre de ventes (retours exclus). |
 
-Normalisation : la caisse est en centimes TTC et heure locale (converties avec `stores.timezone`), Shopify en décimal TTC et UTC. Le CA web est le `total_price` des commandes payées, hors commandes de test, annulées ou nées en caisse Shopify.
+Normalisation : la caisse est en centimes TTC et heure locale du magasin (date locale retenue telle quelle), Shopify en décimal TTC et UTC. Le CA web est le `total_price` des commandes payées, hors commandes de test, annulées ou nées en caisse Shopify.
 
 Retours : retours caisse (tickets de type `return`), retours en magasin d'achats web (`original_web_order_id`) et remboursements Shopify (transactions de remboursement réussies). Si Shopify a déjà un remboursement pour la même commande, le ticket de retour caisse est ignoré pour éviter un double compte.
 
 ## Règle qualité
 
-Écart au CA comptable inférieur à 0,5 % (seuil 0,005) par mois figé, canal et magasin. La référence comptable est hors lot 1 : c'est un contrôle de réconciliation fourni par le contrôle de gestion (table indicative `finance_controlling.accounting_revenue_monthly`). Contrôles complémentaires : unicité de la clé, CA net = CA identifié + CA anonyme.
+Écart au CA comptable inférieur à 0,5 % (seuil 0,005) par mois figé, canal et magasin, avec un rapprochement en jointure externe complète : un mois, un canal ou un magasin présent d'un seul côté, ou un CA comptable à 0, fait échouer le contrôle. La référence comptable est hors lot 1 : c'est un contrôle de réconciliation fourni par le contrôle de gestion (table indicative `finance_controlling.accounting_revenue_monthly`). Contrôles complémentaires : unicité de la clé, CA net = CA identifié + CA anonyme.
 
 ## Limites assumées du lot 1
 

@@ -9,12 +9,12 @@ domain: customer
 tags: [customer]
 description:
   purpose: Indicateurs clients et chiffre d'affaires net de retours par mois, canal (magasin ou web) et magasin, pour le controle de gestion et le comex. Une ligne par mois x canal x magasin (store_code, valeur conventionnelle WEB pour le canal web).
-  usage: Alimente le rapport Power BI comex (sponsor DAF / controle de gestion). Le mois est fige a M+3 jours ouvres, la table est rafraichie chaque jour (J+1) ; un mois non fige peut encore bouger (retours, remboursements tardifs). Les montants sont en EUR decimal TTC, les mois sont calcules en date locale (magasin pour la caisse, Europe/Paris pour le web). Les mesures de clients distincts ne sont pas additives entre magasins ni entre canaux (un client present dans plusieurs cellules est compte dans chacune).
+  usage: Alimente le rapport Power BI comex (sponsor DAF / controle de gestion). Le mois est fige a M+3 jours OUVRES (non calendaires), la table est rafraichie chaque jour (J+1) ; un mois non fige peut encore bouger (retours, remboursements tardifs). Les montants sont en EUR decimal TTC, les mois sont calcules en date locale (magasin pour la caisse, Europe/Paris pour le web). Les mesures de clients distincts ne sont pas additives entre magasins ni entre canaux (un client present dans plusieurs cellules est compte dans chacune).
   limitations: |-
     Limites assumees du lot 1.
     (1) Identite client deterministe : customer_key = SHA256(LOWER(TRIM(email))), sans rapprochement flou. Les tickets sans carte fidelite sont anonymes (environ 50 % des tickets) : ils sont comptes dans le CA mais pas au niveau client (clients actifs, nouveaux, reachat, omnicanaux). Cote caisse l'e-mail vient de raw__loyalty_members__pos via loyalty_card_id (facultatif, saisi sans verification) ; cote Shopify de orders puis customers.
     (2) Un client qui achete en magasin sans carte puis sur le web est compte comme nouveau au premier achat identifie : les nouveaux clients et l'omnicanalite sont sous ou sur-estimes dans cette mesure. L'historique de depart est celui disponible dans les raw (3 ans).
-    (3) Unites normalisees : caisse en centimes TTC et heure locale du magasin (converties avec stores.timezone), Shopify en decimal TTC et UTC. Seules les lignes en EUR sont retenues (les autres devises sont ignorees). Commandes Shopify de test, annulees ou nees en caisse Shopify (source_name pos) exclues.
+    (3) Unites normalisees : caisse en centimes TTC et heure locale du magasin (le mois est pris sur la date locale du magasin, sans conversion de fuseau), Shopify en decimal TTC et UTC. Seules les lignes en EUR sont retenues (les autres devises sont ignorees). Commandes Shopify de test, annulees ou nees en caisse Shopify (source_name pos) exclues.
     (4) Retours : un retour en magasin d'un achat web (original_web_order_id) est impute au canal web, a la date du retour. Si Shopify a deja enregistre un remboursement pour la meme commande, le ticket de retour caisse est ignore pour ne pas compter deux fois. Les remboursements web sont les transactions de remboursement reussies, a la date du remboursement.
     (5) Le CA est TTC ; le rapprochement avec le CA comptable (hors lot 1, fourni par le controle de gestion) est un controle de reconciliation d'ecart inferieur a 0,5 % sur les mois figes.
     (6) Consentement, audiences et attribution marketing sont hors de ce contrat.
@@ -56,10 +56,10 @@ slaProperties:
     description: J+1 - les donnees d'un jour J sont disponibles au plus tard le jour J+1.
   - property: monthClosingDelay
     value: 3
-    unit: d
+    unit: businessDays
     element: customer_kpis_monthly.month_date
     driver: analytics
-    description: Le mois M est fige au plus tard a M+3 jours ouvres (jours ouvres, calendrier France). Apres le gel, les valeurs du mois ne changent plus.
+    description: Le mois M est fige au plus tard a M+3 jours OUVRES (valeur 3 en jours ouvres, calendrier France, et non en jours calendaires). Apres le gel, les valeurs du mois ne changent plus.
   - property: retention
     value: 3
     unit: y
@@ -96,7 +96,7 @@ customProperties:
                DATE(t.ticket_datetime_local) AS event_date,
                t.ticket_type AS event_type,
                CONCAT('pos:', CAST(t.ticket_id AS STRING)) AS order_id,
-               t.total_amount_cents / 100 AS amount_eur,
+               CAST(t.total_amount_cents AS NUMERIC) / 100 AS amount_eur,
                COALESCE(NULLIF(TRIM(lm.email), ''), wo.email) AS email
         FROM raw_pos.tickets t
         JOIN raw_pos.stores s ON s.store_id = t.store_id
@@ -170,14 +170,16 @@ schema:
       - type: sql
         query: |-
           SELECT COUNT(*) FROM ${table} k
-          JOIN `retail-data-prod.finance_controlling.accounting_revenue_monthly` a
+          FULL OUTER JOIN `retail-data-prod.finance_controlling.accounting_revenue_monthly` a
             ON a.month_date = k.month_date AND a.channel = k.channel AND a.store_code = k.store_code
-          WHERE a.is_closed
-            AND SAFE_DIVIDE(ABS(k.net_revenue_amount - a.net_revenue_ttc_amount), ABS(a.net_revenue_ttc_amount)) >= 0.005
+          WHERE COALESCE(k.month_date, a.month_date) < DATE_TRUNC(CURRENT_DATE('Europe/Paris'), MONTH)
+            AND COALESCE(a.is_closed, TRUE)
+            AND (k.month_date IS NULL OR a.month_date IS NULL
+                 OR IFNULL(SAFE_DIVIDE(ABS(k.net_revenue_amount - a.net_revenue_ttc_amount), ABS(a.net_revenue_ttc_amount)), 1) >= 0.005)
         mustBe: 0
         dimension: accuracy
         severity: error
-        description: Controle de reconciliation fourni par le controle de gestion (hors lot 1) - sur les mois figes, l'ecart entre le CA net TTC de la table et le CA comptable de reference doit rester inferieur a 0,5 % pour chaque mois, canal et magasin (seuil 0,005).
+        description: Controle de reconciliation fourni par le controle de gestion (hors lot 1). Sur les mois passes et figes, l'ecart entre le CA net TTC de la table et le CA comptable de reference doit rester inferieur a 0,5 % (seuil 0,005) pour chaque mois, canal et magasin. Echoue aussi si un mois, un canal ou un magasin existe d'un seul cote, ou si le CA comptable vaut 0.
     properties:
       - name: month_date
         physicalType: DATE
@@ -192,6 +194,18 @@ schema:
           - raw__tickets__pos#tickets.ticket_datetime_local
           - raw__orders__shopify#orders.created_at
           - raw__refunds__shopify#refunds.created_at
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__stores__pos#stores.store_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__refunds__shopify#refunds.order_id
+          - raw__customers__shopify#customers.id
         transformDescription: Mois de la date locale du ticket de caisse, de la commande Shopify ou du remboursement Shopify (converti en Europe/Paris).
         customProperties:
           - property: transformExpression
@@ -211,6 +225,17 @@ schema:
         transformSourceObjects:
           - raw__tickets__pos#tickets.original_web_order_id
           - raw__orders__shopify#orders.id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__stores__pos#stores.store_id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__refunds__shopify#refunds.order_id
+          - raw__customers__shopify#customers.id
         transformDescription: Canal web pour les commandes Shopify et les retours en magasin d'une commande web, canal store pour les autres tickets de caisse.
         customProperties:
           - property: transformExpression
@@ -236,6 +261,18 @@ schema:
         transformSourceObjects:
           - raw__stores__pos#stores.store_code
           - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__stores__pos#stores.store_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__refunds__shopify#refunds.order_id
+          - raw__customers__shopify#customers.id
         transformDescription: Code du magasin du ticket, ou WEB pour le canal web.
         customProperties:
           - property: transformExpression
@@ -249,6 +286,17 @@ schema:
         transformSourceObjects:
           - raw__tickets__pos#tickets.store_id
           - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.currency
+          - raw__stores__pos#stores.store_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__refunds__shopify#refunds.order_id
+          - raw__customers__shopify#customers.id
         transformDescription: Identifiant du magasin du ticket, NULL pour le canal web.
         customProperties:
           - property: transformExpression
@@ -280,6 +328,29 @@ schema:
           - raw__loyalty_members__pos#loyalty_members.email
           - raw__orders__shopify#orders.email
           - raw__customers__shopify#customers.email
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
         transformDescription: Comptage des customer_key distincts ayant une vente dans la cellule mois x canal x magasin.
         customProperties:
           - property: transformExpression
@@ -296,6 +367,29 @@ schema:
           - raw__loyalty_members__pos#loyalty_members.email
           - raw__orders__shopify#orders.created_at
           - raw__orders__shopify#orders.email
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.loyalty_card_id
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
         transformDescription: Clients actifs dont la date de premiere vente (minimum toutes sources) est dans le mois de la ligne.
         customProperties:
           - property: transformExpression
@@ -312,6 +406,29 @@ schema:
           - raw__loyalty_members__pos#loyalty_members.email
           - raw__orders__shopify#orders.created_at
           - raw__orders__shopify#orders.email
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.loyalty_card_id
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
         transformDescription: Clients actifs dont la date de premiere vente est strictement anterieure au premier jour du mois.
         customProperties:
           - property: transformExpression
@@ -329,6 +446,28 @@ schema:
           - raw__loyalty_members__pos#loyalty_members.email
           - raw__orders__shopify#orders.created_at
           - raw__orders__shopify#orders.email
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
         transformDescription: Clients actifs dont les ventes des 12 derniers mois couvrent les deux canaux.
         customProperties:
           - property: transformExpression
@@ -344,6 +483,30 @@ schema:
           - raw__tickets__pos#tickets.ticket_id
           - raw__tickets__pos#tickets.ticket_type
           - raw__orders__shopify#orders.id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.loyalty_card_id
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.email
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
         transformDescription: Comptage des tickets de vente et des commandes Shopify retenues.
         customProperties:
           - property: transformExpression
@@ -359,6 +522,33 @@ schema:
           - raw__tickets__pos#tickets.total_amount_cents
           - raw__tickets__pos#tickets.ticket_type
           - raw__orders__shopify#orders.total_price
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.loyalty_card_id
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.email
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
+          - raw__refunds__shopify#refunds.transactions.amount
         transformDescription: Somme des totaux TTC des ventes, centimes de la caisse divises par 100 et total Shopify en EUR.
         customProperties:
           - property: transformExpression
@@ -377,6 +567,30 @@ schema:
           - raw__refunds__shopify#refunds.transactions.amount
           - raw__refunds__shopify#refunds.transactions.kind
           - raw__refunds__shopify#refunds.transactions.status
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.loyalty_card_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.email
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.currency
+          - raw__orders__shopify#orders.total_price
         transformDescription: Valeur absolue de la somme des tickets de retour et des transactions de remboursement Shopify reussies.
         customProperties:
           - property: transformExpression
@@ -393,6 +607,33 @@ schema:
           - raw__tickets__pos#tickets.total_amount_cents
           - raw__orders__shopify#orders.total_price
           - raw__refunds__shopify#refunds.transactions.amount
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.loyalty_card_id
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.email
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
         transformDescription: Somme algebrique des ventes (positives) et des retours (negatifs) en EUR TTC.
         customProperties:
           - property: transformExpression
@@ -411,6 +652,30 @@ schema:
           - raw__orders__shopify#orders.total_price
           - raw__orders__shopify#orders.email
           - raw__customers__shopify#customers.email
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
+          - raw__refunds__shopify#refunds.transactions.amount
         transformDescription: Somme du CA net des evenements dont la customer_key n'est pas NULL.
         customProperties:
           - property: transformExpression
@@ -429,6 +694,30 @@ schema:
           - raw__orders__shopify#orders.total_price
           - raw__orders__shopify#orders.email
           - raw__customers__shopify#customers.email
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
+          - raw__refunds__shopify#refunds.transactions.amount
         transformDescription: Somme du CA net des evenements dont la customer_key est NULL.
         customProperties:
           - property: transformExpression
@@ -445,6 +734,31 @@ schema:
           - raw__loyalty_members__pos#loyalty_members.email
           - raw__orders__shopify#orders.total_price
           - raw__orders__shopify#orders.email
+          - raw__tickets__pos#tickets.ticket_id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
+          - raw__refunds__shopify#refunds.transactions.amount
         transformDescription: Rapport du CA net identifie sur le CA net, en pourcentage.
         customProperties:
           - property: transformExpression
@@ -460,6 +774,32 @@ schema:
           - raw__tickets__pos#tickets.ticket_id
           - raw__orders__shopify#orders.total_price
           - raw__orders__shopify#orders.id
+          - raw__tickets__pos#tickets.store_id
+          - raw__tickets__pos#tickets.currency
+          - raw__tickets__pos#tickets.ticket_type
+          - raw__tickets__pos#tickets.loyalty_card_id
+          - raw__tickets__pos#tickets.original_web_order_id
+          - raw__tickets__pos#tickets.ticket_datetime_local
+          - raw__stores__pos#stores.store_id
+          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.email
+          - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.created_at
+          - raw__refunds__shopify#refunds.transactions.kind
+          - raw__refunds__shopify#refunds.transactions.status
+          - raw__refunds__shopify#refunds.transactions.currency
+          - raw__refunds__shopify#refunds.transactions.amount
         transformDescription: Ventes brutes divisees par le nombre de tickets de vente et de commandes.
         customProperties:
           - property: transformExpression

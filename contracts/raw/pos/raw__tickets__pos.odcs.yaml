@@ -164,6 +164,7 @@ schema:
         logicalType: integer
         description: Pour un retour cross-canal (achat web rendu en magasin) - identifiant de la commande Shopify d'origine (raw__orders__shopify, objet orders, id). Vide sinon.
         classification: confidential
+        tags: [pseudonymized]
       - name: payment_method
         physicalType: STRING
         logicalType: string

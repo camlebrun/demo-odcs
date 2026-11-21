@@ -52,3 +52,4 @@ Power BI, revue paid media hebdomadaire.
 - Sans consentement analytics ou avec bloqueur, l'achat échappe à GA4 et tombe en `other_web`.
 - Valeur de cohorte limitée au web (pas de CA magasin).
 - Montants en EUR ; devises autres ignorées.
+- Le ROAS nouveaux clients rapporte un CA TTC (`total_price`) à une dépense plateforme dont le caractère TTC ou HT n'est pas confirmé : il est indicatif et à valider avec l'acquisition avant arbitrage fin.

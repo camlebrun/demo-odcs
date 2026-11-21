@@ -112,7 +112,9 @@ schema:
     physicalType: INT64
     logicalType: integer
     description: Identifiant du collaborateur Shopify ayant cree le remboursement. Vide si automatique.
-    classification: internal
+    classification: confidential
+    tags:
+    - pseudonymized
   - name: note
     physicalType: STRING
     logicalType: string

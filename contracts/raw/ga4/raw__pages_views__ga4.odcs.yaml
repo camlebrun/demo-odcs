@@ -1,4 +1,4 @@
-# Objet de schema : events (evenements page_view et view_item). Cles : events.user_pseudo_id, events.event_timestamp, events.event_params.key (ga_session_id), events.traffic_source.*, events.collected_traffic_source.*, events.items.item_id.
+# Objet de schema : events (vue page_view_events, evenements page_view et view_item). Cles : events.user_pseudo_id, events.event_timestamp, events.event_params.key (ga_session_id), events.traffic_source.*, events.collected_traffic_source.*, events.items.item_id.
 apiVersion: v3.2.0
 kind: DataContract
 id: raw__pages_views__ga4
@@ -10,9 +10,9 @@ tags:
 - raw
 - ga4
 description:
-  purpose: Evenements de navigation (page_view et view_item) du site, extraits de l'export BigQuery GA4 (objet de schema events), une ligne par evenement.
+  purpose: Evenements de navigation (page_view et view_item) du site, extraits de l'export BigQuery GA4 et exposes par la vue page_view_events du dataset raw_ga4 (objet de schema events), une ligne par evenement.
   usage: Source des contrats customer (parcours web, acquisition, interet produit). Ne pas exposer directement aux consommateurs metier.
-  limitations: 'Donnees incompletes par construction : avec Consent Mode, les visiteurs qui refusent le consentement analytics sont absents ou sans user_pseudo_id (modelisation non exportee), et les bloqueurs de publicite masquent une partie du trafic. L''export est limite par quotas (1 million d''evenements par jour pour la version standard). Les sessions se reconstruisent via event_params (ga_session_id) et user_pseudo_id. traffic_source est la premiere acquisition de l''utilisateur.'
+  limitations: 'Donnees incompletes par construction : avec Consent Mode, les visiteurs qui refusent le consentement analytics sont absents ou sans user_pseudo_id (modelisation non exportee), et les bloqueurs de publicite masquent une partie du trafic. L''export est limite par quotas (1 million d''evenements par jour pour la version standard). Les sessions se reconstruisent via event_params (ga_session_id) et user_pseudo_id. traffic_source est la premiere acquisition de l''utilisateur. L''export natif GA4 n''a pas de colonnes meta_loaded_at ni meta_source_file : elles sont ajoutees par la vue ou la copie d''ingestion.'
 servers:
 - server: bigquery_prod
   type: bigquery
@@ -36,25 +36,25 @@ slaProperties:
 - property: frequency
   value: 1
   unit: d
-  element: events
+  element: page_view_events
   driver: analytics
   description: Une ingestion complete par jour.
 - property: latency
   value: 24
   unit: h
-  element: events.event_timestamp
+  element: page_view_events.event_timestamp
   driver: analytics
   description: Tables quotidiennes de l'export BigQuery GA4 disponibles au plus tard 24 heures apres la fin du jour.
 - property: retention
   value: 3
   unit: y
-  element: events
+  element: page_view_events
   description: Historique conserve 3 ans.
 schema:
 - name: events
-  physicalName: events_*
+  physicalName: page_view_events
   physicalType: table
-  description: Evenements page_view et view_item de l'export BigQuery GA4 (tables quotidiennes events_AAAAMMJJ, interrogees via le motif events_*), une ligne par evenement.
+  description: Evenements page_view et view_item de l'export BigQuery GA4, exposes par la vue page_view_events (filtre event_name IN ('page_view', 'view_item') sur l'export natif events_*), une ligne par evenement.
   dataGranularityDescription: Une ligne par evenement GA4.
   quality:
   - type: library
@@ -102,7 +102,7 @@ schema:
   - name: event_params
     physicalType: ARRAY<STRUCT<key STRING, value STRUCT<string_value STRING, int_value INT64, float_value FLOAT64, double_value FLOAT64>>>
     logicalType: array
-    description: Parametres de l'evenement, liste cle/valeur (REPEATED RECORD). On y lit notamment ga_session_id (int_value), ga_session_number (int_value), page_location, page_referrer et page_title (string_value), session_engaged, engagement_time_msec.
+    description: 'Parametres de l''evenement, liste cle/valeur (REPEATED RECORD). On y lit notamment ga_session_id (int_value), ga_session_number (int_value), page_location, page_referrer et page_title (string_value), session_engaged, engagement_time_msec. Attention : page_location et page_referrer (URL) peuvent contenir un e-mail ou un identifiant dans la query string, ces valeurs sont a traiter comme PII potentielle.'
     classification: internal
     items:
       logicalType: object
@@ -139,6 +139,8 @@ schema:
           logicalType: number
           description: Valeur decimale double precision du parametre.
           classification: internal
+    tags:
+    - pii_potential
   - name: event_previous_timestamp
     physicalType: INT64
     logicalType: integer
@@ -154,14 +156,15 @@ schema:
     logicalType: string
     description: Identifiant pseudonyme de l'appareil ou du navigateur genere par GA4 (cookie). Peut etre vide quand le consentement analytics est refuse.
     classification: confidential
-    tags: &id001
+    tags:
     - pseudonymized
   - name: user_id
     physicalType: STRING
     logicalType: string
     description: Identifiant utilisateur envoye par le site apres connexion. Vide pour un visiteur non connecte.
     classification: confidential
-    tags: *id001
+    tags:
+    - pseudonymized
   - name: user_first_touch_timestamp
     physicalType: INT64
     logicalType: integer

@@ -12,6 +12,8 @@
 /tests/                     @org/data-platform
 /schema/                    @org/data-platform
 /Makefile                   @org/data-platform
+/README.md                  @org/data-platform
+/CHANGELOG.md               @org/data-platform
 /pyproject.toml             @org/data-platform
 /.github/                   @org/data-platform
 /CODEOWNERS                 @org/data-platform

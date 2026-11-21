@@ -58,7 +58,7 @@ schema:
     physicalName: ad_spend
     physicalType: table
     description: Objet logique ad_spend (reference par raw__ad_spend__googleads#ad_spend.<property>). statistiques Google Ads par jour et par campagne.
-    dataGranularityDescription: Une ligne par jour (segments_date), campagne (campaign_id) et compte (customer_id), eventuellement par reseau.
+    dataGranularityDescription: Une ligne par jour (segments_date), campagne (campaign_id) et compte (customer_id). L'export du lot 1 n'est pas segmente par reseau - segments_ad_network_type reste informatif.
     quality:
       - type: library
         metric: rowCount
@@ -67,11 +67,11 @@ schema:
         severity: error
         description: La table ne doit jamais etre vide apres une ingestion.
       - type: sql
-        query: SELECT COUNT(*) FROM (SELECT segments_date, campaign_id, customer_id, IFNULL(segments_ad_network_type, '') AS n FROM ${table} GROUP BY 1, 2, 3, 4 HAVING COUNT(*) > 1)
+        query: SELECT COUNT(*) FROM (SELECT segments_date, campaign_id, customer_id FROM ${table} GROUP BY 1, 2, 3 HAVING COUNT(*) > 1)
         mustBe: 0
         dimension: uniqueness
         severity: error
-        description: Une seule ligne par jour, campagne, compte et reseau.
+        description: Une seule ligne par jour, campagne et compte (cle primaire).
       - type: sql
         query: SELECT COUNT(*) FROM ${table} WHERE metrics_cost_micros < 0 OR metrics_clicks > metrics_impressions
         mustBe: 0

@@ -87,6 +87,8 @@ Les contraintes de structure (champs inconnus refusés par `unevaluatedPropertie
 - Types : `logicalType` ODCS (`string`, `integer`, `number`, `boolean`, `timestamp`, `date`, `array`, `object`) **et** `physicalType` BigQuery (`STRING`, `INT64`, `NUMERIC`, `BOOL`, `TIMESTAMP`, `DATE`, `ARRAY<...>`, `STRUCT<...>`, `JSON`) renseignés sur chaque property.
 - Champs techniques présents sur chaque table raw : `meta_loaded_at` (TIMESTAMP UTC, chargement dans BigQuery) et `meta_source_file` (STRING, URI du fichier de dépôt d'origine, y compris pour une ingestion par API). Ils portent `transformLogic: create` et `transformDescription`, sans source.
 
+Contrôlé par `tools/validate_lineage.py` : L015 (snake_case ; en customer `_at` = `TIMESTAMP`, `_date` = `DATE`, `_amount`/`_eur` = `NUMERIC`, `is_`/`has_` = `BOOL`, `meta_` réservé aux champs `create`) et L016 (`customer_key` confidentiel et pseudonymisé).
+
 ## 4. Lineage (customer uniquement)
 
 Le lineage est porté **au niveau property** des contrats customer. Chaque champ customer de premier niveau porte :
@@ -140,7 +142,7 @@ IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
 - `SHA256` renvoie des `BYTES` ; `TO_HEX` produit la chaîne.
 - Email `NULL` ou vide (après `TRIM`) : `customer_key` vaut `NULL`. On ne hache jamais la chaîne vide, sinon tous les clients sans e-mail partageraient la même clé.
 - Aucune normalisation supplémentaire (pas de suppression de `+tag`, pas de traitement du domaine) : ce que la règle ne dit pas n'est pas fait.
-- Tout champ nommé `customer_key` dans un customer reprend cette expression à l'identique (même colonne aux trois emplacements). Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `confidential`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
+- Tout champ nommé `customer_key` dans un customer reprend cette expression à l'identique (même colonne aux deux emplacements de l'expression). Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `confidential`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
 
 ## 5. Versionnement et breaking changes
 
@@ -186,11 +188,11 @@ Un contrat `deprecated` reste publié au moins une version MAJOR avant `retired`
 
 Tags de property : `pii` (donnée personnelle directe), `pseudonymized` (identifiant haché ou technique rattachable à une personne). Règle PII : `classification: restricted` **et** `tags: [pii]` vont toujours ensemble ; l'un sans l'autre est une erreur (L010). Le contenu d'un champ texte libre susceptible de contenir des données personnelles (note client, commentaire) est traité comme `pii`.
 
-Un champ customer dérivé d'une PII n'hérite pas automatiquement de la classification : l'auteur et le relecteur décident (le hachage de `customer_key` la fait passer à `confidential`). Cette revue est dans la checklist de PR.
+Un champ customer dérivé d'une PII n'hérite pas automatiquement de la classification : l'auteur et le relecteur décident (le hachage de `customer_key` la fait passer à `confidential`, vérifié par L016). Dans une table dont le grain est le client (`customer_key`), tous les champs comportementaux rattachés à la clé sont `confidential` avec le tag `pseudonymized`. Cette revue est dans la checklist de PR.
 
 ## 7. SLA et support
 
-`slaProperties` (liste `{property, value, unit, element, driver, description}`) : on utilise `frequency` (fréquence de mise à jour), `latency` (délai maximal entre la source et la table), `retention` (durée de conservation) avec `unit` ISO (`d`, `h`, `y`) et `driver: analytics`. Ce sont des **engagements déclaratifs** : le lot 1 ne les mesure pas.
+`slaProperties` (liste `{property, value, unit, element, driver, description}`) : on utilise `frequency` (fréquence de mise à jour), `latency` (délai maximal entre la source et la table), `retention` (durée de conservation) avec `unit` ISO (`d`, `h`, `y`) et `driver: analytics`. Propriété maison `monthClosingDelay` (contrats de reporting mensuel) : délai de gel d'un mois clos, exprimé en **jours ouvrés** (`unit: businessDays`). Un SLA hebdomadaire se déclare par `frequency` avec `value: 1`, `unit: w`. Ce sont des **engagements déclaratifs** : le lot 1 ne les mesure pas.
 
 `support` : au moins un canal avec `tool: email` et une adresse de l'équipe propriétaire.
 

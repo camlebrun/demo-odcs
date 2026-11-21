@@ -18,7 +18,7 @@ description:
     (4) Identite client deterministe : customer_key = SHA256(LOWER(TRIM(email))), e-mail de orders puis de customers. Un nouveau client est un client dont la premiere commande Shopify (web) est celle de la ligne ; un client ayant deja achete en magasin (carte fidelite ou non) est donc compte a tort comme nouveau, car la caisse n'est pas dans ce contrat. Tickets sans carte : anonymes, hors scope. Une commande sans e-mail ne compte pas comme nouveau client.
     (5) Unites normalisees en EUR decimal : micros Google Ads divises par 1 000 000, depense Meta decimale ; seules les lignes en EUR sont retenues. Le CA du premier achat est le total TTC de la commande Shopify, avant retours. La valeur de cohorte a 90 jours est le CA net TTC de retours (remboursements Shopify reussis) des seules commandes web du client, sur 90 jours apres la premiere commande ; elle ne contient pas le CA magasin. Elle est NULL tant que tous les clients de la ligne n'ont pas 90 jours de recul.
     (6) La depense est celle des plateformes, corrigee retroactivement (conversions tardives, clics invalides) sur les jours recents.
-    (7) Le mois d'une ligne est celui du jour de depense (fuseau du compte publicitaire) et celui de la premiere commande (Europe/Paris) ; une commande suit sa campagne le jour de l'achat, pas le jour du clic.
+    (7) Le ROAS nouveaux clients rapporte un CA TTC (total_price Shopify) a une depense plateforme dont le caractere TTC ou HT n'est pas confirme : le ratio est donc indicatif et pas strictement comparable entre canaux, a valider avec l'acquisition avant tout arbitrage au centime. (8) Le mois d'une ligne est celui du jour de depense (fuseau du compte publicitaire) et celui de la premiere commande (Europe/Paris) ; une commande suit sa campagne le jour de l'achat, pas le jour du clic.
 
 servers:
   - server: bigquery_prod
@@ -94,9 +94,8 @@ customProperties:
       ),
       ga_purchases AS (
         SELECT ko.id AS order_id, p.collected_traffic_source AS cts
-        FROM raw_ga4.`events_*` p
+        FROM raw_ga4.purchase_events p
         JOIN keyed_orders ko ON p.ecommerce.transaction_id IN (CAST(ko.id AS STRING), ko.name, LTRIM(ko.name, '#'))
-        WHERE p.event_name = 'purchase'
         QUALIFY ROW_NUMBER() OVER (PARTITION BY ko.id ORDER BY p.event_timestamp) = 1
       ),
       attributed AS (
@@ -109,6 +108,27 @@ customProperties:
                LOWER(TRIM(gp.cts.manual_campaign_name)) AS utm_campaign
         FROM ga_purchases gp
       ),
+      refund_totals AS (
+        SELECT r.id, r.order_id, r.created_at, SUM(tr.amount) AS refund_eur
+        FROM raw_shopify.refunds r, UNNEST(r.transactions) tr
+        WHERE tr.kind = 'refund' AND tr.status = 'success' AND tr.currency = 'EUR'
+        GROUP BY r.id, r.order_id, r.created_at
+      ),
+      cohort_gross AS (
+        SELECT fo.customer_key, SUM(k.total_price) AS gross_90d
+        FROM first_orders fo
+        JOIN keyed_orders k ON k.customer_key = fo.customer_key
+         AND k.created_at < TIMESTAMP_ADD(fo.first_order.created_at, INTERVAL 90 DAY)
+        GROUP BY fo.customer_key
+      ),
+      cohort_refunds AS (
+        SELECT fo.customer_key, SUM(rt.refund_eur) AS refund_90d
+        FROM first_orders fo
+        JOIN keyed_orders k ON k.customer_key = fo.customer_key
+        JOIN refund_totals rt ON rt.order_id = k.id
+         AND rt.created_at < TIMESTAMP_ADD(fo.first_order.created_at, INTERVAL 90 DAY)
+        GROUP BY fo.customer_key
+      ),
       new_customer_rows AS (
         SELECT DATE_TRUNC(DATE(fo.first_order.created_at, 'Europe/Paris'), MONTH) AS month_date,
                IFNULL(a.channel, 'other_web') AS channel,
@@ -117,23 +137,19 @@ customProperties:
                CASE WHEN a.channel = 'google_ads' THEN gc.campaign_name WHEN a.channel = 'meta_ads' THEN mc.name END AS campaign_name,
                fo.customer_key,
                fo.first_order.total_price AS first_order_revenue_eur,
-               (SELECT SUM(k.total_price) FROM keyed_orders k
-                WHERE k.customer_key = fo.customer_key AND k.created_at < TIMESTAMP_ADD(fo.first_order.created_at, INTERVAL 90 DAY))
-               - (SELECT IFNULL(SUM(tr.amount), 0) FROM raw_shopify.refunds r
-                  JOIN keyed_orders k ON k.id = r.order_id AND k.customer_key = fo.customer_key
-                  CROSS JOIN UNNEST(r.transactions) tr
-                  WHERE r.created_at < TIMESTAMP_ADD(fo.first_order.created_at, INTERVAL 90 DAY)
-                    AND tr.kind = 'refund' AND tr.status = 'success' AND tr.currency = 'EUR') AS cohort_value_90d_eur,
+               IFNULL(cg.gross_90d, 0) - IFNULL(cr.refund_90d, 0) AS cohort_value_90d_eur,
                TIMESTAMP_ADD(fo.first_order.created_at, INTERVAL 90 DAY) <= CURRENT_TIMESTAMP() AS is_cohort_90d_mature
         FROM first_orders fo
         LEFT JOIN attributed a ON a.order_id = fo.first_order.id
+        LEFT JOIN cohort_gross cg ON cg.customer_key = fo.customer_key
+        LEFT JOIN cohort_refunds cr ON cr.customer_key = fo.customer_key
         LEFT JOIN raw_googleads.campaigns gc ON a.channel = 'google_ads' AND a.utm_campaign = LOWER(TRIM(gc.campaign_name))
         LEFT JOIN raw_metaads.campaigns mc ON a.channel = 'meta_ads'
           AND (a.utm_campaign = CAST(mc.campaign_id AS STRING) OR a.utm_campaign = LOWER(TRIM(mc.name)))
       ),
       spend_rows AS (
         SELECT DATE_TRUNC(g.segments_date, MONTH) AS month_date, 'google_ads' AS channel, g.campaign_id, gc.campaign_name,
-               g.metrics_cost_micros / 1000000 AS spend_eur
+               CAST(g.metrics_cost_micros AS NUMERIC) / 1000000 AS spend_eur
         FROM raw_googleads.ad_spend g
         LEFT JOIN raw_googleads.campaigns gc ON gc.campaign_id = g.campaign_id
         WHERE g.currency_code = 'EUR'
@@ -200,6 +216,8 @@ schema:
           - raw__ad_spend__googleads#ad_spend.segments_date
           - raw__ad_spend__metaads#ad_spend.date_start
           - raw__orders__shopify#orders.created_at
+          - raw__ad_spend__googleads#ad_spend.campaign_id
+          - raw__ad_spend__metaads#ad_spend.campaign_id
         transformDescription: Mois du jour de depense Google Ads ou Meta, ou de la premiere commande Shopify convertie en Europe/Paris.
         customProperties:
           - property: transformExpression
@@ -224,6 +242,16 @@ schema:
           - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
           - raw__ad_spend__googleads#ad_spend.campaign_id
           - raw__ad_spend__metaads#ad_spend.campaign_id
+          - raw__purchases__ga4#events.ecommerce.transaction_id
+          - raw__purchases__ga4#events.event_timestamp
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.name
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
         transformDescription: Canal deduit de la source collectee sur l'evenement purchase GA4 (gclid ou UTM), google_ads et meta_ads pour la depense de la plateforme correspondante.
         customProperties:
           - property: transformExpression
@@ -243,6 +271,11 @@ schema:
           - raw__campaigns__googleads#campaigns.campaign_id
           - raw__campaigns__metaads#campaigns.campaign_id
           - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
+          - raw__purchases__ga4#events.ecommerce.transaction_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.name
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.name
         transformDescription: Identifiant de campagne Google Ads ou Meta de la depense, ou de la campagne rapprochee de l'achat par son nom UTM, 0 sinon.
         customProperties:
           - property: transformExpression
@@ -256,6 +289,9 @@ schema:
         transformSourceObjects:
           - raw__campaigns__googleads#campaigns.campaign_name
           - raw__campaigns__metaads#campaigns.name
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
         transformDescription: Nom de la campagne Google Ads ou Meta, unattributed quand l'achat n'est rapproche d'aucune campagne.
         customProperties:
           - property: transformExpression
@@ -287,6 +323,12 @@ schema:
           - raw__ad_spend__googleads#ad_spend.currency_code
           - raw__ad_spend__metaads#ad_spend.spend
           - raw__ad_spend__metaads#ad_spend.account_currency
+          - raw__ad_spend__googleads#ad_spend.campaign_id
+          - raw__ad_spend__metaads#ad_spend.campaign_id
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__ad_spend__googleads#ad_spend.segments_date
+          - raw__ad_spend__metaads#ad_spend.date_start
         transformDescription: Somme des micros Google Ads divises par 1 000 000 et de la depense Meta decimale, en EUR.
         customProperties:
           - property: transformExpression
@@ -308,6 +350,19 @@ schema:
           - raw__purchases__ga4#events.collected_traffic_source.manual_source
           - raw__purchases__ga4#events.collected_traffic_source.manual_medium
           - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__orders__shopify#orders.name
+          - raw__customers__shopify#customers.id
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.name
+          - raw__purchases__ga4#events.event_timestamp
         transformDescription: Comptage des clients dont la premiere commande Shopify est rattachee a la ligne par le pont transaction_id et la source GA4.
         customProperties:
           - property: transformExpression
@@ -332,6 +387,19 @@ schema:
           - raw__purchases__ga4#events.collected_traffic_source.manual_source
           - raw__purchases__ga4#events.collected_traffic_source.manual_medium
           - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__orders__shopify#orders.name
+          - raw__customers__shopify#customers.id
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.name
+          - raw__purchases__ga4#events.event_timestamp
         transformDescription: Depense divisee par le nombre de nouveaux clients, NULL sans nouveau client.
         customProperties:
           - property: transformExpression
@@ -354,6 +422,19 @@ schema:
           - raw__purchases__ga4#events.collected_traffic_source.manual_source
           - raw__purchases__ga4#events.collected_traffic_source.manual_medium
           - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__orders__shopify#orders.name
+          - raw__customers__shopify#customers.id
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.name
+          - raw__purchases__ga4#events.event_timestamp
         transformDescription: Somme des totaux TTC des premieres commandes des nouveaux clients de la ligne.
         customProperties:
           - property: transformExpression
@@ -361,7 +442,7 @@ schema:
       - name: new_customer_roas
         physicalType: NUMERIC
         logicalType: number
-        description: ROAS nouveaux clients, CA du premier achat divise par la depense (sans unite). Calcule sur les commandes Shopify, jamais sur les conversions des plateformes (non dedupliquees). NULL sans depense.
+        description: ROAS nouveaux clients, CA du premier achat divise par la depense (sans unite). Calcule sur les commandes Shopify (CA TTC) rapporte a la depense plateforme dont le TTC ou HT n'est pas confirme, donc indicatif ; jamais sur les conversions des plateformes (non dedupliquees). NULL sans depense.
         classification: internal
         transformLogic: transform
         transformSourceObjects:
@@ -379,6 +460,19 @@ schema:
           - raw__purchases__ga4#events.collected_traffic_source.manual_source
           - raw__purchases__ga4#events.collected_traffic_source.manual_medium
           - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__orders__shopify#orders.name
+          - raw__customers__shopify#customers.id
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.name
+          - raw__purchases__ga4#events.event_timestamp
         transformDescription: CA du premier achat divise par la depense, calcule sur les commandes Shopify et non sur les conversions plateforme.
         customProperties:
           - property: transformExpression
@@ -401,6 +495,25 @@ schema:
           - raw__purchases__ga4#events.collected_traffic_source.manual_source
           - raw__purchases__ga4#events.collected_traffic_source.manual_medium
           - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__orders__shopify#orders.name
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.name
+          - raw__purchases__ga4#events.event_timestamp
+          - raw__purchases__ga4#events.ecommerce.transaction_id
+          - raw__refunds__shopify#refunds.id
+          - raw__refunds__shopify#refunds.order_id
+          - raw__refunds__shopify#refunds.transactions.currency
         transformDescription: CA net de retours des commandes web des nouveaux clients sur 90 jours apres leur premiere commande, NULL tant que la cohorte est immature.
         customProperties:
           - property: transformExpression
@@ -414,6 +527,23 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - raw__orders__shopify#orders.created_at
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.customer_id
+          - raw__orders__shopify#orders.email
+          - raw__orders__shopify#orders.test
+          - raw__orders__shopify#orders.cancelled_at
+          - raw__orders__shopify#orders.currency
+          - raw__orders__shopify#orders.source_name
+          - raw__orders__shopify#orders.financial_status
+          - raw__orders__shopify#orders.name
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.name
+          - raw__purchases__ga4#events.event_timestamp
+          - raw__purchases__ga4#events.ecommerce.transaction_id
         transformDescription: Vrai quand tous les nouveaux clients de la ligne ont au moins 90 jours de recul.
         customProperties:
           - property: transformExpression

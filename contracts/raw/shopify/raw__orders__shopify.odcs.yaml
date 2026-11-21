@@ -121,6 +121,7 @@ schema:
         logicalType: integer
         description: Identifiant du client Shopify (cle vers raw__customers__shopify). Vide pour une commande invite.
         classification: confidential
+        tags: [pseudonymized]
       - name: created_at
         physicalType: TIMESTAMP
         logicalType: timestamp

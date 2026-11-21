@@ -79,7 +79,7 @@ schema:
       mustBe: 0
       dimension: uniqueness
       severity: error
-    tags: &id002
+    tags:
     - pseudonymized
   - name: email
     physicalType: STRING
@@ -88,26 +88,29 @@ schema:
     classification: restricted
     logicalTypeOptions:
       format: email
-    tags: &id001
+    tags:
     - pii
   - name: phone
     physicalType: STRING
     logicalType: string
     description: Numero de telephone du client, au format fourni par le client.
     classification: restricted
-    tags: *id001
+    tags:
+    - pii
   - name: first_name
     physicalType: STRING
     logicalType: string
     description: Prenom du client.
     classification: restricted
-    tags: *id001
+    tags:
+    - pii
   - name: last_name
     physicalType: STRING
     logicalType: string
     description: Nom de famille du client.
     classification: restricted
-    tags: *id001
+    tags:
+    - pii
   - name: created_at
     physicalType: TIMESTAMP
     logicalType: timestamp
@@ -190,7 +193,8 @@ schema:
     logicalType: integer
     description: Identifiant de la derniere commande du client (cle vers raw__orders__shopify#orders.id).
     classification: confidential
-    tags: *id002
+    tags:
+    - pseudonymized
   - name: tags
     physicalType: STRING
     logicalType: string
@@ -201,7 +205,8 @@ schema:
     logicalType: string
     description: Note libre sur le client, susceptible de contenir des donnees personnelles.
     classification: restricted
-    tags: *id001
+    tags:
+    - pii
   - name: default_address
     physicalType: STRUCT<id INT64, name STRING, company STRING, address1 STRING, address2 STRING, zip STRING, city STRING, province STRING, country STRING, country_code STRING, phone STRING>
     logicalType: object
@@ -213,68 +218,80 @@ schema:
       logicalType: integer
       description: Identifiant de l'adresse dans Shopify.
       classification: confidential
-      tags: *id002
+      tags:
+      - pseudonymized
     - name: name
       physicalType: STRING
       logicalType: string
       description: Nom complet du destinataire de l'adresse.
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: company
       physicalType: STRING
       logicalType: string
       description: Societe du destinataire.
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: address1
       physicalType: STRING
       logicalType: string
       description: Premiere ligne de l'adresse (numero et rue).
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: address2
       physicalType: STRING
       logicalType: string
       description: Complement d'adresse.
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: zip
       physicalType: STRING
       logicalType: string
       description: Code postal.
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: city
       physicalType: STRING
       logicalType: string
       description: Ville.
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: province
       physicalType: STRING
       logicalType: string
       description: Region ou province.
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: country
       physicalType: STRING
       logicalType: string
       description: Nom du pays.
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: country_code
       physicalType: STRING
       logicalType: string
       description: Code pays ISO 3166-1 alpha-2 (FR, BE).
       classification: restricted
-      tags: *id001
+      tags:
+      - pii
     - name: phone
       physicalType: STRING
       logicalType: string
       description: Telephone associe a l'adresse.
       classification: restricted
-      tags: *id001
-    tags: *id001
+      tags:
+      - pii
+    tags:
+    - pii
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
