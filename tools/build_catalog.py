@@ -292,6 +292,20 @@ def render_html(manifest: dict, out_dir: Path) -> Path:
     return html
 
 
+def write_notices(out_dir: Path) -> None:
+    """Joint la licence MIT de dbt-colibri a la page (obligatoire : l'interface en est derivee)."""
+    from importlib.metadata import distribution
+
+    dist = distribution("dbt-colibri")
+    text = dist.read_text("licenses/LICENSE") or dist.read_text("LICENSE") or "MIT License (voir le depot dbt-colibri)."
+    header = (
+        "Interface du catalogue : derivee de dbt-colibri "
+        f"{dist.version} (https://github.com/b-ned/dbt-colibri), licence MIT.\n"
+        "Modifications : retrait des fonctions dbt et des encarts Colibri Cloud, panneau contrat ODCS.\n\n"
+    )
+    (out_dir / "THIRD_PARTY_LICENSES.txt").write_text(header + text, encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=Path, default=REPO_ROOT)
@@ -307,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"OK {manifest['metadata']['total_model_count']} contrats, {n_cols} colonnes, {len(manifest['lineage']['edges'])} aretes -> {args.out}/colibri-manifest.json")
     if not args.json_only:
         page = render_html(manifest, args.out)
+        write_notices(args.out)
         print(f"OK catalogue -> {page}")
         if args.open:
             import webbrowser

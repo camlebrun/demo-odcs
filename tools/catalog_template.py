@@ -126,6 +126,13 @@ def _patch_columns_tab(html: str) -> str:
     extra = f',R.jsx("div",{{dangerouslySetInnerHTML:{{__html:window.cpColumnTabHtml({model},{col}.columnName)}}}})'
     html = html[: m.end()] + extra + html[m.end() :]
 
+    # Bloc natif "Tests" de la ligne depliee (puce "odcs" sans contenu utile) : retire.
+    html = _resub(
+        html,
+        r'([\w$]+)\.hasTests&&\1\.tests&&R\.jsxs\("div",\{className:"mt-4 border-t pt-4"',
+        'false&&R.jsxs("div",{className:"mt-4 border-t pt-4"',
+    )
+
     anchor = 'R.jsx("div",{className:"mb-4",children:R.jsxs("div",{className:"relative max-w-sm",children:[R.jsx(v6,'
     if html.count(anchor) != 1:
         raise TemplateMismatch("barre de recherche de l'onglet Columns introuvable")
