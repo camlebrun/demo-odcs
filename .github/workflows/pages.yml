@@ -1,7 +1,7 @@
 name: pages
 
-# Publie le catalogue de données sur GitHub Pages à chaque push sur main.
-# Miroir de la démo : le domaine demo-odcs.camillelebrun.fr est servi par Cloudflare (make publish).
+# À chaque push sur main : publie le catalogue sur Cloudflare Pages (demo-odcs.camillelebrun.fr)
+# si le secret CLOUDFLARE_API_TOKEN existe, et sur GitHub Pages (miroir).
 on:
   push:
     branches: [main]
@@ -19,6 +19,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Secrets du dépôt. Sans CLOUDFLARE_API_TOKEN, le déploiement Cloudflare est simplement ignoré.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,6 +36,9 @@ jobs:
         run: make check
       - name: Générer le catalogue
         run: python tools/build_catalog.py
+      - name: Déployer sur Cloudflare Pages (demo-odcs.camillelebrun.fr)
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx --yes wrangler@4 pages deploy dist/catalog --project-name demo-odcs --branch main --commit-message "${GITHUB_SHA}"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/catalog
