@@ -2,13 +2,9 @@
    mode expert. Lit window.colibriData (genere depuis les data contracts). Aucun appel reseau. */
 (function () {
   "use strict";
-  var KEY = "catalog.expert";
-  function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
-  function set(v) { try { localStorage.setItem(KEY, v); } catch (e) { /* non memorise */ } }
-  if (get() === "1") document.documentElement.classList.add("cp-expert");
+  /* Le mode expert repart toujours desactive a l'ouverture de la page (pas de memorisation). */
   window.cpToggleExpert = function () {
-    var on = document.documentElement.classList.toggle("cp-expert");
-    set(on ? "1" : "0");
+    document.documentElement.classList.toggle("cp-expert");
   };
 
   var copies = [];

@@ -21,9 +21,11 @@
 .cp-btn{font:inherit;font-size:10.5px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:5px;padding:0 7px}
 .cp-btn:hover{background:hsl(var(--accent))}
 .cp-expert-toggle{font-size:11px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:6px;padding:2px 8px;white-space:nowrap}
+html.cp-expert .cp-expert-toggle::after{content:" : activé"}
+.cp-expert-toggle::after{content:" : désactivé"}
 html.cp-expert .cp-expert-toggle{background:hsl(var(--purple-primary));border-color:hsl(var(--purple-primary));color:#fff}
-.cp-expert-only{display:none}
-html.cp-expert .cp-expert-only{display:flex;flex-direction:column;gap:6px;border-left:2px solid hsl(var(--purple-primary));padding-left:8px}
+.cp-expert-only{display:none!important}
+html.cp-expert .cp-expert-only{display:flex!important;flex-direction:column;gap:6px;border-left:2px solid hsl(var(--purple-primary));padding-left:8px}
 .cp-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 .cp-list li{word-break:break-all}
 .cp-json{margin:0;padding:6px;border-radius:6px;overflow:auto;max-height:160px;font:11px/1.4 ui-monospace,Menlo,monospace;background:hsl(var(--muted)/.4)}
