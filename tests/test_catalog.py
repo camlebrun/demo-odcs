@@ -46,7 +46,7 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     from catalog_template import patch_template
 
     html = patch_template((Path(gen.__file__).parent / "index.html").read_text(encoding="utf-8"))
-    forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"')
+    forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
     assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert"))

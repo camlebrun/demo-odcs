@@ -147,6 +147,30 @@ def _remove_code_views(html: str) -> str:
     )
 
 
+def _bigquery_info(html: str) -> str:
+    """Overview : le bloc "Model Information" (database, materialization, type de modele...) devient le schema BigQuery."""
+    html = _sub(html, 'children:"Model Information"})', 'children:"Schéma BigQuery"})', 1)
+    # Colonne de gauche : projet puis table. Colonne de droite : dataset.
+    html = _sub(html, 'mb-1",children:"Database"}),R.jsx("div",{className:"text-sm font-medium",children:be?.split(".")[0]||"N/A"})',
+                'mb-1",children:"Projet"}),R.jsx("div",{className:"text-sm font-medium",children:s?.database||"N/A"})', 1)
+    html = _sub(html, 'mb-1",children:"Materialization"}),R.jsx("div",{className:"text-sm font-medium capitalize",children:Oe})',
+                'mb-1",children:"Table"}),R.jsx("div",{className:"text-sm font-medium",children:(s?.relationName||"").split(".").pop()||"N/A"})', 1)
+    html = _sub(html, 'mb-1",children:"Schema"}),', 'mb-1",children:"Dataset"}),', 1)
+    # Sans objet pour un contrat : "Contract Enforced" et "Model Type".
+    html = _resub(
+        html,
+        r'[\w$]+!==void 0&&R\.jsxs\("div",\{children:\[R\.jsx\("div",\{className:"text-sm text-muted-foreground mb-1",children:"Contract Enforced"\}\),'
+        r'R\.jsx\("div",\{className:"text-sm font-medium",children:[\w$]+\?"Yes":"No"\}\)\]\}\)',
+        "null",
+    )
+    return _resub(
+        html,
+        r'R\.jsxs\("div",\{children:\[R\.jsx\("div",\{className:"text-sm text-muted-foreground mb-1",children:"Model Type"\}\),'
+        r'R\.jsx\("div",\{className:"text-sm font-medium capitalize",children:[\w$]+\}\)\]\}\)',
+        "null",
+    )
+
+
 def _drop_lineage_warning(html: str) -> str:
     """Retire la bulle "Column lineage unavailable" des noeuds : fausse pour un contrat raw (pas de source amont)."""
     key = "Column lineage unavailable"
@@ -215,6 +239,7 @@ def patch_template(html: str) -> str:
     html = _patch_model_info(html)
     html = _patch_columns_tab(html)
     html = _remove_code_views(html)
+    html = _bigquery_info(html)
     css = (ASSETS / "column_info.css").read_text(encoding="utf-8")
     js = (ASSETS / "column_info.js").read_text(encoding="utf-8")
     return _sub(html, "</head>", f"<style>{css}</style><script>{js}</script></head>", 1)

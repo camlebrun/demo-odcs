@@ -78,37 +78,11 @@
         (k.query ? sql(k.query, "Requête de contrôle") : "") + "</div>";
     }).join("");
   }
-  function from(id, col) {
-    return data().lineage.edges.filter(function (e) { return e.target === id && e.targetColumn === col && e.sourceColumn; })
-      .map(function (e) { return esc(e.source + " . " + e.sourceColumn); });
-  }
-  function to(id, col) {
-    return data().lineage.edges.filter(function (e) { return e.source === id && e.sourceColumn === col && e.targetColumn; })
-      .map(function (e) { return esc(e.target + " . " + e.targetColumn); });
-  }
-  function links(id, dir) {
-    var seen = {};
-    return data().lineage.edges.filter(function (e) {
-      if (e.sourceColumn || e.targetColumn) return false;
-      var k = dir === "up" ? (e.target === id ? e.source : null) : (e.source === id ? e.target : null);
-      if (!k || seen[k]) return false;
-      seen[k] = 1;
-      return true;
-    }).map(function (e) { return esc(dir === "up" ? e.source : e.target); });
-  }
 
   function expertBlock(model, name, c, m) {
-    var ex = kv([
-      ["transformLogic", esc(m.transformLogic)], ["lineageType", esc(c.lineageType)], ["classification", esc(m.classification)],
-      ["obligatoire", m.required ? "oui" : ""], ["unique", m.unique ? "oui" : ""], ["tags", esc((c.tags || []).join(", "))]
-    ]);
-    ex += "<div><b>Sources</b></div>" + list(from(model, name));
-    ex += "<div><b>Utilisé par</b></div>" + list(to(model, name));
+    var ex = kv([["transformLogic", esc(m.transformLogic)], ["lineageType", esc(c.lineageType)]]);
     if (c.tests && c.tests.length) ex += "<div><b>Contrôles qualité</b></div>" + tests(c.tests);
-    var rest = {};
-    Object.keys(m).forEach(function (k) { if (["transformExpression", "transformDescription"].indexOf(k) < 0) rest[k] = m[k]; });
-    ex += '<pre class="cp-json">' + esc(JSON.stringify(rest, null, 2)) + "</pre>";
-    return '<div class="cp-expert-only">' + ex + "</div>";
+    return ex ? '<div class="cp-expert-only">' + ex + "</div>" : "";
   }
   function typesLine(c) {
     return kv([["Type logique", esc(c.contractType)], ["Type physique", esc(c.dataType)]]);
@@ -152,21 +126,6 @@
     if (sla.length) h += acc("SLA", list(sla), false);
     var sup = (m.support || []).map(function (s) { return esc((s.channel || "") + " " + (s.url || "")); });
     if (sup.length) h += acc("Support", list(sup), false);
-    var up = links(model, "up"), down = links(model, "down");
-    if (up.length || down.length) h += acc("Alimenté par et alimente", "<b>Alimenté par</b>" + list(up) + "<b>Alimente</b>" + list(down), false);
-    var s = Object.keys(n.columns).filter(function (k) {
-      var c = n.columns[k], mm = c.meta || {}, t = c.tags || [];
-      return mm.classification === "C3" || mm.classification === "C2" || t.indexOf("pii") >= 0 || t.indexOf("pseudonymized") >= 0 || t.indexOf("pii_potential") >= 0;
-    });
-    if (s.length) h += acc("Colonnes sensibles (" + s.length + ")", list(s.map(function (k) { return esc(k) + " " + sens(n.columns[k]); })), false);
-    var cp = m.customProperties || {}, ex = "";
-    Object.keys(cp).forEach(function (k) {
-      var v = cp[k];
-      ex += /SELECT/i.test(String(v)) ? sql(v, k) : kv([[k, esc(typeof v === "string" ? v : JSON.stringify(v))]]);
-    });
-    ex += kv([["apiVersion", esc(m.apiVersion)], ["tags", esc((n.tags || []).join(", "))], ["fichier", esc(n.path)]]);
-    if (n.tests && n.tests.length) ex += "<div><b>Contrôles qualité du contrat</b></div>" + tests(n.tests);
-    h += '<div class="cp-expert-only">' + ex + "</div>";
     return '<div class="cp-card">' + h + "</div>";
   };
 })();
