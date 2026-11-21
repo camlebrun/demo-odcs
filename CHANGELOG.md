@@ -10,6 +10,7 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 - Règles L015 (nommage des properties) et L016 (`customer_key` pseudonymisé).
 
 ### Modifié
+- Raw : chaque champ de premier niveau porte `transformLogic` (`map`, `create` pour `meta_*`), `transformSourceObjects` (champ de la source externe) et `transformDescription` ; la règle L006 est inversée en conséquence.
 - Champs techniques préfixés `meta_` : `meta_loaded_at`, `meta_source_file`, `meta_computed_at`. Aucun nom ne commence par `_`.
 - GA4 : `raw__purchases__ga4` et `raw__pages_views__ga4` pointent des vues filtrées (`purchase_events`, `page_view_events`).
 - Audiences : `audience_date` fait partie de la clé primaire (historique de 30 jours).

@@ -34,6 +34,10 @@ schema:
     classification: C1
     primaryKey: true
     required: true
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Order.id
+    transformDescription: Recopie du champ id de l'objet Order de l'API Admin Shopify, sans transformation.
   - name: email
     physicalType: STRING
     logicalType: string
@@ -41,26 +45,38 @@ schema:
     classification: C3
     tags:
     - pii
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Order.email
+    transformDescription: Recopie du champ email de l'objet Order de l'API Admin Shopify, sans transformation.
   - name: total_price
     physicalType: NUMERIC
     logicalType: number
     description: Champ total_price.
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Order.total_price
+    transformDescription: Recopie du champ total_price de l'objet Order de l'API Admin Shopify, sans transformation.
   - name: created_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ created_at.
     classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - shopify_admin_api#Order.created_at
+    transformDescription: Recopie du champ created_at de l'objet Order de l'API Admin Shopify, sans transformation.
   - name: meta_loaded_at
     physicalType: TIMESTAMP
     logicalType: timestamp
     description: Champ meta_loaded_at.
     classification: C1
     transformLogic: create
-    transformDescription: Horodatage de chargement.
+    transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
   - name: meta_source_file
     physicalType: STRING
     logicalType: string
     description: Champ meta_source_file.
     classification: C1
     transformLogic: create
-    transformDescription: Fichier de depot.
+    transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).

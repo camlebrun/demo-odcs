@@ -67,7 +67,7 @@ Une équipe propriétaire par domaine. `docs/`, `tools/`, `tests/`, `schema/` et
 | `classification` | **chaîne libre** par property | valeurs du tableau de la section 6 (L014) |
 | `required` | booléen, `true` = la colonne ne contient pas de NULL (la description du schéma est ambiguë) | `true` seulement si la source garantit l'absence de NULL |
 | `transformLogic` | **chaîne libre** (3.2.0 l'utilise aussi pour les mesures) | convention maison : `map`, `transform`, `create` (L007) |
-| `transformSourceObjects` | liste de chaînes libres | format `<contract_id>#<objet>.<property>` (L003) |
+| `transformSourceObjects` | liste de chaînes libres | customer : `<contract_id>#<objet>.<property>` (L003) ; raw : `<système>#<objet>.<champ>` de la source externe (L006) |
 | `transformDescription` | chaîne | une phrase |
 | Nesting | `object` : `properties` ; `array` : `items.properties` ; `map` : `map.key` / `map.value` | un chemin de lineage traverse `items` sans le nommer |
 
@@ -129,7 +129,7 @@ Autres règles :
 - tout champ customer de premier niveau a `transformLogic` et `transformDescription` (L008) ;
 - toutes les références doivent exister : contrat, objet de schéma, property, y compris chemins imbriqués (L003) ;
 - pas de cycle (L005), un customer ne référence que des raw (L004) ;
-- un raw ne porte aucun `transform*`, sauf `meta_loaded_at` et `meta_source_file` en `create` (L006).
+- raw (L006) : tout champ de premier niveau porte `transformLogic: map`, une source externe `<système>#<objet>.<champ>` et `transformDescription` ; `meta_loaded_at` et `meta_source_file` sont en `create`, sans source. Systèmes : `shopify_admin_api`, `pos_export`, `ga4_bigquery_export`, `googleads_api`, `metaads_api`. Pas de `transformExpression` ni de calcul.
 
 ### Règle `customer_key` (définie ici, une seule fois) (L012)
 
