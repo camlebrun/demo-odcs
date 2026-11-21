@@ -53,6 +53,9 @@ def _tests(quality, prefix: str) -> list[dict]:
             {
                 "unique_id": f"{prefix}.{name}.{i}",
                 "name": str(name),
+                # Cles lues par le bloc "Model Tests" de l'interface (elle n'affiche rien sans elles).
+                "testName": str(rule.get("description") or name),
+                "testUniqueId": f"{rule.get('dimension') or 'quality'}.{rule.get('type') or 'rule'}.{name}",
                 "namespace": "odcs",
                 "config": {"severity": rule.get("severity"), "warn_if": None, "error_if": None},
                 "kwargs": {k: v for k, v in rule.items() if k not in ("severity",)},
