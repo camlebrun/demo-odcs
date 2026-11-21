@@ -33,3 +33,7 @@ html.cp-expert .cp-expert-only{display:flex!important;flex-direction:column;gap:
 .dark .cp-k{color:#c3a6ff}.dark .cp-f{color:#7cc0ff}.dark .cp-s{color:#7fd9a0}.dark .cp-n{color:#ffb86b}
 .cp-h{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:600;margin-top:4px}
 .cp-tab{margin-top:16px;gap:10px;font-size:13px}
+/* Panneau de contrat : le nom du contrat, la relation et le chemin ne sont jamais tronques (retour a la ligne si besoin). */
+span.truncate.max-w-\[300px\],span.truncate.max-w-\[120px\],div.max-w-\[250px\]>span.truncate{max-width:none;overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
+div.truncate:has(>span.max-w-\[300px\]){overflow:visible;text-overflow:clip;white-space:normal;min-width:0}
+div.max-w-\[250px\]{max-width:100%}
