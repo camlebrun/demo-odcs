@@ -1,7 +1,7 @@
 name: pages
 
 # À chaque push sur main : publie le catalogue sur Cloudflare Pages (demo-odcs.camillelebrun.fr)
-# si le secret CLOUDFLARE_API_TOKEN existe, et sur GitHub Pages (miroir).
+# si le secret CLOUDFLARE_API_TOKEN existe (GitHub Pages désactivé).
 on:
   push:
     branches: [main]
@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -39,16 +37,3 @@ jobs:
       - name: Déployer sur Cloudflare Pages (demo-odcs.camillelebrun.fr)
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx --yes wrangler@4 pages deploy dist/catalog --project-name demo-odcs --branch main --commit-message "${GITHUB_SHA}"
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist/catalog
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
