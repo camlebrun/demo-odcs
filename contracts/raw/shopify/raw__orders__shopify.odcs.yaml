@@ -72,6 +72,9 @@ schema:
         dimension: accuracy
         severity: error
         description: Aucun total de commande negatif.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: id
         physicalType: INT64

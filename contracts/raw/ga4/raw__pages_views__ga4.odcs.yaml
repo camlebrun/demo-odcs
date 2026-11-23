@@ -53,7 +53,7 @@ slaProperties:
 schema:
 - name: events
   physicalName: page_view_events
-  physicalType: table
+  physicalType: view
   description: Evenements page_view et view_item de l'export BigQuery GA4, exposes par la vue page_view_events (filtre event_name IN ('page_view', 'view_item') sur l'export natif events_*), une ligne par evenement.
   dataGranularityDescription: Une ligne par evenement GA4.
   quality:
@@ -69,6 +69,9 @@ schema:
     dimension: completeness
     severity: error
     description: Chaque evenement est horodate.
+  customProperties:
+    - property: loadStrategy
+      value: full_refresh
   properties:
   - name: event_date
     physicalType: STRING

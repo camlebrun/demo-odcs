@@ -20,6 +20,8 @@ Regles (code dans la sortie) :
   L015 nommage des properties (snake_case, suffixes _at/_date/_amount/_eur/is_/has_ vs type physique)
   L016 customer_key : classification C2 et tag pseudonymized
   L017 description du contrat (purpose, usage, limitations) et des objets : 350 caracteres maximum (5 lignes)
+  L018 objet de schema : physicalType table|view ; customProperties loadStrategy (full_refresh|incremental|append) facultatif,
+       incrementalKey (property existante) obligatoire si incremental
 
 Code retour 1 s'il y a au moins une erreur.
 """
@@ -46,6 +48,8 @@ TECH_FIELDS = ("meta_loaded_at", "meta_source_file")
 # Systeme source externe cite dans transformSourceObjects d'un raw : <systeme>#<objet>.<champ>.
 RAW_SYSTEMS = {"shopify": "shopify_admin_api", "pos": "pos_export", "ga4": "ga4_bigquery_export", "googleads": "googleads_api", "metaads": "metaads_api"}
 LOGICS = ("map", "transform", "create")
+OBJECT_TYPES = ("table", "view")
+LOAD_STRATEGIES = ("full_refresh", "incremental", "append")
 API_VERSION = "v3.2.0"
 DESCRIPTION_MAX = 350  # caracteres : 5 lignes dans le catalogue
 
@@ -257,6 +261,28 @@ def check_metadata(c: Contract) -> list[Err]:
         errs.append(Err("L013", c.rel, "team.members doit contenir un membre avec role 'owner'"))
     if not isinstance(d.get("support"), list) or not d.get("support"):
         errs.append(Err("L013", c.rel, "support: liste non vide attendue"))
+    return errs
+
+
+def check_load_strategy(c: Contract) -> list[Err]:
+    """L018 : type de l'objet et strategie de chargement (affiches dans le catalogue)."""
+    errs = []
+    for obj in schema_objects(c):
+        where = f"{c.rel} {obj.get('name', '?')}"
+        if obj.get("physicalType") not in OBJECT_TYPES:
+            errs.append(Err("L018", where, f"physicalType '{obj.get('physicalType')}' hors de {', '.join(OBJECT_TYPES)}"))
+        strategy = custom_prop(obj, "loadStrategy")
+        if strategy is None:
+            continue
+        if strategy not in LOAD_STRATEGIES:
+            errs.append(Err("L018", where, f"loadStrategy '{strategy}' hors de {', '.join(LOAD_STRATEGIES)}"))
+            continue
+        key = custom_prop(obj, "incrementalKey")
+        names = {p.get("name") for p in obj.get("properties") or [] if isinstance(p, dict)}
+        if strategy == "incremental" and key not in names:
+            errs.append(Err("L018", where, f"incremental exige customProperties.incrementalKey, une property de l'objet (trouve '{key}')"))
+        if strategy != "incremental" and key is not None:
+            errs.append(Err("L018", where, "incrementalKey n'a de sens qu'avec loadStrategy incremental"))
     return errs
 
 
@@ -473,6 +499,7 @@ def run(root: Path, count: bool = True) -> list[Err]:
         errors += check_naming(c)
         errors += check_metadata(c)
         errors += check_docs(c)
+        errors += check_load_strategy(c)
         errors += check_pii(c)
         errors += check_property_names(c)
         errors += check_customer_key_class(c)

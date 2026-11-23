@@ -71,6 +71,9 @@ schema:
         dimension: accuracy
         severity: error
         description: Aucune vente avec un total negatif (les retours sont de type return).
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: ticket_id
         physicalType: INT64

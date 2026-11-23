@@ -209,6 +209,9 @@ schema:
         dimension: completeness
         severity: error
         description: Un client du segment product_viewers_no_purchase a une date de derniere consultation de fiche produit.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: customer_key
         physicalType: STRING

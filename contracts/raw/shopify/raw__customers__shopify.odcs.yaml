@@ -63,6 +63,9 @@ schema:
     dimension: completeness
     severity: error
     description: La table ne doit jamais etre vide apres une ingestion.
+  customProperties:
+    - property: loadStrategy
+      value: full_refresh
   properties:
   - name: id
     physicalType: INT64

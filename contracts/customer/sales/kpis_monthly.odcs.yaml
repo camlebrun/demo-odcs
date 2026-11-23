@@ -183,6 +183,9 @@ schema:
         dimension: accuracy
         severity: error
         description: Controle de reconciliation fourni par le controle de gestion (hors lot 1). Sur les mois passes et figes, l'ecart entre le CA net TTC de la table et le CA comptable de reference doit rester inferieur a 0,5 % (seuil 0,005) pour chaque mois, canal et magasin. Echoue aussi si un mois, un canal ou un magasin existe d'un seul cote, ou si le CA comptable vaut 0.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: month_date
         physicalType: DATE

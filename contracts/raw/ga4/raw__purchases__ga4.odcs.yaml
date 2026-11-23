@@ -53,7 +53,7 @@ slaProperties:
 schema:
 - name: events
   physicalName: purchase_events
-  physicalType: table
+  physicalType: view
   description: Evenements purchase de l'export BigQuery GA4, exposes par la vue purchase_events (filtre event_name = 'purchase' sur l'export natif events_*), une ligne par evenement.
   dataGranularityDescription: Une ligne par evenement GA4.
   quality:
@@ -69,6 +69,9 @@ schema:
     dimension: completeness
     severity: error
     description: Chaque achat porte un transaction_id (identifiant de commande Shopify).
+  customProperties:
+    - property: loadStrategy
+      value: full_refresh
   properties:
   - name: event_date
     physicalType: STRING

@@ -69,6 +69,9 @@ schema:
     dimension: accuracy
     severity: error
     description: Aucune quantite negative.
+  customProperties:
+    - property: loadStrategy
+      value: full_refresh
   properties:
   - name: id
     physicalType: INT64
