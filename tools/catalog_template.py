@@ -48,7 +48,7 @@ def _sub(html: str, old: str, new: str, count: int | None = None) -> str:
     return html.replace(old, new)
 
 
-def _resub(html: str, pattern: str, repl: str) -> str:
+def _resub(html: str, pattern: str, repl) -> str:
     new, n = re.subn(pattern, repl, html)
     if n < 1:
         raise TemplateMismatch(f"motif introuvable : {pattern[:70]}")
@@ -93,8 +93,8 @@ def _patch_model_info(html: str) -> str:
     if k < 0 or j < 0 or k - j > 600:
         raise TemplateMismatch("en-tete de la liste des colonnes introuvable")
     button = (
-        'R.jsx("button",{className:"cp-expert-toggle",title:"Afficher les propri\\u00e9t\\u00e9s techniques",'
-        'onClick:()=>window.cpToggleExpert(),children:"Mode expert"}),'
+        'R.jsx("button",{className:"cp-expert-toggle",title:"Show technical properties",'
+        'onClick:()=>window.cpToggleExpert(),children:"Expert mode"}),'
     )
     html = html[:j] + button + html[j:]
 
@@ -105,6 +105,17 @@ def _patch_model_info(html: str) -> str:
         raise TemplateMismatch("entete Columns de l'apercu introuvable")
     card = f'R.jsx("div",{{dangerouslySetInnerHTML:{{__html:window.cpNodeHtml({model})}}}}),'
     return html[:n] + card + html[n:]
+
+
+def _patch_model_tests(html: str) -> str:
+    """Bloc natif "Model Tests" : ne montre que la severite (champs absents des contrats). Remplace par un bloc lisible."""
+    return _resub(
+        html,
+        r'children:\["Model Tests \(",([\w$]+)\.length,"\)"\]\}\),R\.jsx\("div",\{className:"space-y-3",children:\1\.map\(',
+        r'children:["Quality checks (",\1.length,")"]}),'
+        r'R.jsx("div",{dangerouslySetInnerHTML:{__html:window.cpModelTestsHtml(\1)}}),'
+        r'R.jsx("div",{hidden:!0,className:"space-y-3",children:\1.map(',
+    )
 
 
 def _patch_columns_tab(html: str) -> str:
@@ -138,7 +149,7 @@ def _patch_columns_tab(html: str) -> str:
         raise TemplateMismatch("barre de recherche de l'onglet Columns introuvable")
     toggle = (
         'R.jsx("div",{className:"flex justify-end mb-2",children:R.jsx("button",{className:"cp-expert-toggle",'
-        'title:"Afficher les propriétés techniques",onClick:()=>window.cpToggleExpert(),children:"Mode expert"})}),'
+        'title:"Show technical properties",onClick:()=>window.cpToggleExpert(),children:"Expert mode"})}),'
     )
     return html.replace(anchor, toggle + anchor)
 
@@ -156,7 +167,7 @@ def _remove_code_views(html: str) -> str:
 
 def _bigquery_info(html: str) -> str:
     """Overview : le bloc "Model Information" (database, materialization, type de modele...) devient le schema BigQuery."""
-    html = _sub(html, 'children:"Model Information"})', 'children:"Schéma BigQuery"})', 1)
+    html = _sub(html, 'children:"Model Information"})', 'children:"BigQuery schema"})', 1)
     # Colonne de gauche : projet puis table. Colonne de droite : dataset.
     # Database = project_id.dataset.table (relationName) : l'interface ne recoit pas le champ `database`.
     html = _sub(html, 'mb-1",children:"Database"}),R.jsx("div",{className:"text-sm font-medium",children:be?.split(".")[0]||"N/A"})',
@@ -164,18 +175,29 @@ def _bigquery_info(html: str) -> str:
     html = _sub(html, 'mb-1",children:"Materialization"}),R.jsx("div",{className:"text-sm font-medium capitalize",children:Oe})',
                 'mb-1",children:"Table"}),R.jsx("div",{className:"text-sm font-medium",children:(s?.relationName||"").split(".").pop()||"N/A"})', 1)
     html = _sub(html, 'mb-1",children:"Schema"}),', 'mb-1",children:"Dataset"}),', 1)
-    # Sans objet pour un contrat : "Contract Enforced" et "Model Type".
+    # Grille sans retour a la ligne : les colonnes s'adaptent au contenu.
+    html = _sub(html, 'className:"grid grid-cols-2 gap-y-6 max-w-2xl",children:[R.jsxs("div",{className:"space-y-6",children:[R.jsxs("div",{children:[R.jsx("div",{className:"text-sm text-muted-foreground mb-1",children:"Database"})',
+                'className:"grid gap-y-6",style:{gridTemplateColumns:"max-content max-content",columnGap:"4rem"},children:[R.jsxs("div",{className:"space-y-6",children:[R.jsxs("div",{children:[R.jsx("div",{className:"text-sm text-muted-foreground mb-1",children:"Database"})', 1)
+    html = _sub(html, 'className:"text-sm font-medium break-all",children:s?.relationName', 'className:"text-sm font-medium whitespace-nowrap",children:s?.relationName', 1)
+
+    def cell(label: str, call: str) -> str:
+        return (
+            'R.jsxs("div",{children:[R.jsx("div",{className:"text-sm text-muted-foreground mb-1",children:"' + label + '"}),'
+            'R.jsx("div",{className:"text-sm font-medium capitalize whitespace-nowrap",children:window.' + call + '(s?.fullName)})]})'
+        )
+
+    # "Contract Enforced" (sans objet) devient le type de l'objet (table, view) ; "Model Type" devient la strategie de chargement.
     html = _resub(
         html,
         r'[\w$]+!==void 0&&R\.jsxs\("div",\{children:\[R\.jsx\("div",\{className:"text-sm text-muted-foreground mb-1",children:"Contract Enforced"\}\),'
         r'R\.jsx\("div",\{className:"text-sm font-medium",children:[\w$]+\?"Yes":"No"\}\)\]\}\)',
-        "null",
+        lambda _m: cell("Type", "cpObjectType"),
     )
     return _resub(
         html,
         r'R\.jsxs\("div",\{children:\[R\.jsx\("div",\{className:"text-sm text-muted-foreground mb-1",children:"Model Type"\}\),'
         r'R\.jsx\("div",\{className:"text-sm font-medium capitalize",children:[\w$]+\}\)\]\}\)',
-        "null",
+        lambda _m: cell("Load strategy", "cpLoadStrategy"),
     )
 
 
@@ -235,17 +257,18 @@ def patch_template(html: str) -> str:
     html = _sub(html, "No dependent models found for this column.", "No dependent contracts found for this column.")
     html = _sub(html, "Error generating dbt command:", "Error copying contract id:")
     html = _sub(html, "https://schemas.getdbt.com/dbt/manifest/v12.json", "odcs-v3.2.0")
-    html = _sub(html, "<title>Colibri Data</title>", "<title>Catalogue de données</title>", 1)
+    html = _sub(html, "<title>Colibri Data</title>", "<title>Data catalog</title>", 1)
 
     # 3. Pas de code compile : onglet masque, "Raw" devient le YAML du contrat.
     html = _sub(html, 'children:"Compiled"})', 'children:"Compiled",style:{display:"none"}})', 2)
-    html = _sub(html, 'rounded-[4px]",children:"Raw"}', 'rounded-[4px]",children:"Contrat YAML"}', 1)
-    html = _sub(html, 'disabled:!ie,children:"Raw"}', 'disabled:!ie,children:"Contrat YAML"}', 1)
-    html = _sub(html, "Compiled SQL", "Requête de contrôle", 2)
+    html = _sub(html, 'rounded-[4px]",children:"Raw"}', 'rounded-[4px]",children:"Contract YAML"}', 1)
+    html = _sub(html, 'disabled:!ie,children:"Raw"}', 'disabled:!ie,children:"Contract YAML"}', 1)
+    html = _sub(html, "Compiled SQL", "Check query", 2)
 
     # 4. Panneau natif "Model info" : infos du contrat, types, SQL de transformation, mode expert.
     html = _patch_model_info(html)
     html = _patch_columns_tab(html)
+    html = _patch_model_tests(html)
     html = _remove_code_views(html)
     html = _bigquery_info(html)
     css = (ASSETS / "column_info.css").read_text(encoding="utf-8")

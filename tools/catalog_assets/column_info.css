@@ -21,8 +21,8 @@
 .cp-btn{font:inherit;font-size:10.5px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:5px;padding:0 7px}
 .cp-btn:hover{background:hsl(var(--accent))}
 .cp-expert-toggle{font-size:11px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:6px;padding:2px 8px;white-space:nowrap}
-html.cp-expert .cp-expert-toggle::after{content:" : activé"}
-.cp-expert-toggle::after{content:" : désactivé"}
+html.cp-expert .cp-expert-toggle::after{content:" : on"}
+.cp-expert-toggle::after{content:" : off"}
 html.cp-expert .cp-expert-toggle{background:hsl(var(--purple-primary));border-color:hsl(var(--purple-primary));color:#fff}
 .cp-expert-only{display:none!important}
 html.cp-expert .cp-expert-only{display:flex!important;flex-direction:column;gap:6px;border-left:2px solid hsl(var(--purple-primary));padding-left:8px}
@@ -37,3 +37,5 @@ html.cp-expert .cp-expert-only{display:flex!important;flex-direction:column;gap:
 span.truncate.max-w-\[300px\],span.truncate.max-w-\[120px\],div.max-w-\[250px\]>span.truncate{max-width:none;overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
 div.truncate:has(>span.max-w-\[300px\]){overflow:visible;text-overflow:clip;white-space:normal;min-width:0}
 div.max-w-\[250px\]{max-width:100%}
+.cp-tests{display:flex;flex-direction:column;gap:12px}
+.cp-test{border:1px solid hsl(var(--border));border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.45}

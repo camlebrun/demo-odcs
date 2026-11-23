@@ -13,7 +13,7 @@
     if (!b) return;
     ev.stopPropagation();
     var txt = copies[+b.getAttribute("data-cp-copy")];
-    if (navigator.clipboard && txt != null) navigator.clipboard.writeText(txt).then(function () { b.textContent = "Copié"; });
+    if (navigator.clipboard && txt != null) navigator.clipboard.writeText(txt).then(function () { b.textContent = "Copied"; });
   }, true);
 
   function data() { return window.colibriData || { nodes: {}, lineage: { edges: [] } }; }
@@ -43,7 +43,7 @@
   function sql(text, title) {
     copies.push(String(text));
     return '<div class="cp-sql"><div class="cp-sqlbar"><span>' + esc(title) + '</span><button class="cp-btn" data-cp-copy="' +
-      (copies.length - 1) + '">Copier</button></div><pre><code>' + hl(text) + "</code></pre></div>";
+      (copies.length - 1) + '">Copy</button></div><pre><code>' + hl(text) + "</code></pre></div>";
   }
   function acc(title, body, open) {
     return '<details class="cp-acc"' + (open ? " open" : "") + "><summary>" + esc(title) + '</summary><div class="cp-in">' + body + "</div></details>";
@@ -55,37 +55,57 @@
     return h ? '<div class="cp-kv">' + h + "</div>" : "";
   }
   function list(items) {
-    return items.length ? '<ul class="cp-list">' + items.map(function (i) { return "<li>" + i + "</li>"; }).join("") + "</ul>" : '<span class="cp-note">Aucun</span>';
+    return items.length ? '<ul class="cp-list">' + items.map(function (i) { return "<li>" + i + "</li>"; }).join("") + "</ul>" : '<span class="cp-note">None</span>';
   }
-  var LEVEL = { C0: "public", C1: "interne", C2: "confidentiel", C3: "restreint" };
+  var LEVEL = { C0: "public", C1: "internal", C2: "confidential", C3: "restricted" };
   function sens(c) {
     var m = c.meta || {}, t = c.tags || [], h = "";
     if (m.classification) h += badge(LEVEL[m.classification] ? m.classification + " · " + LEVEL[m.classification] : m.classification, m.classification === "C3" ? "hi" : m.classification === "C2" ? "mid" : "");
     if (t.indexOf("pii") >= 0) h += badge("PII", "hi");
-    if (t.indexOf("pseudonymized") >= 0) h += badge("pseudonymisé", "mid");
-    if (t.indexOf("pii_potential") >= 0) h += badge("PII potentielle", "mid");
+    if (t.indexOf("pseudonymized") >= 0) h += badge("pseudonymized", "mid");
+    if (t.indexOf("pii_potential") >= 0) h += badge("potential PII", "mid");
     return h;
   }
   function tests(ts) {
     return (ts || []).map(function (t) {
       var k = t.kwargs || {};
-      return "<div><b>" + esc(t.name) + "</b> " + badge(k.dimension || "contrôle") + (t.config && t.config.severity ? badge(t.config.severity) : "") +
+      return "<div><b>" + esc(t.name) + "</b> " + badge(k.dimension || "check") + (t.config && t.config.severity ? badge(t.config.severity) : "") +
         (k.description ? '<div class="cp-note">' + esc(k.description) + "</div>" : "") +
-        (k.query ? sql(k.query, "Requête de contrôle") : "") + "</div>";
+        (k.query ? sql(k.query, "Check query") : "") + "</div>";
     }).join("");
   }
 
+  var OPS = { mustBe: "=", mustNotBe: "≠", mustBeGreaterThan: ">", mustBeGreaterOrEqualTo: "≥", mustBeLessThan: "<", mustBeLessOrEqualTo: "≤" };
+  /* Regle lisible d'un controle : `rowCount > 0`, `résultat de la requête = 0`. */
+  function ruleOf(k) {
+    var subject = k.type === "sql" ? "query result" : (k.metric || "value"), out = [];
+    Object.keys(OPS).forEach(function (op) { if (k[op] != null) out.push(subject + " " + OPS[op] + " " + k[op]); });
+    if (k.mustBeBetween) out.push(subject + " between " + k.mustBeBetween[0] + " and " + k.mustBeBetween[1]);
+    return out.join(" ; ");
+  }
+  /* Bloc "Contrôles qualité" de l'onglet Model info (remplace le bloc natif, vide). */
+  window.cpModelTestsHtml = function (ts) {
+    return '<div class="cp-tests">' + (ts || []).map(function (t) {
+      var k = t.kwargs || {}, sev = t.config && t.config.severity, r = ruleOf(k);
+      return '<div class="cp-test"><div><b>' + esc(t.name) + "</b> " + badge(k.dimension || "check") +
+        (sev ? badge(sev, sev === "error" ? "hi" : sev === "warning" ? "mid" : "") : "") + "</div>" +
+        (k.description ? "<div>" + esc(k.description) + "</div>" : "") +
+        (r ? '<div class="cp-note">Rule: ' + esc(r) + "</div>" : "") +
+        (k.query ? sql(k.query, "Check query") : "") + "</div>";
+    }).join("") + "</div>";
+  };
+
   function expertBlock(model, name, c, m) {
-    var ex = kv([["transformLogic", esc(m.transformLogic)], ["lineageType", esc(c.lineageType)]]);
-    if (c.tests && c.tests.length) ex += "<div><b>Contrôles qualité</b></div>" + tests(c.tests);
+    var ex = "";
+    if (c.tests && c.tests.length) ex += "<div><b>Quality checks</b></div>" + tests(c.tests);
     return ex ? '<div class="cp-expert-only">' + ex + "</div>" : "";
   }
   function typesLine(c) {
-    return kv([["Type logique", esc(c.contractType)], ["Type physique", esc(c.dataType)]]);
+    return kv([["Logical type", esc(c.contractType)], ["Physical type", esc(c.dataType)]]);
   }
   function flagsOf(c) {
     var m = c.meta || {}, f = sens(c);
-    if (m.primaryKey) f += badge("clé primaire" + (m.primaryKeyPosition ? " " + m.primaryKeyPosition : ""));
+    if (m.primaryKey) f += badge("primary key" + (m.primaryKeyPosition ? " " + m.primaryKeyPosition : ""));
     return f ? "<div>" + f + "</div>" : "";
   }
 
@@ -104,12 +124,24 @@
     if (m.transformDescription || m.transformExpression) {
       x += '<div class="cp-h">Transformation</div>';
       if (m.transformDescription) x += "<div>" + esc(m.transformDescription) + "</div>";
-      if (m.transformExpression) x += sql(m.transformExpression, "SQL BigQuery");
+      if (m.transformExpression) x += sql(m.transformExpression, "BigQuery SQL");
     }
     /* Types et transformation (SQL) : visibles uniquement en mode expert. La classification reste visible. */
-    var ex = x + (kv([["transformLogic", esc(m.transformLogic)], ["lineageType", esc(c.lineageType)]]) || "");
-    if (c.tests && c.tests.length) ex += "<div><b>Contrôles qualité</b></div>" + tests(c.tests);
+    var ex = x;
+    if (c.tests && c.tests.length) ex += "<div><b>Quality checks</b></div>" + tests(c.tests);
     return '<div class="cp-col cp-tab">' + flagsOf(c) + '<div class="cp-expert-only">' + ex + "</div></div>";
+  };
+
+  /* Valeurs du bloc "BigQuery schema" : type de l'objet et strategie de chargement, lus dans le contrat. */
+  window.cpObjectType = function (model) {
+    var n = data().nodes[model], m = (n && n.meta) || {};
+    return m.objectType || "N/A";
+  };
+  var STRATEGY = { full_refresh: "Full refresh", incremental: "Incremental", append: "Append" };
+  window.cpLoadStrategy = function (model) {
+    var n = data().nodes[model], m = (n && n.meta) || {};
+    if (!m.loadStrategy) return "Not specified";
+    return (STRATEGY[m.loadStrategy] || m.loadStrategy) + (m.incrementalKey ? " (key: " + m.incrementalKey + ")" : "");
   };
 
   window.cpNodeHtml = function (model) {
@@ -117,7 +149,7 @@
     if (!n) return "";
     var m = n.meta || {}, dp = m.descriptionParts || {}, h = "";
     h += '<div>' + badge("v" + (m.contractVersion || "?")) + badge(m.contractStatus || "?", m.contractStatus === "active" ? "ok" : "") + badge(m.domain || "") + "</div>";
-    h += kv([["Équipe", esc(m.team)], ["Usage", esc(dp.usage)], ["Limites", esc(dp.limitations)]]);
+    h += kv([["Team", esc(m.team)], ["Usage", esc(dp.usage)], ["Limitations", esc(dp.limitations)]]);
     var sla = (m.slaProperties || []).map(function (s) {
       return "<b>" + esc(s.property) + "</b> " + esc(s.value) + " " + esc(s.unit || "") + (s.element ? " (" + esc(s.element) + ")" : "");
     });

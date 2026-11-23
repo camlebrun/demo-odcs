@@ -135,6 +135,7 @@ def build_manifest(root: Path) -> dict:
             columns[name] = {k: v for k, v in entry.items() if v is not None}
 
         objs = schema_objects(c) or [{}]
+        obj0 = objs[0]
         tables = [o.get("physicalName") or o.get("name") for o in objs]
         table = tables[0] if len(tables) == 1 else "{" + ",".join(str(t) for t in tables) + "}"
         node_meta = {
@@ -148,6 +149,9 @@ def build_manifest(root: Path) -> dict:
             "slaProperties": d.get("slaProperties"),
             "apiVersion": d.get("apiVersion"),
             "descriptionParts": desc if isinstance(desc, dict) else None,
+            "objectType": obj0.get("physicalType"),
+            "loadStrategy": custom_prop(obj0, "loadStrategy"),
+            "incrementalKey": custom_prop(obj0, "incrementalKey"),
             "customProperties": {
                 cp["property"]: cp.get("value")
                 for cp in d.get("customProperties") or []
