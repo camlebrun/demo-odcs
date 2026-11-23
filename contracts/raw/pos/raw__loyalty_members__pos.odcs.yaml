@@ -71,6 +71,9 @@ schema:
         dimension: accuracy
         severity: error
         description: Les e-mails renseignes ont un format valide.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: loyalty_card_id
         physicalType: STRING

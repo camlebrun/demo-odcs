@@ -10,6 +10,9 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 - Règles L015 (nommage des properties) et L016 (`customer_key` pseudonymisé).
 
 ### Modifié
+- Catalogue : interface en anglais (hors contenu des contrats), bloc « Quality checks » lisible (règle, dimension, SQL), bloc « BigQuery schema » sans retour à ligne avec type de l'objet et stratégie de chargement lus dans les contrats.
+- Catalogue : `transformLogic` et `lineageType` ne sont plus affichés dans les fiches de colonne (ils restent dans `colibri-manifest.json`).
+- Contrats : `customProperties.loadStrategy: full_refresh` sur les objets dont le SLA décrit un chargement complet ; `raw__pages_views__ga4` et `raw__purchases__ga4` passent en `physicalType: view` ; nouvelle règle L018.
 - Customer : un sous-dossier par flux métier (`acquisition/`, `audiences/`, `sales/`) et noms courts (`acquisition_monthly`, `audiences`, `kpis_monthly`) sans les sources ; L009 vérifie désormais le dossier de flux.
 - Raw : chaque champ de premier niveau porte `transformLogic` (`map`, `create` pour `meta_*`), `transformSourceObjects` (champ de la source externe) et `transformDescription` ; la règle L006 est inversée en conséquence.
 - Champs techniques préfixés `meta_` : `meta_loaded_at`, `meta_source_file`, `meta_computed_at`. Aucun nom ne commence par `_`.

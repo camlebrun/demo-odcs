@@ -71,6 +71,9 @@ schema:
         dimension: accuracy
         severity: error
         description: La date de fermeture ne precede jamais la date d'ouverture.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: store_id
         physicalType: INT64

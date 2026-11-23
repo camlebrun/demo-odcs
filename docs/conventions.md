@@ -67,6 +67,7 @@ Une équipe propriétaire par domaine. `docs/`, `tools/`, `tests/`, `schema/` et
 | `classification` | **chaîne libre** par property | valeurs du tableau de la section 6 (L014) |
 | `required` | booléen, `true` = la colonne ne contient pas de NULL (la description du schéma est ambiguë) | `true` seulement si la source garantit l'absence de NULL |
 | `transformLogic` | **chaîne libre** (3.2.0 l'utilise aussi pour les mesures) | convention maison : `map`, `transform`, `create` (L007) |
+| `schema[].physicalType` et `customProperties` de l'objet | `physicalType` : `table` ou `view` ; `loadStrategy` (facultatif) : `full_refresh`, `incremental` ou `append` ; `incrementalKey` : property de l'objet, obligatoire si `incremental` | affichés dans le bloc « BigQuery schema » du catalogue (L018) |
 | `transformSourceObjects` | liste de chaînes libres | customer : `<contract_id>#<objet>.<property>` (L003) ; raw : `<système>#<objet>.<champ>` de la source externe (L006) |
 | `transformDescription` | chaîne | une phrase |
 | Nesting | `object` : `properties` ; `array` : `items.properties` ; `map` : `map.key` / `map.value` | un chemin de lineage traverse `items` sans le nommer |

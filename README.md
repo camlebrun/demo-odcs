@@ -50,7 +50,7 @@ Démo publique : https://demo-odcs.camillelebrun.fr, hébergée sur Cloudflare P
 
 Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrangler pages deploy`, voir `wrangler.jsonc` ; nécessite `wrangler login`).
 
-Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le « Mode expert » affiche les propriétés techniques (transformLogic, sources, classification, contrôles qualité avec leur SQL, YAML).
+Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le "Expert mode" affiche les propriétés techniques (transformLogic, sources, classification, contrôles qualité avec leur SQL, YAML).
 
 ## Contribuer
 

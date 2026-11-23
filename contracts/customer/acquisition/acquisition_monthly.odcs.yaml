@@ -205,6 +205,9 @@ schema:
         dimension: consistency
         severity: warning
         description: Sans nouveau client, le CAC n'est pas defini.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: month_date
         physicalType: DATE

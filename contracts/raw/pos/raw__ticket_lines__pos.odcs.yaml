@@ -71,6 +71,9 @@ schema:
         dimension: accuracy
         severity: error
         description: Taux de TVA compris entre 0 et 100.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
     properties:
       - name: ticket_line_id
         physicalType: INT64
