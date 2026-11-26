@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>How lineage works</title>
+<title>From ODCS contracts to a data catalog</title>
 <style>
 :root{--bg:#fff;--fg:#18181b;--muted:#63636e;--line:#e4e4e7;--soft:#f4f4f5;--accent:#6d28d9}
 html.dark{--bg:#111113;--fg:#ededef;--muted:#a1a1aa;--line:#2e2e33;--soft:#1c1c1f;--accent:#a78bfa}
@@ -16,6 +16,18 @@ p.lead{color:var(--muted);margin-top:0}
 pre{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:12px;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,monospace}
 code{font:13px ui-monospace,Menlo,monospace;background:var(--soft);padding:0 4px;border-radius:4px}
 pre code{background:none;padding:0}
+.flow{margin:16px 0;overflow-x:auto}
+.flow svg{display:block}
+.flow text{font:11px system-ui,-apple-system,sans-serif;fill:var(--fg)}
+.flow .cap{font-weight:600}
+.flow .mut{fill:var(--muted)}
+.flow .mono{font:10.5px ui-monospace,Menlo,monospace}
+.flow .hi{fill:var(--accent)}
+.flow .lab{font:9.5px system-ui,-apple-system,sans-serif;fill:var(--muted)}
+.flow .box{fill:var(--soft);stroke:var(--line)}
+.flow .chip{fill:var(--bg);stroke:var(--line)}
+.flow .ln{stroke:var(--accent);stroke-width:1.5;fill:none}
+.flow figcaption{color:var(--muted);font-size:13px;margin-top:8px}
 .scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{border-bottom:1px solid var(--line);text-align:left;padding:6px 10px 6px 0;vertical-align:top}
@@ -27,7 +39,7 @@ nav .lang{margin-left:auto}
 details{border-top:1px solid var(--line);padding:10px 0}
 summary{cursor:pointer;font-weight:600}
 </style>
-<script>try{var t=localStorage.getItem('vite-ui-theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.className='dark'}catch(e){}</script>
+<script>try{var t=localStorage.getItem('vite-ui-theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.className='dark'}catch(e){}</script>
 </head>
 <body>
 <nav><strong>data-contracts</strong><a href="index.html">Catalog</a><a href="lineage.html" aria-current="page">Doc</a><a class="lang" href="lineage.fr.html" lang="fr">Français</a></nav>
@@ -37,7 +49,7 @@ summary{cursor:pointer;font-weight:600}
 <p>The code that creates the JSON: <a href="https://github.com/camlebrun/demo-odcs/blob/main/tools/build_catalog.py">tools/build_catalog.py</a> (function <code>build_manifest</code>). The result: <a href="colibri-manifest.json">colibri-manifest.json</a>.</p>
 <h2>1. One ODCS contract per table</h2>
 <p>Each contract becomes a catalog <b>node</b>, with its sheet and columns.</p>
-<details><summary>Which ODCS field becomes what?</summary>
+<details open><summary>Which ODCS field becomes what?</summary>
 <div class="scroll"><table><tr><th>In the contract</th><th>In the catalog</th></tr>
 <tr><td><code>id</code></td><td>the node identifier</td></tr>
 <tr><td><code>servers</code></td><td>the project and dataset the table is filed under</td></tr>
@@ -73,10 +85,35 @@ summary{cursor:pointer;font-weight:600}
 <p>The source is the external system, for example <code>shopify_admin_api#Order.id</code>. It is not a contract of this repository: no arrow is drawn and the reference only appears in the contract YAML. Each top-level raw field copied from the source is still marked <b>P</b> (pass-through).</p>
 </details>
 <h2>3. Each reference between contracts becomes an arrow</h2>
-<pre><code>core__ad_spend # ad_spend . spend_eur
-   contract       object    column
-
-core__ad_spend.spend_eur  →  acquisition_monthly.spend_amount</code></pre>
+<figure class="flow">
+<svg width="720" viewBox="0 0 720 308" role="img" aria-label="A transformSourceObjects reference declared in the contract becomes an edge in lineage.edges, then an arrow between the core__ad_spend and acquisition_monthly tables in the catalog.">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--accent)"/></marker></defs>
+<rect class="box" x="0" y="0" width="720" height="88" rx="8"/>
+<text class="cap" x="14" y="24">1. In the contract — one of the 4 sources of <tspan class="mono">spend_amount</tspan></text>
+<text class="mono" x="14" y="46">- name: spend_amount</text>
+<text class="mono" x="14" y="64">  transformSourceObjects: <tspan class="hi">core__ad_spend#ad_spend.spend_eur</tspan></text>
+<text class="lab" x="219" y="80" text-anchor="middle">contract</text>
+<text class="lab" x="296" y="80" text-anchor="middle">object</text>
+<text class="lab" x="354" y="80" text-anchor="middle">column</text>
+<line class="ln" x1="40" y1="88" x2="40" y2="114" marker-end="url(#ah)"/>
+<text class="mut" x="56" y="106">each reference becomes a column-to-column arrow (one edge)</text>
+<rect class="box" x="0" y="116" width="720" height="74" rx="8"/>
+<text class="cap" x="14" y="140">2. In colibri-manifest.json — <tspan class="mono">lineage.edges</tspan></text>
+<text class="mono" x="14" y="162">{"source": "core__ad_spend", "sourceColumn": "spend_eur",</text>
+<text class="mono" x="14" y="178"> "target": "acquisition_monthly", "targetColumn": "spend_amount"}</text>
+<line class="ln" x1="40" y1="190" x2="40" y2="216" marker-end="url(#ah)"/>
+<text class="mut" x="56" y="208">the catalog draws one arrow per edge</text>
+<rect class="box" x="0" y="218" width="720" height="90" rx="8"/>
+<text class="cap" x="14" y="242">3. In the catalog — Lineage tab</text>
+<rect class="chip" x="36" y="258" width="200" height="26" rx="6"/>
+<text x="136" y="275" text-anchor="middle">core__ad_spend</text>
+<rect class="chip" x="484" y="258" width="200" height="26" rx="6"/>
+<text x="584" y="275" text-anchor="middle">acquisition_monthly</text>
+<line class="ln" x1="236" y1="271" x2="480" y2="271" marker-end="url(#ah)"/>
+<text class="mono mut" x="360" y="252" text-anchor="middle">spend_eur → spend_amount</text>
+</svg>
+<figcaption>A source declared in the contract (1) becomes an edge in the JSON (2), which the catalog draws as an arrow (3).</figcaption>
+</figure>
 <p>Arrows between tables follow from this: nobody declares them. From raw to core and then to customer, they form the full path of a number.</p>
 <details><summary>What the JSON contains</summary>
 <pre><code>{
