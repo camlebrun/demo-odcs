@@ -1,4 +1,7 @@
 """Tests du generateur de catalogue (JSON consomme par dbt-colibri)."""
+import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -6,6 +9,40 @@ import pytest
 import build_catalog
 
 FIXTURE = Path(__file__).parent / "fixtures" / "valid" / "mini_repo"
+ASSETS = Path(build_catalog.__file__).parent / "catalog_assets"
+
+# Execute catalog_assets/column_info.js hors navigateur : window/document factices, manifeste
+# injecte comme dans l'index.html (metadata, nodes, lineage.edges, tree).
+HARNESS = """
+const fs = require("fs");
+const [asset, manifestPath, model, column] = process.argv.slice(2);
+global.window = {};
+global.document = { documentElement: { classList: { toggle() {} } }, addEventListener() {} };
+global.navigator = {};
+eval(fs.readFileSync(asset, "utf8"));
+const src = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+window.colibriData = { metadata: src.metadata, nodes: src.nodes, lineage: { edges: src.lineage.edges }, tree: src.tree };
+process.stdout.write(window.cpSourceTraceHtml(model, column));
+"""
+
+
+def _trace(tmp_path, manifest: dict, model: str, column: str) -> str:
+    """Rend la trace d'une colonne avec node (le JS du catalogue n'est pas reimplemente en Python)."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node est necessaire pour executer le JS du catalogue")
+    harness = tmp_path / "trace.js"
+    harness.write_text(HARNESS, encoding="utf-8")
+    data = tmp_path / "manifest.json"
+    data.write_text(json.dumps(manifest), encoding="utf-8")
+    out = subprocess.run(
+        [node, str(harness), str(ASSETS / "column_info.js"), str(data), model, column],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert out.returncode == 0, out.stderr
+    return out.stdout
 
 
 def test_manifest_has_one_node_per_contract():
@@ -62,7 +99,50 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
-    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType"))
+    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpToggleTrace", "cpSourceTraceHtml", "Source trace"))
+
+
+def test_source_trace_goes_raw_core_customer(tmp_path):
+    """La trace concatene les transformations des sources jusqu'au contrat affiche."""
+    trace = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "kpis_monthly", "customer_key")
+    assert "Source trace" in trace
+    assert "2 upstream steps" in trace and "3 contracts" in trace
+    # ordre source -> mart, avec la transformation declaree a chaque etape
+    assert trace.index("raw__orders__shopify") < trace.index("core__orders") < trace.index("kpis_monthly")
+    for text in ("Recopie du champ email", "Alimente customer_key", "from core__orders#customer_key", "TO_HEX"):
+        assert text in trace, text
+
+
+def test_source_trace_reports_create_and_missing_upstream(tmp_path):
+    manifest = build_catalog.build_manifest(FIXTURE)
+    create = _trace(tmp_path, manifest, "kpis_monthly", "computed_at")
+    assert "Created in this contract, no upstream source." in create
+    assert "upstream steps" not in create
+
+
+def test_source_trace_reports_undocumented_step_and_ignores_cycles(tmp_path):
+    """Qualite variable : une colonne amont sans transformation est signalee, un cycle ne boucle pas."""
+    nodes = {
+        "raw__orders__shopify": {"id": "raw__orders__shopify", "nodeType": "source", "columns": {"id": {}}},
+        "core__orders": {"id": "core__orders", "nodeType": "model", "columns": {"order_id": {"meta": {"transformLogic": "map"}}}},
+        "kpis_monthly": {
+            "id": "kpis_monthly",
+            "nodeType": "model",
+            "columns": {"order_id": {"meta": {"transformLogic": "map", "transformDescription": "Copie de order_id."}}},
+        },
+    }
+    edges = [
+        {"id": 1, "source": "core__orders", "target": "kpis_monthly", "sourceColumn": "order_id", "targetColumn": "order_id"},
+        {"id": 2, "source": "raw__orders__shopify", "target": "core__orders", "sourceColumn": "id", "targetColumn": "order_id"},
+        {"id": 3, "source": "raw__orders__shopify", "target": "core__orders", "sourceColumn": "id", "targetColumn": "order_id"},
+        # arete de retour : un contrat amont qui depend de lui-meme (cycle)
+        {"id": 4, "source": "kpis_monthly", "target": "core__orders", "sourceColumn": "order_id", "targetColumn": "order_id"},
+    ]
+    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "kpis_monthly", "order_id")
+    assert trace.count("<b>raw__orders__shopify</b>") == 1, "une colonne amont n'est listee qu'une fois"
+    assert trace.count("<b>core__orders</b>") == 1
+    assert "Transformation not documented" in trace
+    assert "Copie de order_id." in trace
 
 
 def test_render_writes_lineage_page_linked_from_dashboard(tmp_path):

@@ -1,5 +1,6 @@
 /* Contenu ajoute au panneau natif "Model info" du catalogue : types, transformation SQL,
-   mode expert. Lit window.colibriData (genere depuis les data contracts). Aucun appel reseau. */
+   mode expert, trace des sources. Lit window.colibriData (genere depuis les data contracts).
+   Aucun appel reseau. */
 (function () {
   "use strict";
   /* Le mode expert repart toujours desactive a l'ouverture de la page (pas de memorisation). */
@@ -95,6 +96,103 @@
     }).join("") + "</div>";
   };
 
+  /* ---------- Trace des sources : toutes les modifications, des sources au contrat affiche. ----
+     Une colonne amont peut alimenter plusieurs colonnes (diamants) : chaque colonne n'est listee
+     qu'une fois, rangee par couche (raw, core, customer) dans le sens source -> contrat. Les
+     contrats ne sont pas tous documentes de la meme facon : une etape sans transformation est
+     signalee comme telle, une colonne sans amont aussi. Rien n'est calcule avant l'affichage. */
+  window.cpToggleTrace = function () {
+    document.documentElement.classList.toggle("cp-trace");
+  };
+
+  var PARENTS = null;
+  var LAYER_RANK = { raw: 0, core: 1, customer: 2 };
+  var TRACE_MAX = 200; /* garde-fou : contrat tres large ou lineage cyclique */
+
+  /* Index des colonnes amont, construit une seule fois depuis les aretes colonne a colonne. */
+  function parentsIndex() {
+    if (PARENTS) return PARENTS;
+    PARENTS = {};
+    (((data().lineage || {}).edges) || []).forEach(function (e) {
+      if (!e.sourceColumn || !e.targetColumn) return; /* arete de contrat a contrat */
+      var k = e.target + "\u001f" + e.targetColumn;
+      var list = PARENTS[k] || (PARENTS[k] = []);
+      for (var i = 0; i < list.length; i++) if (list[i].c === e.source && list[i].col === e.sourceColumn) return;
+      list.push({ c: e.source, col: e.sourceColumn });
+    });
+    return PARENTS;
+  }
+  function layerOf(id) {
+    var n = data().nodes[id] || {};
+    if (n.nodeType === "source") return "raw";
+    return String(id).indexOf("core__") === 0 ? "core" : "customer";
+  }
+  /* Colonnes amont d'une colonne, de la source (premier) au contrat affiche (dernier). */
+  function traceSteps(model, name) {
+    var seen = {}, steps = [], queue = [{ c: model, col: name, d: 0 }];
+    seen[model + "\u001f" + name] = 1;
+    while (queue.length && steps.length < TRACE_MAX) {
+      var cur = queue.shift(), ps = parentsIndex()[cur.c + "\u001f" + cur.col] || [];
+      steps.push(cur);
+      for (var i = 0; i < ps.length && steps.length < TRACE_MAX; i++) {
+        var k = ps[i].c + "\u001f" + ps[i].col;
+        if (seen[k]) continue; /* diamant ou cycle : la colonne n'est listee qu'une fois */
+        seen[k] = 1;
+        queue.push({ c: ps[i].c, col: ps[i].col, d: cur.d + 1 });
+      }
+    }
+    return steps.sort(function (a, b) {
+      var ra = LAYER_RANK[layerOf(a.c)], rb = LAYER_RANK[layerOf(b.c)];
+      return ra !== rb ? ra - rb : b.d - a.d;
+    });
+  }
+  /* Colonne de la trace : nom, logique et transformation declaree du contrat qui la produit. */
+  function traceColumnHtml(step, showFrom) {
+    var n = data().nodes[step.c] || {}, c = (n.columns || {})[step.col] || {}, m = c.meta || {};
+    var ps = showFrom ? parentsIndex()[step.c + "\u001f" + step.col] || [] : [];
+    var h = '<li class="cp-tracecol"><div class="cp-stepline">' +
+      '<span class="cp-hopcol">' + esc(step.col) + "</span>" + (m.transformLogic ? badge(m.transformLogic) : "") + "</div>";
+    if (ps.length) {
+      h += '<div class="cp-note">from ' + ps.slice(0, 8).map(function (p) { return esc(p.c + "#" + p.col); }).join(", ") +
+        (ps.length > 8 ? " +" + (ps.length - 8) : "") + "</div>";
+    }
+    h += m.transformDescription ? '<div class="cp-hopdesc">' + esc(m.transformDescription) + "</div>"
+      : '<div class="cp-note">Transformation not documented</div>';
+    if (m.transformExpression) h += acc("SQL", sql(m.transformExpression, "Transformation SQL"), false);
+    return h + "</li>";
+  }
+  /* Trace affichee dans le panneau : vide pour un raw (pas d'amont dans le catalogue). */
+  window.cpSourceTraceHtml = function (model, name) {
+    var n = data().nodes[model];
+    if (!n || n.nodeType === "source") return "";
+    var steps = traceSteps(model, name), m = ((n.columns || {})[name] || {}).meta || {};
+    if (steps.length < 2) {
+      return '<div class="cp-trace"><div class="cp-h">Source trace</div><div class="cp-note">' +
+        (m.transformLogic === "create" ? "Created in this contract, no upstream source." : "No upstream lineage declared.") +
+        "</div></div>";
+    }
+    /* Un groupe par contrat, dans l'ordre des couches : la concatenation reste courte meme quand
+       une colonne agregee brasse tout le lineage (une colonne amont n'apparait qu'une fois). */
+    var groups = [], byContract = {};
+    steps.forEach(function (s) {
+      var g = byContract[s.c] || (byContract[s.c] = { c: s.c, steps: [] });
+      if (!g.steps.length) groups.push(g);
+      g.steps.push(s);
+    });
+    var up = steps.length - 1;
+    var h = '<div class="cp-trace"><div class="cp-h">Source trace · ' + up + " upstream step" + (up > 1 ? "s" : "") +
+      " · " + groups.length + ' contracts</div><ol class="cp-steps">';
+    groups.forEach(function (g) {
+      var ly = layerOf(g.c);
+      h += '<li class="cp-step"><div class="cp-stepline">' + badge(ly, ly === "raw" ? "mid" : ly === "customer" ? "ok" : "") +
+        "<b>" + esc(g.c) + "</b>" + '<span class="cp-note">' + g.steps.length + (g.steps.length > 1 ? " columns" : " column") +
+        "</span></div><ul class=\"cp-cols\">";
+      g.steps.forEach(function (s) { h += traceColumnHtml(s, s.d === 0); });
+      h += "</ul></li>";
+    });
+    return h + "</ol></div>";
+  };
+
   function expertBlock(model, name, c, m) {
     var ex = "";
     if (c.tests && c.tests.length) ex += "<div><b>Quality checks</b></div>" + tests(c.tests);
@@ -109,11 +207,12 @@
     return f ? "<div>" + f + "</div>" : "";
   }
 
-  /* Fiche de colonne du panneau lateral : type et classification seulement. */
+  /* Fiche de colonne du panneau lateral : type, classification, trace des sources. */
   window.cpColumnHtml = function (model, name) {
     var n = data().nodes[model], c = n && n.columns && n.columns[name];
     if (!c) return "";
-    return '<div class="cp-col">' + flagsOf(c) + typesLine(c) + expertBlock(model, name, c, c.meta || {}) + "</div>";
+    return '<div class="cp-col">' + flagsOf(c) + typesLine(c) + expertBlock(model, name, c, c.meta || {}) +
+      window.cpSourceTraceHtml(model, name) + "</div>";
   };
 
   /* Ligne depliee de l'onglet Columns : types, classification, transformation (description et SQL). */
@@ -129,7 +228,8 @@
     /* Types et transformation (SQL) : visibles uniquement en mode expert. La classification reste visible. */
     var ex = x;
     if (c.tests && c.tests.length) ex += "<div><b>Quality checks</b></div>" + tests(c.tests);
-    return '<div class="cp-col cp-tab">' + flagsOf(c) + '<div class="cp-expert-only">' + ex + "</div></div>";
+    return '<div class="cp-col cp-tab">' + flagsOf(c) + '<div class="cp-expert-only">' + ex + "</div>" +
+      window.cpSourceTraceHtml(model, name) + "</div>";
   };
 
   /* Valeurs du bloc "BigQuery schema" : type de l'objet et strategie de chargement, lus dans le contrat. */

@@ -10,7 +10,8 @@ Retraits :
 - le vocabulaire dbt (commandes `dbt build`, aides `dbt compile`, titre) ;
 - l'onglet "Compiled" (pas de code compile dans un contrat).
 Ajouts dans le panneau natif "Model info" (catalog_assets/column_info.js et .css) : infos du
-contrat, types logique et physique en accordeon, SQL de transformation, mode expert.
+contrat, types logique et physique en accordeon, SQL de transformation, mode expert, trace des
+sources (toutes les transformations, des contrats raw jusqu'au contrat affiche).
 """
 from __future__ import annotations
 
@@ -20,6 +21,13 @@ from pathlib import Path
 ASSETS = Path(__file__).parent / "catalog_assets"
 UPSELL_START = "R.jsx($c,{delayDuration:200,"
 UPSELL_END = 'Try this feature on Colibri Cloud"})]})})'
+# Bascule CSS pure : la classe est posee sur <html>, les blocs sont deja rendus, pas de re-rendu React.
+TOGGLES = (
+    '[R.jsx("button",{className:"cp-expert-toggle",title:"Show technical properties",'
+    'onClick:()=>window.cpToggleExpert(),children:"Expert mode"}),'
+    'R.jsx("button",{className:"cp-trace-toggle",title:"Show every transformation, from the source contracts",'
+    'onClick:()=>window.cpToggleTrace(),children:"Source trace"})]'
+)
 
 
 class TemplateMismatch(RuntimeError):
@@ -86,17 +94,14 @@ def _patch_model_info(html: str) -> str:
     at = m.start(2)
     html = html[:at] + extra + html[at:]
 
-    # b) Bouton "Mode expert" dans l'en-tete de la liste des colonnes.
+    # b) Boutons "Mode expert" et "Source trace" dans l'en-tete de la liste des colonnes.
     k = html.find('placeholder:"Find...",value:')
     box = 'R.jsxs("div",{className:"relative w-32",children:['
     j = html.rfind(box, 0, k) if k >= 0 else -1
     if k < 0 or j < 0 or k - j > 600:
         raise TemplateMismatch("en-tete de la liste des colonnes introuvable")
-    button = (
-        'R.jsx("button",{className:"cp-expert-toggle",title:"Show technical properties",'
-        'onClick:()=>window.cpToggleExpert(),children:"Expert mode"}),'
-    )
-    html = html[:j] + button + html[j:]
+    toggles = f'R.jsx("div",{{className:"cp-toggles",children:{TOGGLES}}}),'
+    html = html[:j] + toggles + html[j:]
 
     # c) Infos du contrat avant la liste des colonnes (apercu du noeud).
     head = 'R.jsxs("div",{children:[R.jsxs("div",{className:"flex items-center justify-between mb-2",children:[R.jsxs(pk,{children:["Columns ("'
@@ -148,8 +153,8 @@ def _patch_columns_tab(html: str) -> str:
     if html.count(anchor) != 1:
         raise TemplateMismatch("barre de recherche de l'onglet Columns introuvable")
     toggle = (
-        'R.jsx("div",{className:"flex justify-end mb-2",children:R.jsx("button",{className:"cp-expert-toggle",'
-        'title:"Show technical properties",onClick:()=>window.cpToggleExpert(),children:"Expert mode"})}),'
+        'R.jsx("div",{className:"flex justify-end mb-2",children:'
+        f'R.jsx("div",{{className:"cp-toggles",children:{TOGGLES}}})}}),'
     )
     return html.replace(anchor, toggle + anchor)
 
