@@ -24,56 +24,76 @@ nav strong{margin-right:12px;font-weight:500}
 nav a{padding:4px 12px;border-radius:6px;color:var(--muted);text-decoration:none}
 nav a:hover,nav a[aria-current]{background:var(--soft);color:var(--fg)}
 nav .lang{margin-left:auto}
-.pipe{list-style:none;padding:0;margin:12px auto;max-width:480px;text-align:center}
-.pipe .down{color:var(--muted);line-height:1.4}
-.box{border:1px solid var(--line);border-radius:8px;background:var(--soft);padding:8px 12px;font-size:13px}
-.box b{display:block}
+details{border-top:1px solid var(--line);padding:10px 0}
+summary{cursor:pointer;font-weight:600}
 </style>
 <script>try{var t=localStorage.getItem('vite-ui-theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.className='dark'}catch(e){}</script>
 </head>
 <body>
 <nav><strong>data-contracts</strong><a href="index.html">Catalogue</a><a href="lineage.fr.html" aria-current="page">Doc</a><a class="lang" href="lineage.html" lang="en">English</a></nav>
 <main>
-<h1>Comment fonctionne le lineage</h1>
-<p class="lead">Le lineage dit d'où vient un chiffre et ce qui casse si on modifie un champ. Il tient en une règle : <b>chaque source déclarée devient une flèche entre deux colonnes</b>.</p>
-<p><b>Data contract</b> : un fichier YAML qui décrit une table. <b>Raw</b> : table recopiée d'un système (Shopify, GA4…). <b>Customer</b> : table calculée à partir des raw.</p>
-<h2>1. Déclarer une colonne</h2><p>Exemple : <code>spend_amount</code>, la dépense publicitaire mensuelle, additionne Google Ads et Meta Ads.</p>
-<pre><code># contracts/customer/acquisition/acquisition_monthly.odcs.yaml (extrait)
+<h1>Des contrats ODCS au data catalogue</h1>
+<p class="lead">Nos contrats suffisent à construire le catalogue et son lineage. Ni dbt, ni base de données, ni analyse du SQL.</p>
+<p>Le code qui crée le JSON : <a href="https://github.com/camlebrun/demo-odcs/blob/main/tools/build_catalog.py">tools/build_catalog.py</a> (fonction <code>build_manifest</code>). Le résultat : <a href="colibri-manifest.json">colibri-manifest.json</a>.</p>
+<h2>1. Un contrat ODCS par table</h2>
+<p>Chaque contrat devient un <b>nœud</b> du catalogue, avec sa fiche et ses colonnes.</p>
+<details><summary>Quel champ ODCS devient quoi ?</summary>
+<div class="scroll"><table><tr><th>Dans le contrat</th><th>Dans le catalogue</th></tr>
+<tr><td><code>id</code></td><td>l'identifiant du nœud</td></tr>
+<tr><td><code>servers</code></td><td>le projet et le dataset où la table est rangée</td></tr>
+<tr><td><code>schema.properties</code></td><td>les colonnes, y compris les champs imbriqués</td></tr>
+<tr><td><code>physicalType</code>, <code>logicalType</code>, <code>description</code></td><td>les types et la description de la colonne</td></tr>
+<tr><td><code>classification</code>, <code>tags</code></td><td>les étiquettes de la colonne</td></tr>
+<tr><td><code>quality</code></td><td>le bloc des contrôles qualité</td></tr>
+<tr><td><code>version</code>, <code>team</code>, <code>slaProperties</code>, <code>support</code></td><td>la fiche de la table</td></tr>
+</table></div>
+</details>
+<h2>2. <code>transformSourceObjects</code> : d'où vient chaque colonne</h2>
+<p>ODCS prévoit ce champ sur chaque colonne : une liste de chaînes libres. Notre convention : <code>contrat#objet.colonne</code>, où <code>contrat</code> est l'<code>id</code> du contrat source et <code>objet</code> le <code>name</code> de la table dans son <code>schema</code>.</p>
+<pre><code># acquisition_monthly.odcs.yaml (extrait)
 - name: spend_amount
   transformLogic: transform
   transformSourceObjects:
-    - raw__ad_spend__googleads#ad_spend.metrics_cost_micros
-    - raw__ad_spend__metaads#ad_spend.spend
-    # + 8 (10 sources)
-  transformDescription: Somme des micros Google Ads divises par 1 000 000 et de la depense Meta decimale, en EUR.
+    - core__ad_spend#ad_spend.spend_eur
+    - core__ad_spend#ad_spend.spend_date
+    - core__ad_spend#ad_spend.platform
+    - core__ad_spend#ad_spend.campaign_id
   customProperties:
     - property: transformExpression
       value: IFNULL(SUM(spend_eur), 0)</code></pre>
-<ul><li><code>transformSourceObjects</code> : toutes les colonnes utilisées, y compris pour filtrer ou joindre. <b>C’est la seule chose qui dessine le graphe.</b></li><li><code>transformDescription</code> : une phrase lisible par tous.</li><li><code>transformExpression</code> : le SQL BigQuery. Il n’est ni exécuté ni comparé aux sources ; ici <code>spend_eur</code> est un nom intermédiaire.</li></ul>
-<div class="scroll"><table><tr><th>transformLogic</th><th>Quand</th><th>Sources</th><th>SQL</th></tr><tr><td><code>map</code></td><td>valeur recopiée</td><td>exactement une</td><td>facultatif : renommage ou cast simple seulement</td></tr><tr><td><code>transform</code></td><td>valeur calculée, agrégée, jointe</td><td>au moins une</td><td>obligatoire</td></tr><tr><td><code>create</code></td><td>valeur sans source</td><td>aucune</td><td>facultatif</td></tr></table></div>
-<h2>2. Du YAML au graphe</h2><p>Le code découpe chaque référence et en fait un lien entre deux colonnes. Il ne lit pas le SQL pour cela.</p>
-<pre><code>raw__ad_spend__metaads # ad_spend . spend
-        contrat           objet     colonne
+<p>La dépense est la somme de <code>spend_eur</code>. Les trois autres colonnes servent à la grouper par mois, canal et campagne : <b>elles sont citées aussi</b>, pas seulement celle de l'expression.</p>
+<details><summary>Nos règles d'écriture</summary>
+<ul><li>Un champ imbriqué s'écrit avec son chemin : <code>raw__refunds__shopify#refunds.transactions.amount</code>.</li><li><code>transformExpression</code> : le SQL BigQuery, propriété maison dans <code>customProperties</code>. Il est affiché, jamais exécuté.</li></ul><div class="scroll"><table><tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression</th></tr>
+<tr><td><code>map</code></td><td>exactement une</td><td>facultative : renommage ou cast simple seulement</td></tr>
+<tr><td><code>transform</code></td><td>au moins une</td><td>obligatoire</td></tr>
+<tr><td><code>create</code></td><td>aucune</td><td>facultative</td></tr>
+</table></div>
+</details>
+<details><summary>Et pour les tables raw ?</summary>
+<p>La source est le système externe, par exemple <code>shopify_admin_api#Order.id</code>. Ce n'est pas un contrat du dépôt : aucune flèche n'est dessinée et la référence ne figure que dans le YAML du contrat. Chaque champ raw de premier niveau recopié de la source est tout de même marqué <b>P</b> (<i>pass-through</i>, recopie).</p>
+</details>
+<h2>3. Chaque référence entre contrats devient une flèche</h2>
+<pre><code>core__ad_spend # ad_spend . spend_eur
+   contrat        objet     colonne
 
-{"source": "raw__ad_spend__metaads", "sourceColumn": "spend",
- "target": "acquisition_monthly",    "targetColumn": "spend_amount"}</code></pre>
-<p>Le lineage des tables ne se déclare pas : dès qu’une colonne de B cite une colonne de A, le catalogue trace A &rarr; B.</p>
-<ol class="pipe">
-<li class="box"><b>Contrats YAML</b>les sources de chaque colonne</li>
-<li class="down" aria-hidden="true">&darr;</li>
-<li class="box"><b>make check</b>vérifie les références (étape séparée)</li>
-<li class="down" aria-hidden="true">&darr;</li>
-<li class="box"><b>make catalog</b>crée les traits, sans vérifier</li>
-<li class="down" aria-hidden="true">&darr;</li>
-<li class="box"><b>index.html + colibri-manifest.json</b>le catalogue et la copie des données</li>
-</ol>
-<p><b>Attention :</b> <code>make catalog</code> et <code>make publish</code> ne vérifient rien. Une référence fausse passe dans le graphe. Lancer <code>make check</code> avant ; la CI le fait avant de déployer depuis <code>main</code>.</p>
-<h2>3. Où le voir</h2>
-<ul><li>Onglet <b>Lineage</b> : le bouton <code>+</code> et les flèches élargissent le graphe. <b>T</b> = transformation, <b>R</b> = renommage, <b>P</b> = recopie.</li><li>SQL et description : <b>Model Info</b>, onglet <b>Columns</b>, déplier la colonne, activer <b>Expert mode</b>.</li></ul>
-<h2>4. Modifier un lineage</h2>
-<ol><li>Modifier la colonne dans son contrat.</li><li>Monter la version du contrat. Changer les sources d’une colonne customer est un changement cassant : version MAJOR et revue.</li><li>Lancer <code>make check</code>, puis <code>make catalog-open</code>.</li><li>Ouvrir une pull request. Le merge sur <code>main</code> publie, si le jeton de déploiement est configuré.</li></ol>
-<h2>5. Ce qui n’est pas vérifié</h2><p><code>make check</code> contrôle que les colonnes citées par les contrats customer existent, qu’il n’y a pas de cycle et que les champs obligatoires sont remplis. Pour les raw, le système externe est contrôlé, pas ses champs. Rien ne prouve que le SQL utilise les sources déclarées, ni que le pipeline fait ce que dit le contrat.</p>
-<p class="lead">Pour les développeurs : <code>tools/build_catalog.py</code> (<code>build_manifest</code>, <code>render_html</code>) et <code>tools/validate_lineage.py</code>.</p>
+core__ad_spend.spend_eur  →  acquisition_monthly.spend_amount</code></pre>
+<p>Les flèches entre tables en découlent : personne ne les déclare. De raw à core puis à customer, elles forment le chemin complet d'un chiffre.</p>
+<details><summary>Ce que contient le JSON</summary>
+<pre><code>{
+  "metadata": { ... },
+  "nodes":    { "acquisition_monthly": { "columns": { ... } }, ... },
+  "lineage":  { "edges": [ ... ], "parents": { ... }, "children": { ... } },
+  "tree":     { "byDatabase": { ... }, "byPath": { ... } }
+}
+
+// une entrée de lineage.edges
+{"id": 1,
+ "source": "core__ad_spend",      "sourceColumn": "spend_eur",
+ "target": "acquisition_monthly", "targetColumn": "spend_amount"}</code></pre><p>Le site reçoit <code>metadata</code>, <code>nodes</code>, <code>tree</code> et <code>lineage.edges</code> ; <code>parents</code> et <code>children</code> ne restent que dans le fichier JSON. <code>edges</code> contient une entrée par flèche entre colonnes, plus une par paire de tables liées (colonnes vides).</p>
+</details>
+<h2>4. Vérifier, puis générer</h2>
+<p><code>make check</code> contrôle les contrats (et lance les tests), dont l'existence des colonnes citées par core et customer (pour les raw, seul le nom du système externe est contrôlé). <code>make catalog</code> refait les contrôles des contrats (schéma et références) et s'arrête s'ils échouent. Sinon, il écrit le JSON et l'injecte dans l'interface de <a href="https://github.com/b-ned/dbt-colibri">dbt-colibri</a> (licence MIT), sans dbt : c'est le <a href="index.html">catalogue</a>.</p>
+<p><b>Limite : rien ne prouve que le SQL utilise les sources déclarées.</b></p>
 </main>
 </body>
 </html>

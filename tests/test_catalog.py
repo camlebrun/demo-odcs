@@ -70,5 +70,5 @@ def test_render_writes_lineage_page_linked_from_dashboard(tmp_path):
     html = build_catalog.render_html(build_catalog.build_manifest(Path(build_catalog.REPO_ROOT)), tmp_path)
     assert (tmp_path / "lineage.html").is_file()
     assert (tmp_path / "lineage.fr.html").is_file()
-    assert 'href:"lineage.html"' in html.read_text(encoding="utf-8")
+    assert 'href:"lineage.fr.html"' in html.read_text(encoding="utf-8")
 

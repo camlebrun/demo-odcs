@@ -219,10 +219,10 @@ def _drop_lineage_warning(html: str) -> str:
 
 
 def _doc_tab(html: str) -> str:
-    """Onglet "Doc" a cote de "Model Info" et "Lineage" : ouvre catalog_assets/lineage.html."""
+    """Onglet "Doc" a cote de "Model Info" et "Lineage" : ouvre catalog_assets/lineage.fr.html (lien vers l'anglais dans la page)."""
     anchor = "p.label]},p.id)}),"
     link = (
-        'R.jsx("a",{href:"lineage.html",className:"flex items-center gap-2 px-3 py-1.5 text-xs font-medium '
+        'R.jsx("a",{href:"lineage.fr.html",className:"flex items-center gap-2 px-3 py-1.5 text-xs font-medium '
         'rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50",children:"Doc"}),'
     )
     return _sub(html, anchor, anchor + link, 1)
