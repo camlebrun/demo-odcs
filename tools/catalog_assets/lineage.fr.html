@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Des contrats ODCS au data catalogue</title>
+<style>
+:root{--bg:#fff;--fg:#18181b;--muted:#63636e;--line:#e4e4e7;--soft:#f4f4f5;--accent:#6d28d9}
+html.dark{--bg:#111113;--fg:#ededef;--muted:#a1a1aa;--line:#2e2e33;--soft:#1c1c1f;--accent:#a78bfa}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+h1{font-size:26px;margin:16px 0 4px}
+h2{font-size:18px;margin:32px 0 8px}
+p.lead{color:var(--muted);margin-top:0}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:12px;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,monospace}
+code{font:13px ui-monospace,Menlo,monospace;background:var(--soft);padding:0 4px;border-radius:4px}
+pre code{background:none;padding:0}
+.flow{margin:16px 0;overflow-x:auto}
+.flow svg{display:block}
+.flow text{font:11px system-ui,-apple-system,sans-serif;fill:var(--fg)}
+.flow .cap{font-weight:600}
+.flow .mut{fill:var(--muted)}
+.flow .mono{font:10.5px ui-monospace,Menlo,monospace}
+.flow .hi{fill:var(--accent)}
+.flow .lab{font:9.5px system-ui,-apple-system,sans-serif;fill:var(--muted)}
+.flow .box{fill:var(--soft);stroke:var(--line)}
+.flow .chip{fill:var(--bg);stroke:var(--line)}
+.flow .ln{stroke:var(--accent);stroke-width:1.5;fill:none}
+.flow figcaption{color:var(--muted);font-size:13px;margin-top:8px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);text-align:left;padding:6px 10px 6px 0;vertical-align:top}
+nav{position:sticky;top:0;display:flex;gap:4px;align-items:center;padding:6px 16px;background:var(--bg);border-bottom:1px solid var(--line);font-size:13px}
+nav strong{margin-right:12px;font-weight:500}
+nav a{padding:4px 12px;border-radius:6px;color:var(--muted);text-decoration:none}
+nav a:hover,nav a[aria-current]{background:var(--soft);color:var(--fg)}
+nav .lang{margin-left:auto}
+details{border-top:1px solid var(--line);padding:10px 0}
+summary{cursor:pointer;font-weight:600}
+</style>
+<script>try{var t=localStorage.getItem('vite-ui-theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.className='dark'}catch(e){}</script>
+</head>
+<body>
+<nav><strong>data-contracts</strong><a href="index.html">Catalogue</a><a href="lineage.fr.html" aria-current="page">Doc</a><a class="lang" href="lineage.html" lang="en">English</a></nav>
+<main>
+<h1>Des contrats ODCS au data catalogue</h1>
+<p class="lead">Nos contrats suffisent à construire le catalogue et son lineage. Ni dbt, ni base de données, ni analyse du SQL.</p>
+<p>Le code qui crée le JSON : <a href="https://github.com/camlebrun/demo-odcs/blob/main/tools/build_catalog.py">tools/build_catalog.py</a> (fonction <code>build_manifest</code>). Le résultat : <a href="colibri-manifest.json">colibri-manifest.json</a>.</p>
+<h2>1. Un contrat ODCS par table</h2>
+<p>Chaque contrat devient un <b>nœud</b> du catalogue, avec sa fiche et ses colonnes.</p>
+<details open><summary>Quel champ ODCS devient quoi ?</summary>
+<div class="scroll"><table><tr><th>Dans le contrat</th><th>Dans le catalogue</th></tr>
+<tr><td><code>id</code></td><td>l'identifiant du nœud</td></tr>
+<tr><td><code>servers</code></td><td>le projet et le dataset où la table est rangée</td></tr>
+<tr><td><code>schema.properties</code></td><td>les colonnes, y compris les champs imbriqués</td></tr>
+<tr><td><code>physicalType</code>, <code>logicalType</code>, <code>description</code></td><td>les types et la description de la colonne</td></tr>
+<tr><td><code>classification</code>, <code>tags</code></td><td>les étiquettes de la colonne</td></tr>
+<tr><td><code>quality</code></td><td>le bloc des contrôles qualité</td></tr>
+<tr><td><code>version</code>, <code>team</code>, <code>slaProperties</code>, <code>support</code></td><td>la fiche de la table</td></tr>
+</table></div>
+</details>
+<h2>2. <code>transformSourceObjects</code> : d'où vient chaque colonne</h2>
+<p>ODCS prévoit ce champ sur chaque colonne : une liste de chaînes libres. Notre convention : <code>contrat#objet.colonne</code>, où <code>contrat</code> est l'<code>id</code> du contrat source et <code>objet</code> le <code>name</code> de la table dans son <code>schema</code>.</p>
+<pre><code># acquisition_monthly.odcs.yaml (extrait)
+- name: spend_amount
+  transformLogic: transform
+  transformSourceObjects:
+    - core__ad_spend#ad_spend.spend_eur
+    - core__ad_spend#ad_spend.spend_date
+    - core__ad_spend#ad_spend.platform
+    - core__ad_spend#ad_spend.campaign_id
+  customProperties:
+    - property: transformExpression
+      value: IFNULL(SUM(spend_eur), 0)</code></pre>
+<p>La dépense est la somme de <code>spend_eur</code>. Les trois autres colonnes servent à la grouper par mois, canal et campagne : <b>elles sont citées aussi</b>, pas seulement celle de l'expression.</p>
+<details><summary>Nos règles d'écriture</summary>
+<ul><li>Un champ imbriqué s'écrit avec son chemin : <code>raw__refunds__shopify#refunds.transactions.amount</code>.</li><li><code>transformExpression</code> : le SQL BigQuery, propriété maison dans <code>customProperties</code>. Il est affiché, jamais exécuté.</li></ul><div class="scroll"><table><tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression</th></tr>
+<tr><td><code>map</code></td><td>exactement une</td><td>facultative : renommage ou cast simple seulement</td></tr>
+<tr><td><code>transform</code></td><td>au moins une</td><td>obligatoire</td></tr>
+<tr><td><code>create</code></td><td>aucune</td><td>facultative</td></tr>
+</table></div>
+</details>
+<details><summary>Et pour les tables raw ?</summary>
+<p>La source est le système externe, par exemple <code>shopify_admin_api#Order.id</code>. Ce n'est pas un contrat du dépôt : aucune flèche n'est dessinée et la référence ne figure que dans le YAML du contrat. Chaque champ raw de premier niveau recopié de la source est tout de même marqué <b>P</b> (<i>pass-through</i>, recopie).</p>
+</details>
+<h2>3. Chaque référence entre contrats devient une flèche</h2>
+<figure class="flow">
+<svg width="720" viewBox="0 0 720 308" role="img" aria-label="Une source transformSourceObjects declaree dans le contrat devient une arete dans lineage.edges, puis une fleche entre les tables core__ad_spend et acquisition_monthly dans le catalogue.">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--accent)"/></marker></defs>
+<rect class="box" x="0" y="0" width="720" height="88" rx="8"/>
+<text class="cap" x="14" y="24">1. Dans le contrat — une des 4 sources de <tspan class="mono">spend_amount</tspan></text>
+<text class="mono" x="14" y="46">- name: spend_amount</text>
+<text class="mono" x="14" y="64">  transformSourceObjects: <tspan class="hi">core__ad_spend#ad_spend.spend_eur</tspan></text>
+<text class="lab" x="219" y="80" text-anchor="middle">contrat</text>
+<text class="lab" x="296" y="80" text-anchor="middle">objet</text>
+<text class="lab" x="354" y="80" text-anchor="middle">colonne</text>
+<line class="ln" x1="40" y1="88" x2="40" y2="114" marker-end="url(#ah)"/>
+<text class="mut" x="56" y="106">chaque référence devient une flèche entre colonnes (une arête)</text>
+<rect class="box" x="0" y="116" width="720" height="74" rx="8"/>
+<text class="cap" x="14" y="140">2. Dans colibri-manifest.json — <tspan class="mono">lineage.edges</tspan></text>
+<text class="mono" x="14" y="162">{"source": "core__ad_spend", "sourceColumn": "spend_eur",</text>
+<text class="mono" x="14" y="178"> "target": "acquisition_monthly", "targetColumn": "spend_amount"}</text>
+<line class="ln" x1="40" y1="190" x2="40" y2="216" marker-end="url(#ah)"/>
+<text class="mut" x="56" y="208">le catalogue dessine une flèche par arête</text>
+<rect class="box" x="0" y="218" width="720" height="90" rx="8"/>
+<text class="cap" x="14" y="242">3. Dans le catalogue — onglet Lineage</text>
+<rect class="chip" x="36" y="258" width="200" height="26" rx="6"/>
+<text x="136" y="275" text-anchor="middle">core__ad_spend</text>
+<rect class="chip" x="484" y="258" width="200" height="26" rx="6"/>
+<text x="584" y="275" text-anchor="middle">acquisition_monthly</text>
+<line class="ln" x1="236" y1="271" x2="480" y2="271" marker-end="url(#ah)"/>
+<text class="mono mut" x="360" y="252" text-anchor="middle">spend_eur → spend_amount</text>
+</svg>
+<figcaption>Une source déclarée dans le contrat (1) devient une arête du JSON (2), que le catalogue dessine comme flèche (3).</figcaption>
+</figure>
+<p>Les flèches entre tables en découlent : personne ne les déclare. De raw à core puis à customer, elles forment le chemin complet d'un chiffre.</p>
+<details><summary>Ce que contient le JSON</summary>
+<pre><code>{
+  "metadata": { ... },
+  "nodes":    { "acquisition_monthly": { "columns": { ... } }, ... },
+  "lineage":  { "edges": [ ... ], "parents": { ... }, "children": { ... } },
+  "tree":     { "byDatabase": { ... }, "byPath": { ... } }
+}
+
+// une entrée de lineage.edges
+{"id": 1,
+ "source": "core__ad_spend",      "sourceColumn": "spend_eur",
+ "target": "acquisition_monthly", "targetColumn": "spend_amount"}</code></pre><p>Le site reçoit <code>metadata</code>, <code>nodes</code>, <code>tree</code> et <code>lineage.edges</code> ; <code>parents</code> et <code>children</code> ne restent que dans le fichier JSON. <code>edges</code> contient une entrée par flèche entre colonnes, plus une par paire de tables liées (colonnes vides).</p>
+</details>
+<h2>4. Vérifier, puis générer</h2>
+<p><code>make check</code> contrôle les contrats (et lance les tests), dont l'existence des colonnes citées par core et customer (pour les raw, seul le nom du système externe est contrôlé). <code>make catalog</code> refait les contrôles des contrats (schéma et références) et s'arrête s'ils échouent. Sinon, il écrit le JSON et l'injecte dans l'interface de <a href="https://github.com/b-ned/dbt-colibri">dbt-colibri</a> (licence MIT), sans dbt : c'est le <a href="index.html">catalogue</a>.</p>
+<p><b>Limite : rien ne prouve que le SQL utilise les sources déclarées.</b></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,57 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: core__events
+name: core__events
+version: 1.0.0
+status: active
+domain: core
+description:
+  purpose: Contrat de test core__events.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: core
+team:
+  name: team-core
+  members:
+  - username: '@org/team-core'
+    role: owner
+support:
+- channel: data-customer
+  tool: email
+  url: mailto:data-customer@retail.example
+schema:
+- name: events
+  physicalType: table
+  description: events.
+  properties:
+  - name: event_name
+    physicalType: STRING
+    logicalType: string
+    description: Champ event_name.
+    classification: C1
+    primaryKey: true
+    required: true
+    transformLogic: map
+    transformDescription: Alimente event_name.
+    transformSourceObjects:
+    - raw__pages_views__ga4#events.event_name
+  - name: event_params
+    physicalType: ARRAY<STRUCT<key STRING>>
+    logicalType: array
+    items:
+      logicalType: object
+      properties:
+      - name: key
+        physicalType: STRING
+        logicalType: string
+        description: Champ key.
+        classification: C1
+    description: Champ event_params.
+    classification: C1
+    transformLogic: map
+    transformDescription: Alimente event_params.
+    transformSourceObjects:
+    - raw__pages_views__ga4#events.event_params

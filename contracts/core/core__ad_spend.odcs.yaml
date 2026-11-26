@@ -1,0 +1,195 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: core__ad_spend
+name: core__ad_spend
+version: 1.0.0
+status: active
+domain: core
+tags:
+  - core
+description:
+  purpose: La dépense publicitaire quotidienne de Google Ads et Meta Ads, dans la même unité (euros) et le même format.
+  usage: Source unique de la dépense publicitaire. Le nom de la campagne se lit dans core__campaigns.
+  limitations: Lignes en euros seulement. Les jours récents restent révisés par les plateformes.
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la couche core.
+    project: retail-data-prod
+    dataset: core
+team:
+  name: team-core
+  description: Equipe propriétaire de la couche core.
+  members:
+    - username: '@org/team-core'
+      role: owner
+support:
+  - channel: data-core
+    tool: email
+    scope: issues
+    url: mailto:data-core@retail.example
+    description: Questions et incidents sur la couche core.
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: ad_spend
+    driver: analytics
+    description: Un recalcul complet par jour.
+  - property: latency
+    value: 12
+    unit: h
+    element: ad_spend.meta_computed_at
+    driver: analytics
+    description: Données disponibles au plus tard 12 h après la fin du jour, comme la source la plus lente.
+  - property: retention
+    value: 3
+    unit: y
+    element: ad_spend
+    description: Historique conservé 3 ans.
+customProperties:
+  - property: transformInputs
+    value: |-
+      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
+      -- Colonnes de spend : celles de la table.
+      WITH spend AS (
+        SELECT g.segments_date AS spend_date, 'google_ads' AS platform, g.campaign_id,
+               SUM(CAST(g.metrics_cost_micros AS NUMERIC) / 1000000) AS spend_eur
+        FROM raw_googleads.ad_spend g
+        WHERE g.currency_code = 'EUR'
+        GROUP BY spend_date, g.campaign_id
+        UNION ALL
+        SELECT m.date_start, 'meta_ads', m.campaign_id, SUM(m.spend)
+        FROM raw_metaads.ad_spend m
+        WHERE m.account_currency = 'EUR'
+        GROUP BY m.date_start, m.campaign_id
+      )
+      -- Chaque champ : SELECT <champs> FROM spend
+schema:
+  - name: ad_spend
+    physicalName: ad_spend
+    physicalType: table
+    description: Une ligne par jour, plateforme et campagne.
+    dataGranularityDescription: Une ligne par jour, plateforme et campagne.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table n'est jamais vide après un calcul.
+      - type: sql
+        query: SELECT COUNT(*) FROM (SELECT spend_date, platform, campaign_id FROM ${table} GROUP BY spend_date, platform, campaign_id HAVING COUNT(*) > 1)
+        mustBe: 0
+        dimension: uniqueness
+        severity: error
+        description: La clé primaire (spend_date, platform, campaign_id) est unique.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE spend_date IS NULL OR platform IS NULL OR campaign_id IS NULL
+        mustBe: 0
+        dimension: completeness
+        severity: error
+        description: La clé primaire (spend_date, platform, campaign_id) n'est jamais nulle.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE spend_eur < 0
+        mustBe: 0
+        dimension: consistency
+        severity: error
+        description: Une dépense n'est jamais négative.
+    properties:
+      - name: spend_date
+        physicalType: DATE
+        logicalType: date
+        description: Jour de la dépense, dans le fuseau du compte publicitaire.
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__ad_spend__googleads#ad_spend.segments_date
+          - raw__ad_spend__metaads#ad_spend.date_start
+          - raw__ad_spend__googleads#ad_spend.currency_code
+          - raw__ad_spend__metaads#ad_spend.account_currency
+        transformDescription: Jour des statistiques de la plateforme.
+        customProperties:
+          - property: transformExpression
+            value: spend_date
+      - name: platform
+        physicalType: STRING
+        logicalType: string
+        description: 'Plateforme publicitaire : google_ads ou meta_ads.'
+        primaryKey: true
+        primaryKeyPosition: 2
+        required: true
+        classification: C1
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues:
+                - google_ads
+                - meta_ads
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            description: 'Valeurs autorisées : google_ads, meta_ads.'
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__ad_spend__googleads#ad_spend.campaign_id
+          - raw__ad_spend__metaads#ad_spend.campaign_id
+          - raw__ad_spend__googleads#ad_spend.currency_code
+          - raw__ad_spend__metaads#ad_spend.account_currency
+        transformDescription: Constante selon la table d'origine.
+        customProperties:
+          - property: transformExpression
+            value: platform
+      - name: campaign_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de la campagne sur la plateforme.
+        primaryKey: true
+        primaryKeyPosition: 3
+        required: true
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__ad_spend__googleads#ad_spend.campaign_id
+          - raw__ad_spend__metaads#ad_spend.campaign_id
+          - raw__ad_spend__googleads#ad_spend.currency_code
+          - raw__ad_spend__metaads#ad_spend.account_currency
+        transformDescription: Identifiant de campagne de la plateforme.
+        customProperties:
+          - property: transformExpression
+            value: campaign_id
+      - name: spend_eur
+        physicalType: NUMERIC
+        logicalType: number
+        description: Montant dépensé en euros.
+        required: true
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__ad_spend__googleads#ad_spend.metrics_cost_micros
+          - raw__ad_spend__metaads#ad_spend.spend
+          - raw__ad_spend__googleads#ad_spend.currency_code
+          - raw__ad_spend__metaads#ad_spend.account_currency
+        transformDescription: Micros Google divisés par 1 000 000, montant Meta tel quel, en euros seulement.
+        customProperties:
+          - property: transformExpression
+            value: spend_eur
+      - name: meta_computed_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure du calcul de la ligne, en UTC.
+        required: true
+        classification: C1
+        transformLogic: create
+        transformDescription: Horodatage ajouté au calcul.
+        customProperties:
+          - property: transformExpression
+            value: CURRENT_TIMESTAMP()

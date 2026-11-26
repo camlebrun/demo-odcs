@@ -1,0 +1,72 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: core__orders
+name: core__orders
+version: 1.0.0
+status: active
+domain: core
+description:
+  purpose: Contrat de test core__orders.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: core
+team:
+  name: team-core
+  members:
+  - username: '@org/team-core'
+    role: owner
+support:
+- channel: data-customer
+  tool: email
+  url: mailto:data-customer@retail.example
+schema:
+- name: orders
+  physicalType: table
+  description: orders.
+  properties:
+  - name: id
+    physicalType: INT64
+    logicalType: integer
+    description: Champ id.
+    classification: C1
+    primaryKey: true
+    required: true
+    transformLogic: map
+    transformDescription: Alimente id.
+    transformSourceObjects:
+    - raw__orders__shopify#orders.id
+  - name: customer_key
+    physicalType: STRING
+    logicalType: string
+    description: Champ customer_key.
+    classification: C2
+    transformLogic: transform
+    transformDescription: Alimente customer_key.
+    transformSourceObjects:
+    - raw__orders__shopify#orders.email
+    customProperties:
+    - property: transformExpression
+      value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
+    tags:
+    - pseudonymized
+  - name: total_price
+    physicalType: NUMERIC
+    logicalType: number
+    description: Champ total_price.
+    classification: C1
+    transformLogic: map
+    transformDescription: Alimente total_price.
+    transformSourceObjects:
+    - raw__orders__shopify#orders.total_price
+  - name: created_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Champ created_at.
+    classification: C1
+    transformLogic: map
+    transformDescription: Alimente created_at.
+    transformSourceObjects:
+    - raw__orders__shopify#orders.created_at

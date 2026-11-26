@@ -1,0 +1,256 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: core__customers
+name: core__customers
+version: 1.0.0
+status: active
+domain: core
+tags:
+  - core
+description:
+  purpose: La liste des clients identifiés, avec leur consentement marketing et leurs premières dates d'achat. La règle du consentement le plus récent est écrite ici.
+  usage: Source unique du consentement et de l'ancienneté client. first_sale_date couvre tous les canaux, first_web_order_at les commandes Shopify seules.
+  limitations: Identité fondée sur l'e-mail seul. Consentement Shopify et caisse uniquement, sans CRM ni ESP.
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la couche core.
+    project: retail-data-prod
+    dataset: core
+team:
+  name: team-core
+  description: Equipe propriétaire de la couche core.
+  members:
+    - username: '@org/team-core'
+      role: owner
+support:
+  - channel: data-core
+    tool: email
+    scope: issues
+    url: mailto:data-core@retail.example
+    description: Questions et incidents sur la couche core.
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: customers
+    driver: analytics
+    description: Un recalcul complet par jour.
+  - property: latency
+    value: 12
+    unit: h
+    element: customers.meta_computed_at
+    driver: analytics
+    description: Données disponibles au plus tard 12 h après la fin du jour, comme la source la plus lente.
+  - property: retention
+    value: 3
+    unit: y
+    element: customers
+    description: Historique conservé 3 ans.
+customProperties:
+  - property: transformInputs
+    value: |-
+      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
+      -- Colonnes de customers_all : celles de la table.
+      WITH consent AS (
+        -- Règle « le signal de consentement le plus récent gagne ».
+        SELECT customer_key, ARRAY_AGG(STRUCT(is_opted_in, signal_at, source) ORDER BY signal_at DESC NULLS LAST LIMIT 1)[OFFSET(0)] AS latest
+        FROM (
+          SELECT IF(NULLIF(TRIM(c.email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(c.email))))) AS customer_key,
+                 c.accepts_marketing AS is_opted_in, c.accepts_marketing_updated_at AS signal_at, 'shopify' AS source
+          FROM raw_shopify.customers c
+          UNION ALL
+          SELECT IF(NULLIF(TRIM(lm.email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(lm.email))))),
+                 lm.marketing_opt_in, lm.marketing_opt_in_at, 'pos'
+          FROM raw_pos.loyalty_members lm
+        ) WHERE customer_key IS NOT NULL AND is_opted_in IS NOT NULL
+        GROUP BY customer_key
+      ),
+      first_dates AS (
+        SELECT customer_key,
+               MIN(IF(event_type = 'sale', event_date, NULL)) AS first_sale_date,
+               MIN(IF(event_type = 'sale' AND source_system = 'shopify', event_at, NULL)) AS first_web_order_at
+        FROM core.sales_events WHERE customer_key IS NOT NULL GROUP BY customer_key
+      ),
+      known_keys AS (
+        SELECT IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email))))) AS customer_key
+        FROM (SELECT email FROM raw_shopify.customers UNION ALL SELECT email FROM raw_pos.loyalty_members)
+        UNION DISTINCT
+        SELECT customer_key FROM first_dates
+      ),
+      customers_all AS (
+        SELECT k.customer_key, consent.latest.is_opted_in AS is_marketing_consented, consent.latest.source AS consent_source,
+               consent.latest.signal_at AS consent_updated_at, f.first_sale_date, f.first_web_order_at
+        FROM known_keys k
+        LEFT JOIN consent USING (customer_key)
+        LEFT JOIN first_dates f USING (customer_key)
+        WHERE k.customer_key IS NOT NULL
+      )
+      -- Chaque champ : SELECT <champs> FROM customers_all
+schema:
+  - name: customers
+    physicalName: customers
+    physicalType: table
+    description: Une ligne par client identifié.
+    dataGranularityDescription: Une ligne par client identifié.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table n'est jamais vide après un calcul.
+      - type: sql
+        query: SELECT COUNT(*) FROM (SELECT customer_key FROM ${table} GROUP BY customer_key HAVING COUNT(*) > 1)
+        mustBe: 0
+        dimension: uniqueness
+        severity: error
+        description: La clé primaire (customer_key) est unique.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE customer_key IS NULL
+        mustBe: 0
+        dimension: completeness
+        severity: error
+        description: La clé primaire (customer_key) n'est jamais nulle.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE (is_marketing_consented IS NULL) != (consent_source IS NULL)
+        mustBe: 0
+        dimension: consistency
+        severity: error
+        description: Un consentement connu a toujours une origine, et inversement.
+    properties:
+      - name: customer_key
+        physicalType: STRING
+        logicalType: string
+        description: Clé client pseudonymisée.
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__customers__shopify#customers.email
+          - raw__loyalty_members__pos#loyalty_members.email
+          - core__sales_events#sales_events.customer_key
+        transformDescription: Hachage des e-mails Shopify et fidélité, complété par les clés déjà présentes dans les ventes.
+        customProperties:
+          - property: transformExpression
+            value: customer_key
+      - name: is_marketing_consented
+        physicalType: BOOL
+        logicalType: boolean
+        description: Vrai si le client accepte le marketing ; vide sans aucun signal.
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__customers__shopify#customers.email
+          - raw__customers__shopify#customers.accepts_marketing
+          - raw__customers__shopify#customers.accepts_marketing_updated_at
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in
+          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in_at
+        transformDescription: Valeur du signal de consentement le plus récent.
+        customProperties:
+          - property: transformExpression
+            value: is_marketing_consented
+      - name: consent_source
+        physicalType: STRING
+        logicalType: string
+        description: 'Origine du signal retenu : shopify ou pos.'
+        classification: C2
+        tags:
+          - pseudonymized
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues:
+                - shopify
+                - pos
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            description: 'Valeurs autorisées : shopify, pos.'
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__customers__shopify#customers.email
+          - raw__customers__shopify#customers.accepts_marketing
+          - raw__customers__shopify#customers.accepts_marketing_updated_at
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in
+          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in_at
+        transformDescription: Système du signal le plus récent.
+        customProperties:
+          - property: transformExpression
+            value: consent_source
+      - name: consent_updated_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date du signal de consentement retenu, en UTC.
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__customers__shopify#customers.email
+          - raw__customers__shopify#customers.accepts_marketing
+          - raw__customers__shopify#customers.accepts_marketing_updated_at
+          - raw__loyalty_members__pos#loyalty_members.email
+          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in
+          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in_at
+        transformDescription: Date du signal le plus récent.
+        customProperties:
+          - property: transformExpression
+            value: consent_updated_at
+      - name: first_sale_date
+        physicalType: DATE
+        logicalType: date
+        description: Date du premier achat, tous canaux confondus.
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - core__sales_events#sales_events.customer_key
+          - core__sales_events#sales_events.event_type
+          - core__sales_events#sales_events.event_date
+        transformDescription: Plus ancienne date de vente du client.
+        customProperties:
+          - property: transformExpression
+            value: first_sale_date
+      - name: first_web_order_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de la première commande Shopify, en UTC.
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - core__sales_events#sales_events.customer_key
+          - core__sales_events#sales_events.event_type
+          - core__sales_events#sales_events.source_system
+          - core__sales_events#sales_events.event_at
+        transformDescription: Plus ancienne commande Shopify du client.
+        customProperties:
+          - property: transformExpression
+            value: first_web_order_at
+      - name: meta_computed_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure du calcul de la ligne, en UTC.
+        required: true
+        classification: C1
+        transformLogic: create
+        transformDescription: Horodatage ajouté au calcul.
+        customProperties:
+          - property: transformExpression
+            value: CURRENT_TIMESTAMP()

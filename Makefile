@@ -15,8 +15,10 @@ install-catalog: install
 
 # Catalogue : dist/catalog/index.html + colibri-manifest.json. Autonome : cree le venv et installe
 # dbt-colibri au besoin, donc `make catalog` suffit pour n'importe quel collaborateur.
+# Valide schema et lineage avant de generer : un contrat invalide n'est ni genere ni publie.
 catalog:
 	@test -x $(VENV)/bin/python && $(VENV)/bin/python -c "import dbt_colibri" 2>/dev/null || $(MAKE) install-catalog
+	$(MAKE) schema lineage
 	$(VENV)/bin/python tools/build_catalog.py $(ARGS)
 
 # Publie le catalogue sur Cloudflare Pages (projet demo-odcs, voir wrangler.jsonc).
@@ -30,7 +32,7 @@ catalog-open: catalog
 schema:
 	$(PYTHON) tools/validate_schema.py
 
-# Strict : exige le decompte final (14 raw + 3 customer).
+# Strict : exige le decompte final (14 raw + 5 core + 3 customer).
 lineage:
 	$(PYTHON) tools/validate_lineage.py
 

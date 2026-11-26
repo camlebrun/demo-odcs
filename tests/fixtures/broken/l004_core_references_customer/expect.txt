@@ -1,0 +1,2 @@
+L004
+un core ne reference que des raw ou des core

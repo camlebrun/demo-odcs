@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>From ODCS contracts to a data catalog</title>
+<style>
+:root{--bg:#fff;--fg:#18181b;--muted:#63636e;--line:#e4e4e7;--soft:#f4f4f5;--accent:#6d28d9}
+html.dark{--bg:#111113;--fg:#ededef;--muted:#a1a1aa;--line:#2e2e33;--soft:#1c1c1f;--accent:#a78bfa}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+h1{font-size:26px;margin:16px 0 4px}
+h2{font-size:18px;margin:32px 0 8px}
+p.lead{color:var(--muted);margin-top:0}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:12px;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,monospace}
+code{font:13px ui-monospace,Menlo,monospace;background:var(--soft);padding:0 4px;border-radius:4px}
+pre code{background:none;padding:0}
+.flow{margin:16px 0;overflow-x:auto}
+.flow svg{display:block}
+.flow text{font:11px system-ui,-apple-system,sans-serif;fill:var(--fg)}
+.flow .cap{font-weight:600}
+.flow .mut{fill:var(--muted)}
+.flow .mono{font:10.5px ui-monospace,Menlo,monospace}
+.flow .hi{fill:var(--accent)}
+.flow .lab{font:9.5px system-ui,-apple-system,sans-serif;fill:var(--muted)}
+.flow .box{fill:var(--soft);stroke:var(--line)}
+.flow .chip{fill:var(--bg);stroke:var(--line)}
+.flow .ln{stroke:var(--accent);stroke-width:1.5;fill:none}
+.flow figcaption{color:var(--muted);font-size:13px;margin-top:8px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);text-align:left;padding:6px 10px 6px 0;vertical-align:top}
+nav{position:sticky;top:0;display:flex;gap:4px;align-items:center;padding:6px 16px;background:var(--bg);border-bottom:1px solid var(--line);font-size:13px}
+nav strong{margin-right:12px;font-weight:500}
+nav a{padding:4px 12px;border-radius:6px;color:var(--muted);text-decoration:none}
+nav a:hover,nav a[aria-current]{background:var(--soft);color:var(--fg)}
+nav .lang{margin-left:auto}
+details{border-top:1px solid var(--line);padding:10px 0}
+summary{cursor:pointer;font-weight:600}
+</style>
+<script>try{var t=localStorage.getItem('vite-ui-theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.className='dark'}catch(e){}</script>
+</head>
+<body>
+<nav><strong>data-contracts</strong><a href="index.html">Catalog</a><a href="lineage.html" aria-current="page">Doc</a><a class="lang" href="lineage.fr.html" lang="fr">Français</a></nav>
+<main>
+<h1>From ODCS contracts to a data catalog</h1>
+<p class="lead">Our contracts are enough to build the catalog and its lineage. No dbt, no database, no SQL parsing.</p>
+<p>The code that creates the JSON: <a href="https://github.com/camlebrun/demo-odcs/blob/main/tools/build_catalog.py">tools/build_catalog.py</a> (function <code>build_manifest</code>). The result: <a href="colibri-manifest.json">colibri-manifest.json</a>.</p>
+<h2>1. One ODCS contract per table</h2>
+<p>Each contract becomes a catalog <b>node</b>, with its sheet and columns.</p>
+<details open><summary>Which ODCS field becomes what?</summary>
+<div class="scroll"><table><tr><th>In the contract</th><th>In the catalog</th></tr>
+<tr><td><code>id</code></td><td>the node identifier</td></tr>
+<tr><td><code>servers</code></td><td>the project and dataset the table is filed under</td></tr>
+<tr><td><code>schema.properties</code></td><td>the columns, including nested fields</td></tr>
+<tr><td><code>physicalType</code>, <code>logicalType</code>, <code>description</code></td><td>the column types and description</td></tr>
+<tr><td><code>classification</code>, <code>tags</code></td><td>the column labels</td></tr>
+<tr><td><code>quality</code></td><td>the quality checks block</td></tr>
+<tr><td><code>version</code>, <code>team</code>, <code>slaProperties</code>, <code>support</code></td><td>the table sheet</td></tr>
+</table></div>
+</details>
+<h2>2. <code>transformSourceObjects</code>: where each column comes from</h2>
+<p>ODCS provides this field on every column: a list of free-form strings. Our convention: <code>contract#object.column</code>, where <code>contract</code> is the <code>id</code> of the source contract and <code>object</code> the <code>name</code> of the table in its <code>schema</code>.</p>
+<pre><code># acquisition_monthly.odcs.yaml (excerpt)
+- name: spend_amount
+  transformLogic: transform
+  transformSourceObjects:
+    - core__ad_spend#ad_spend.spend_eur
+    - core__ad_spend#ad_spend.spend_date
+    - core__ad_spend#ad_spend.platform
+    - core__ad_spend#ad_spend.campaign_id
+  customProperties:
+    - property: transformExpression
+      value: IFNULL(SUM(spend_eur), 0)</code></pre>
+<p>The spend is the sum of <code>spend_eur</code>. The three other columns group it by month, channel and campaign: <b>they are cited too</b>, not only the one in the expression.</p>
+<details><summary>Our writing rules</summary>
+<ul><li>A nested field is written with its path: <code>raw__refunds__shopify#refunds.transactions.amount</code>.</li><li><code>transformExpression</code>: the BigQuery SQL, our own property in <code>customProperties</code>. It is displayed, never run.</li></ul><div class="scroll"><table><tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression</th></tr>
+<tr><td><code>map</code></td><td>exactly one</td><td>optional: simple rename or cast only</td></tr>
+<tr><td><code>transform</code></td><td>at least one</td><td>required</td></tr>
+<tr><td><code>create</code></td><td>none</td><td>optional</td></tr>
+</table></div>
+</details>
+<details><summary>What about raw tables?</summary>
+<p>The source is the external system, for example <code>shopify_admin_api#Order.id</code>. It is not a contract of this repository: no arrow is drawn and the reference only appears in the contract YAML. Each top-level raw field copied from the source is still marked <b>P</b> (pass-through).</p>
+</details>
+<h2>3. Each reference between contracts becomes an arrow</h2>
+<figure class="flow">
+<svg width="720" viewBox="0 0 720 308" role="img" aria-label="A transformSourceObjects reference declared in the contract becomes an edge in lineage.edges, then an arrow between the core__ad_spend and acquisition_monthly tables in the catalog.">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--accent)"/></marker></defs>
+<rect class="box" x="0" y="0" width="720" height="88" rx="8"/>
+<text class="cap" x="14" y="24">1. In the contract — one of the 4 sources of <tspan class="mono">spend_amount</tspan></text>
+<text class="mono" x="14" y="46">- name: spend_amount</text>
+<text class="mono" x="14" y="64">  transformSourceObjects: <tspan class="hi">core__ad_spend#ad_spend.spend_eur</tspan></text>
+<text class="lab" x="219" y="80" text-anchor="middle">contract</text>
+<text class="lab" x="296" y="80" text-anchor="middle">object</text>
+<text class="lab" x="354" y="80" text-anchor="middle">column</text>
+<line class="ln" x1="40" y1="88" x2="40" y2="114" marker-end="url(#ah)"/>
+<text class="mut" x="56" y="106">each reference becomes a column-to-column arrow (one edge)</text>
+<rect class="box" x="0" y="116" width="720" height="74" rx="8"/>
+<text class="cap" x="14" y="140">2. In colibri-manifest.json — <tspan class="mono">lineage.edges</tspan></text>
+<text class="mono" x="14" y="162">{"source": "core__ad_spend", "sourceColumn": "spend_eur",</text>
+<text class="mono" x="14" y="178"> "target": "acquisition_monthly", "targetColumn": "spend_amount"}</text>
+<line class="ln" x1="40" y1="190" x2="40" y2="216" marker-end="url(#ah)"/>
+<text class="mut" x="56" y="208">the catalog draws one arrow per edge</text>
+<rect class="box" x="0" y="218" width="720" height="90" rx="8"/>
+<text class="cap" x="14" y="242">3. In the catalog — Lineage tab</text>
+<rect class="chip" x="36" y="258" width="200" height="26" rx="6"/>
+<text x="136" y="275" text-anchor="middle">core__ad_spend</text>
+<rect class="chip" x="484" y="258" width="200" height="26" rx="6"/>
+<text x="584" y="275" text-anchor="middle">acquisition_monthly</text>
+<line class="ln" x1="236" y1="271" x2="480" y2="271" marker-end="url(#ah)"/>
+<text class="mono mut" x="360" y="252" text-anchor="middle">spend_eur → spend_amount</text>
+</svg>
+<figcaption>A source declared in the contract (1) becomes an edge in the JSON (2), which the catalog draws as an arrow (3).</figcaption>
+</figure>
+<p>Arrows between tables follow from this: nobody declares them. From raw to core and then to customer, they form the full path of a number.</p>
+<details><summary>What the JSON contains</summary>
+<pre><code>{
+  "metadata": { ... },
+  "nodes":    { "acquisition_monthly": { "columns": { ... } }, ... },
+  "lineage":  { "edges": [ ... ], "parents": { ... }, "children": { ... } },
+  "tree":     { "byDatabase": { ... }, "byPath": { ... } }
+}
+
+// one entry of lineage.edges
+{"id": 1,
+ "source": "core__ad_spend",      "sourceColumn": "spend_eur",
+ "target": "acquisition_monthly", "targetColumn": "spend_amount"}</code></pre><p>The site receives <code>metadata</code>, <code>nodes</code>, <code>tree</code> and <code>lineage.edges</code>; <code>parents</code> and <code>children</code> stay in the JSON file only. <code>edges</code> holds one entry per arrow between columns, plus one per pair of linked tables (empty columns).</p>
+</details>
+<h2>4. Verify, then generate</h2>
+<p><code>make check</code> checks the contracts (and runs the tests), including that columns cited by core and customer exist (for raw, only the external system name is checked). <code>make catalog</code> runs the contract checks again (schema and references) and stops if they fail. Otherwise it writes the JSON and injects it into the <a href="https://github.com/b-ned/dbt-colibri">dbt-colibri</a> interface (MIT license), without dbt: that is the <a href="index.html">catalog</a>.</p>
+<p><b>Limit: nothing proves that the SQL uses the declared sources.</b></p>
+</main>
+</body>
+</html>

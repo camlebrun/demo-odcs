@@ -58,7 +58,7 @@ Les visiteurs anonymes, sans consentement analytics ou sans cookie ne sont pas r
 
 ## Limites assumées du lot 1
 
-- Identité déterministe `customer_key = SHA256(LOWER(TRIM(email)))` ; côté caisse l'e-mail vient de `raw__loyalty_members__pos` via `loyalty_card_id`, côté Shopify de `customers` et `orders`.
+- Identité déterministe `customer_key = SHA256(LOWER(TRIM(email)))` ; la clé est calculée dans la couche core (`core__sales_events`, `core__customers`) : côté caisse l'e-mail vient de la carte fidélité, côté Shopify de la commande ou du client.
 - Environ 50 % des tickets sont anonymes : aucune audience possible sans e-mail.
 - Pas de CRM ni d'ESP. Les plateformes normalisent l'e-mail à leur façon (ex. Gmail), ce qui peut réduire le taux de correspondance.
 - La table ne gère pas les retraits côté plateformes : la resynchronisation complète est à la charge de l'activation.

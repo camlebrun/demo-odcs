@@ -1,0 +1,158 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: core__campaigns
+name: core__campaigns
+version: 1.0.0
+status: active
+domain: core
+tags:
+  - core
+description:
+  purpose: La liste des campagnes publicitaires Google Ads et Meta Ads, avec leur nom.
+  usage: Sert à nommer les dépenses et à rapprocher le trafic web des campagnes.
+  limitations: 'Nom actuel de la campagne : un renommage s''applique à tout l''historique.'
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la couche core.
+    project: retail-data-prod
+    dataset: core
+team:
+  name: team-core
+  description: Equipe propriétaire de la couche core.
+  members:
+    - username: '@org/team-core'
+      role: owner
+support:
+  - channel: data-core
+    tool: email
+    scope: issues
+    url: mailto:data-core@retail.example
+    description: Questions et incidents sur la couche core.
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: campaigns
+    driver: analytics
+    description: Un recalcul complet par jour.
+  - property: latency
+    value: 6
+    unit: h
+    element: campaigns.meta_computed_at
+    driver: analytics
+    description: Données disponibles au plus tard 6 h après la fin du jour, comme la source la plus lente.
+  - property: retention
+    value: 3
+    unit: y
+    element: campaigns
+    description: Historique conservé 3 ans.
+customProperties:
+  - property: transformInputs
+    value: |-
+      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
+      -- Colonnes de campaigns_all : celles de la table.
+      WITH campaigns_all AS (
+        SELECT 'google_ads' AS platform, campaign_id, campaign_name FROM raw_googleads.campaigns
+        UNION ALL
+        SELECT 'meta_ads', campaign_id, name FROM raw_metaads.campaigns
+      )
+      -- Chaque champ : SELECT <champs> FROM campaigns_all
+schema:
+  - name: campaigns
+    physicalName: campaigns
+    physicalType: table
+    description: Une ligne par plateforme et campagne.
+    dataGranularityDescription: Une ligne par plateforme et campagne.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table n'est jamais vide après un calcul.
+      - type: sql
+        query: SELECT COUNT(*) FROM (SELECT platform, campaign_id FROM ${table} GROUP BY platform, campaign_id HAVING COUNT(*) > 1)
+        mustBe: 0
+        dimension: uniqueness
+        severity: error
+        description: La clé primaire (platform, campaign_id) est unique.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE platform IS NULL OR campaign_id IS NULL
+        mustBe: 0
+        dimension: completeness
+        severity: error
+        description: La clé primaire (platform, campaign_id) n'est jamais nulle.
+    properties:
+      - name: platform
+        physicalType: STRING
+        logicalType: string
+        description: 'Plateforme publicitaire : google_ads ou meta_ads.'
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        classification: C1
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues:
+                - google_ads
+                - meta_ads
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            description: 'Valeurs autorisées : google_ads, meta_ads.'
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.campaign_id
+        transformDescription: Constante selon la table d'origine.
+        customProperties:
+          - property: transformExpression
+            value: platform
+      - name: campaign_id
+        physicalType: INT64
+        logicalType: integer
+        description: Identifiant de la campagne sur la plateforme.
+        primaryKey: true
+        primaryKeyPosition: 2
+        required: true
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__campaigns__googleads#campaigns.campaign_id
+          - raw__campaigns__metaads#campaigns.campaign_id
+        transformDescription: Identifiant de campagne de la plateforme.
+        customProperties:
+          - property: transformExpression
+            value: campaign_id
+      - name: campaign_name
+        physicalType: STRING
+        logicalType: string
+        description: Nom de la campagne, tel que saisi sur la plateforme.
+        required: true
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__campaigns__googleads#campaigns.campaign_name
+          - raw__campaigns__metaads#campaigns.name
+        transformDescription: Nom Google Ads ou Meta Ads.
+        customProperties:
+          - property: transformExpression
+            value: campaign_name
+      - name: meta_computed_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure du calcul de la ligne, en UTC.
+        required: true
+        classification: C1
+        transformLogic: create
+        transformDescription: Horodatage ajouté au calcul.
+        customProperties:
+          - property: transformExpression
+            value: CURRENT_TIMESTAMP()

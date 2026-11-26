@@ -40,4 +40,4 @@ schema:
     - kpis_monthly#customer_kpis.customer_key
     customProperties:
     - property: transformExpression
-      value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
+      value: customer_key

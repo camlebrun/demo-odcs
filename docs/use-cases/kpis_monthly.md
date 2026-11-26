@@ -58,7 +58,7 @@ Retours : retours caisse (tickets de type `return`), retours en magasin d'achats
 
 ## Limites assumées du lot 1
 
-- Identité client déterministe : `customer_key = SHA256(LOWER(TRIM(email)))`. Côté caisse l'e-mail vient de `raw__loyalty_members__pos` via `loyalty_card_id` ; côté Shopify de `orders` puis `customers`.
+- Identité client déterministe : `customer_key = SHA256(LOWER(TRIM(email)))`. La clé est calculée dans la couche core (`core__sales_events`, `core__customers`) : côté caisse l'e-mail vient de la carte fidélité, côté Shopify de la commande ou du client.
 - Environ 50 % des tickets sont anonymes (sans carte) : comptés dans le CA, pas au niveau client. Un client sans carte en magasin puis acheteur web est vu comme nouveau.
 - Seules les lignes en EUR sont retenues. CA TTC uniquement ; le rapprochement comptable se fait en TTC.
 - Pas de consentement, d'audience ni d'attribution marketing ici.

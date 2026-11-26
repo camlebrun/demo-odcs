@@ -3,7 +3,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: raw__purchases__ga4
 name: raw__purchases__ga4
-version: 1.0.0
+version: 1.0.1
 status: active
 domain: ga4
 tags:
@@ -497,6 +497,3 @@ schema:
     classification: C1
     transformLogic: create
     transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).
-customProperties:
-- property: details
-  value: Achats en magasin hors perimetre. event_date est dans le fuseau du compte, event_timestamp en UTC. transaction_id = id de commande Shopify.
