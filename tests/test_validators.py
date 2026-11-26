@@ -48,7 +48,7 @@ def test_broken_fixture_fails_for_the_expected_reason(case):
 
 def test_each_rule_has_a_broken_fixture():
     codes = {expectation(c)[0] for c in BROKEN}
-    expected = {f"L{n:03d}" for n in range(1, 19)} | {"SCHEMA"}
+    expected = {f"L{n:03d}" for n in range(1, 20)} | {"SCHEMA"}
     assert expected <= codes, sorted(expected - codes)
 
 

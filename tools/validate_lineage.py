@@ -3,14 +3,14 @@
 
 Regles (code dans la sortie) :
   L001 decompte (14 raw dont 4/4/2/2/2 par source, 3 customer) ; desactivable avec --no-count
-  L002 nommage raw / customer, id == name == nom de fichier, dossier source == domaine (raw)
+  L002 nommage raw / core / customer, id == name == nom de fichier, dossier source == domaine (raw)
   L003 references transformSourceObjects (contrat, objet, property, chemins imbriques)
-  L004 couches : un customer ne reference que des raw
+  L004 couches : un core et un customer ne referencent que des raw ou des core
   L005 cycle dans le graphe de references
   L006 lineage raw : chaque champ de premier niveau est `map` depuis 1 champ de la source externe
        (<systeme>#<objet>.<champ>), sauf meta_loaded_at / meta_source_file en `create` sans source
   L007 coherence de transformLogic (map / transform / create) et des sources
-  L008 transformLogic et transformDescription presents sur tout champ customer
+  L008 transformLogic et transformDescription presents sur tout champ core et customer
   L009 un contrat customer vit dans contracts/customer/<flux>/ avec <flux> parmi acquisition, audiences, sales
   L010 PII : tag `pii` ET classification `C3`
   L011 map : renommage ou cast trivial uniquement
@@ -22,6 +22,7 @@ Regles (code dans la sortie) :
   L017 description du contrat (purpose, usage, limitations) et des objets : 350 caracteres maximum (5 lignes)
   L018 objet de schema : physicalType table|view ; customProperties loadStrategy (full_refresh|incremental|append) facultatif,
        incrementalKey (property existante) obligatoire si incremental
+  L019 chaque objet d'un contrat core declare au moins une property primaryKey
 
 Code retour 1 s'il y a au moins une erreur.
 """
@@ -47,6 +48,7 @@ PII_CLASSIFICATION = "C3"
 TECH_FIELDS = ("meta_loaded_at", "meta_source_file")
 # Systeme source externe cite dans transformSourceObjects d'un raw : <systeme>#<objet>.<champ>.
 RAW_SYSTEMS = {"shopify": "shopify_admin_api", "pos": "pos_export", "ga4": "ga4_bigquery_export", "googleads": "googleads_api", "metaads": "metaads_api"}
+DERIVED_LAYERS = ("core", "customer")  # couches calculees : lineage par colonne vers le depot
 LOGICS = ("map", "transform", "create")
 OBJECT_TYPES = ("table", "view")
 LOAD_STRATEGIES = ("full_refresh", "incremental", "append")
@@ -56,6 +58,7 @@ DESCRIPTION_MAX = 350  # caracteres : 5 lignes dans le catalogue
 SNAKE = r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*"
 RAW_RE = re.compile(rf"^raw__(?P<table>{SNAKE})__(?P<source>[a-z0-9]+)$")
 CUSTOMER_RE = re.compile(rf"^{SNAKE}$")
+CORE_RE = re.compile(r"^core__[a-z0-9_]+$")
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 REF_RE = re.compile(r"^(?P<contract>[^#\s]+)#(?P<obj>[^.\s#]+)\.(?P<path>[^\s#]+)$")
 
@@ -93,8 +96,8 @@ class Contract:
     path: Path
     rel: str
     data: dict
-    layer: str  # raw | customer | other
-    folder: str  # source pour raw, flux metier pour customer
+    layer: str  # raw | core | customer | other
+    folder: str  # source pour raw, flux metier pour customer, vide pour core
 
     @property
     def cid(self):
@@ -117,6 +120,8 @@ def load_contracts(root: Path) -> tuple[list[Contract], list[Err]]:
             layer, folder = "raw", parts[1]
         elif len(parts) == 3 and parts[0] == "customer":
             layer, folder = "customer", parts[1]
+        elif len(parts) == 2 and parts[0] == "core":
+            layer, folder = "core", ""
         else:
             layer, folder = "other", ""
         try:
@@ -211,7 +216,7 @@ def check_naming(c: Contract) -> list[Err]:
     stem = c.path.name[: -len(".odcs.yaml")]
     cid, name = c.cid, c.data.get("name")
     if c.layer == "other":
-        return [Err("L002", c.rel, "emplacement invalide: attendu contracts/raw/<source>/ ou contracts/customer/<flux>/")]
+        return [Err("L002", c.rel, "emplacement invalide: attendu contracts/raw/<source>/, contracts/core/ ou contracts/customer/<flux>/")]
     if cid != stem:
         errs.append(Err("L002", c.rel, f"id '{cid}' different du nom de fichier '{stem}'"))
     if name != cid:
@@ -226,6 +231,9 @@ def check_naming(c: Contract) -> list[Err]:
             errs.append(Err("L002", c.rel, f"id '{cid}' ne respecte pas raw__<table>__<source>"))
         elif m["source"] != c.folder:
             errs.append(Err("L002", c.rel, f"source '{m['source']}' du nom differente du dossier '{c.folder}'"))
+    elif c.layer == "core":
+        if not CORE_RE.match(cid):
+            errs.append(Err("L002", c.rel, f"id '{cid}' ne respecte pas core__<nom>"))
     else:
         if cid.startswith("raw__"):
             errs.append(Err("L002", c.rel, "un contrat customer ne peut pas porter le prefixe raw__"))
@@ -246,10 +254,10 @@ def check_metadata(c: Contract) -> list[Err]:
         errs.append(Err("L013", c.rel, f"status '{d.get('status')}' hors de {', '.join(STATUSES)}"))
     if not isinstance(d.get("version"), str) or not SEMVER_RE.match(d["version"]):
         errs.append(Err("L013", c.rel, f"version '{d.get('version')}' n'est pas du semver MAJOR.MINOR.PATCH"))
-    expected_domain = c.folder if c.layer == "raw" else "customer"
+    expected_domain = c.folder if c.layer == "raw" else c.layer
     if d.get("domain") != expected_domain:
         errs.append(Err("L013", c.rel, f"domain '{d.get('domain')}' (attendu '{expected_domain}')"))
-    expected_dataset = f"raw_{c.folder}" if c.layer == "raw" else "customer"
+    expected_dataset = f"raw_{c.folder}" if c.layer == "raw" else c.layer
     servers = d.get("servers") if isinstance(d.get("servers"), list) else []
     bq = [s for s in servers if isinstance(s, dict) and s.get("type") == "bigquery"]
     if not bq or not any(s.get("dataset") == expected_dataset for s in bq):
@@ -337,7 +345,7 @@ def check_property_names(c: Contract) -> list[Err]:
         if not PROP_NAME_RE.match(name):
             errs.append(Err("L015", where, f"nom '{name}' : snake_case minuscule ASCII, commence par une lettre"))
             continue
-        if c.layer != "customer" or not p.top:
+        if c.layer not in DERIVED_LAYERS or not p.top:
             continue
         ptype = str(p.node.get("physicalType", "")).upper()
         for kind, token, types in CUSTOMER_TYPE_RULES:
@@ -351,7 +359,7 @@ def check_property_names(c: Contract) -> list[Err]:
 
 def check_customer_key_class(c: Contract) -> list[Err]:
     errs: list[Err] = []
-    if c.layer != "customer":
+    if c.layer not in DERIVED_LAYERS:
         return errs
     for p in all_props(c):
         if p.node.get("name") != "customer_key":
@@ -407,8 +415,17 @@ def check_raw_transform(c: Contract) -> list[Err]:
     return errs
 
 
-def check_customer_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list[Err], set[str]]:
-    """L003, L004, L007, L008, L011, L012 pour un customer. Retourne aussi les ids references."""
+def check_primary_key(c: Contract) -> list[Err]:
+    """L019 : le grain d'un core est declare par une cle primaire."""
+    return [
+        Err("L019", f"{c.rel} {obj.get('name', '?')}", "un objet core a au moins une property primaryKey")
+        for obj in schema_objects(c)
+        if not any(isinstance(p, dict) and p.get("primaryKey") for p in obj.get("properties") or [])
+    ]
+
+
+def check_derived_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list[Err], set[str]]:
+    """L003, L004, L007, L008, L011, L012 pour un core ou un customer. Retourne aussi les ids references."""
     errs, referenced = [], set()
     for p in all_props(c):
         n, where = p.node, f"{c.rel} {p.path}"
@@ -450,8 +467,8 @@ def check_customer_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list
                 errs.append(Err("L003", where, f"contrat '{m['contract']}' introuvable (reference '{ref}')"))
                 continue
             referenced.add(target.cid)
-            if target.layer != "raw":
-                errs.append(Err("L004", where, f"un customer ne reference que des raw, pas '{target.cid}'"))
+            if target.layer not in ("raw", "core"):
+                errs.append(Err("L004", where, f"un {c.layer} ne reference que des raw ou des core, pas '{target.cid}'"))
             obj = next((o for o in schema_objects(target) if o.get("name") == m["obj"]), None)
             if obj is None:
                 errs.append(Err("L003", where, f"objet de schema '{m['obj']}' introuvable dans '{target.cid}'"))
@@ -505,10 +522,10 @@ def run(root: Path, count: bool = True) -> list[Err]:
         errors += check_customer_key_class(c)
         if c.layer == "raw":
             errors += check_raw_transform(c)
-        elif c.layer == "customer":
-            errs, referenced = check_customer_fields(c, by_id)
+        elif c.layer in DERIVED_LAYERS:
+            errs, referenced = check_derived_fields(c, by_id)
             errors += errs
-            errors += check_flow_folder(c)
+            errors += check_flow_folder(c) if c.layer == "customer" else check_primary_key(c)
             if isinstance(c.cid, str):
                 graph[c.cid] = referenced
     for cycle in find_cycles(graph):

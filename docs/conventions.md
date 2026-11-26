@@ -10,6 +10,7 @@ Standard : [Open Data Contract Standard (ODCS) v3.2.0](https://github.com/bitol-
 
 ```
 contracts/raw/<source>/raw__<table>__<source>.odcs.yaml
+contracts/core/core__<nom>.odcs.yaml
 contracts/customer/<flux>/<objet>.odcs.yaml
 ```
 
@@ -23,12 +24,19 @@ Sources du lot 1 : `shopify`, `pos`, `ga4`, `googleads`, `metaads`. Un fichier p
 - Le schéma de données d'un raw reflète la source sans transformation métier : noms de champs de la source en snake_case, aucune jointure, aucun calcul.
 - Le nom de l'objet de schéma (`schema[].name`) est le nom de la table physique dans le dataset (ex. `orders`). Il peut différer de `<table>` quand la source l'impose (ex. `events` pour GA4). Il ne contient jamais de `.`.
 
+### Core (L002, L019)
+
+- Couche entre raw et customer : chaque règle métier partagée y est écrite une seule fois.
+- Id `core__<nom>` (`core__sales_events`), sans sous-dossier ; `domain: core` et dataset `core`. L'objet de schéma porte le nom sans `core__` (`sales_events`).
+- Chaque objet déclare sa clé primaire (L019). Aucun e-mail : seulement `customer_key`.
+- Un core lit des raw ou d'autres core, sans cycle (L004, L005).
+
 ### Customer (L002, L009)
 
 - Un sous-dossier par flux métier sous `contracts/customer/` : `acquisition`, `audiences`, `sales` (L009). Un nouveau flux s'ajoute à `FLOWS` dans `tools/validate_lineage.py`.
 - id `<objet>` en snake_case sans `__` : `acquisition_monthly` (`acquisition/`), `audiences` (`audiences/`), `kpis_monthly` (`sales/`). Les sources ne figurent pas dans le nom : elles sont portées par le lineage.
 - `domain: customer` et dataset `customer` pour tous les flux.
-- Un customer ne référence que des raw (L004), jamais un autre customer.
+- Un customer référence des raw ou des core (L004), jamais un autre customer.
 
 ### Domaines, équipes, datasets
 
@@ -39,6 +47,7 @@ Sources du lot 1 : `shopify`, `pos`, `ga4`, `googleads`, `metaads`. Un fichier p
 | raw ga4 | `ga4` | `raw_ga4` | `team-ga4` | `@org/team-ga4` |
 | raw googleads | `googleads` | `raw_googleads` | `team-googleads` | `@org/team-googleads` |
 | raw metaads | `metaads` | `raw_metaads` | `team-metaads` | `@org/team-metaads` |
+| core | `core` | `core` | `team-core` | `@org/team-core` |
 | customer | `customer` | `customer` | `team-customer` | `@org/team-customer` |
 
 Une équipe propriétaire par domaine. `docs/`, `tools/`, `tests/`, `schema/` et la CI appartiennent à `@org/data-platform`.
@@ -88,11 +97,11 @@ Les contraintes de structure (champs inconnus refusés par `unevaluatedPropertie
 - Types : `logicalType` ODCS (`string`, `integer`, `number`, `boolean`, `timestamp`, `date`, `array`, `object`) **et** `physicalType` BigQuery (`STRING`, `INT64`, `NUMERIC`, `BOOL`, `TIMESTAMP`, `DATE`, `ARRAY<...>`, `STRUCT<...>`, `JSON`) renseignés sur chaque property.
 - Champs techniques présents sur chaque table raw : `meta_loaded_at` (TIMESTAMP UTC, chargement dans BigQuery) et `meta_source_file` (STRING, URI du fichier de dépôt d'origine, y compris pour une ingestion par API). Ils portent `transformLogic: create` et `transformDescription`, sans source.
 
-Contrôlé par `tools/validate_lineage.py` : L015 (snake_case ; en customer `_at` = `TIMESTAMP`, `_date` = `DATE`, `_amount`/`_eur` = `NUMERIC`, `is_`/`has_` = `BOOL`, `meta_` réservé aux champs `create`) et L016 (`customer_key` confidentiel et pseudonymisé).
+Contrôlé par `tools/validate_lineage.py` : L015 (snake_case ; en core et customer `_at` = `TIMESTAMP`, `_date` = `DATE`, `_amount`/`_eur` = `NUMERIC`, `is_`/`has_` = `BOOL`, `meta_` réservé aux champs `create`) et L016 (`customer_key` confidentiel et pseudonymisé).
 
-## 4. Lineage (customer uniquement)
+## 4. Lineage (core et customer)
 
-Le lineage est porté **au niveau property** des contrats customer. Chaque champ customer de premier niveau porte :
+Le lineage est porté **au niveau property** des contrats core et customer. Chacun de leurs champs de premier niveau porte :
 
 | Champ | Contenu |
 |---|---|
@@ -127,9 +136,9 @@ Exemple :
 | `create` | aucune (`transformSourceObjects` absent ou vide) | facultative (`CURRENT_TIMESTAMP()`) | valeur sans source (horodatage de calcul, constante) |
 
 Autres règles :
-- tout champ customer de premier niveau a `transformLogic` et `transformDescription` (L008) ;
+- tout champ core ou customer de premier niveau a `transformLogic` et `transformDescription` (L008) ;
 - toutes les références doivent exister : contrat, objet de schéma, property, y compris chemins imbriqués (L003) ;
-- pas de cycle (L005), un customer ne référence que des raw (L004) ;
+- pas de cycle (L005) ; un core et un customer ne référencent que des raw ou des core (L004) ;
 - raw (L006) : tout champ de premier niveau porte `transformLogic: map`, une source externe `<système>#<objet>.<champ>` et `transformDescription` ; `meta_loaded_at` et `meta_source_file` sont en `create`, sans source. Systèmes : `shopify_admin_api`, `pos_export`, `ga4_bigquery_export`, `googleads_api`, `metaads_api`. Pas de `transformExpression` ni de calcul.
 
 ### Règle `customer_key` (définie ici, une seule fois) (L012)
@@ -143,7 +152,7 @@ IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
 - `SHA256` renvoie des `BYTES` ; `TO_HEX` produit la chaîne.
 - Email `NULL` ou vide (après `TRIM`) : `customer_key` vaut `NULL`. On ne hache jamais la chaîne vide, sinon tous les clients sans e-mail partageraient la même clé.
 - Aucune normalisation supplémentaire (pas de suppression de `+tag`, pas de traitement du domaine) : ce que la règle ne dit pas n'est pas fait.
-- Tout champ nommé `customer_key` dans un customer reprend cette expression à l'identique (même colonne aux deux emplacements de l'expression). Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `C2`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
+- Tout champ nommé `customer_key` dans un core ou un customer reprend cette expression à l'identique (même colonne aux deux emplacements de l'expression). Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `C2`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
 
 ## 5. Versionnement et breaking changes
 

@@ -1,0 +1,40 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: core__sales
+name: core__sales
+version: 1.0.0
+status: active
+domain: core
+description:
+  purpose: Contrat de test core__sales.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: core
+team:
+  name: team-core
+  members:
+  - username: '@org/team-core'
+    role: owner
+support:
+- channel: data-customer
+  tool: email
+  url: mailto:data-customer@retail.example
+schema:
+- name: sales
+  physicalType: table
+  description: Ventes.
+  properties:
+  - name: event_id
+    physicalType: INT64
+    logicalType: integer
+    description: Champ event_id.
+    classification: C1
+    primaryKey: true
+    required: true
+    transformLogic: map
+    transformDescription: Alimente event_id.
+    transformSourceObjects:
+    - kpis_monthly#customer_kpis.order_total

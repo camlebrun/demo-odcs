@@ -1,0 +1,69 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: raw__pages_views__ga4
+name: raw__pages_views__ga4
+version: 1.0.0
+status: active
+domain: ga4
+description:
+  purpose: Contrat de test raw__pages_views__ga4.
+servers:
+- server: bigquery_prod
+  type: bigquery
+  environment: prod
+  project: retail-data-prod
+  dataset: raw_ga4
+team:
+  name: team-ga4
+  members:
+  - username: '@org/team-ga4'
+    role: owner
+support:
+- channel: data-ga4
+  tool: email
+  url: mailto:data-ga4@retail.example
+schema:
+- name: events
+  physicalType: table
+  description: Evenements GA4.
+  properties:
+  - name: event_name
+    physicalType: STRING
+    logicalType: string
+    description: Champ event_name.
+    classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_name
+    transformDescription: Recopie du champ event_name de l'objet events de l'export BigQuery GA4, sans transformation.
+  - name: event_params
+    physicalType: ARRAY<STRUCT<key STRING>>
+    logicalType: array
+    description: Champ event_params.
+    classification: C1
+    items:
+      logicalType: object
+      properties:
+      - name: key
+        physicalType: STRING
+        logicalType: string
+        description: Champ key.
+        classification: C1
+    transformLogic: map
+    transformSourceObjects:
+    - ga4_bigquery_export#events.event_params
+    transformDescription: Recopie du champ event_params de l'objet events de l'export BigQuery GA4, sans transformation.
+  - name: meta_loaded_at
+    physicalType: TIMESTAMP
+    logicalType: timestamp
+    description: Champ meta_loaded_at.
+    classification: C1
+    transformLogic: create
+    transformDescription: Horodatage de chargement de la ligne dans BigQuery, renseigne par l'ingestion (aucune source).
+  - name: meta_source_file
+    physicalType: STRING
+    logicalType: string
+    description: Champ meta_source_file.
+    classification: C1
+    transformLogic: create
+    transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).
