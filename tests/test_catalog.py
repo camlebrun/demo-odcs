@@ -22,12 +22,14 @@ global.navigator = {};
 eval(fs.readFileSync(asset, "utf8"));
 const src = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 window.colibriData = { metadata: src.metadata, nodes: src.nodes, lineage: { edges: src.lineage.edges }, tree: src.tree };
+if (column) window.cpTraceColumnSet(model, column);
 process.stdout.write(window.cpTraceTabHtml(model));
 """
 
 
-def _trace(tmp_path, manifest: dict, model: str) -> str:
-    """Rend l'onglet Trace d'un contrat avec node (le JS du catalogue n'est pas reimplemente en Python)."""
+def _trace(tmp_path, manifest: dict, model: str, column: str | None = None) -> str:
+    """Rend l'onglet Trace d'un contrat avec node (le JS du catalogue n'est pas reimplemente en Python).
+    `column` simule la colonne selectionnee dans la liste des colonnes du panneau du contrat."""
     node = shutil.which("node")
     if not node:
         pytest.skip("node est necessaire pour executer le JS du catalogue")
@@ -35,12 +37,10 @@ def _trace(tmp_path, manifest: dict, model: str) -> str:
     harness.write_text(HARNESS, encoding="utf-8")
     data = tmp_path / "manifest.json"
     data.write_text(json.dumps(manifest), encoding="utf-8")
-    out = subprocess.run(
-        [node, str(harness), str(ASSETS / "column_info.js"), str(data), model],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    args = [node, str(harness), str(ASSETS / "column_info.js"), str(data), model]
+    if column:
+        args.append(column)
+    out = subprocess.run(args, capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr
     return out.stdout
 
@@ -99,19 +99,19 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
-    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", 'id:"trace",label:"Trace"'))
+    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace"'))
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
 
-def test_trace_tab_lists_columns_and_traces_the_selected_one(tmp_path):
-    """L'onglet Trace liste les colonnes du contrat ; la colonne choisie affiche sa trace raw -> mart."""
-    trace = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "kpis_monthly")
-    assert "Source trace · kpis_monthly" in trace
-    # chaque colonne du contrat est un bouton cliquable, la premiere est selectionnee par defaut
-    for col in ("customer_key", "order_total", "first_order_at", "last_param_key", "computed_at"):
-        assert f'data-col="{col}"' in trace and "cpTraceSelect" in trace
-    assert 'cp-trace-col-btn on" data-col="customer_key"' in trace
-    # ordre source -> mart, avec la transformation declaree a chaque etape
+def test_trace_tab_follows_the_column_selected_in_the_contract_panel(tmp_path):
+    """L'onglet Trace suit la colonne selectionnee dans la liste des colonnes du contrat."""
+    manifest = build_catalog.build_manifest(FIXTURE)
+    hint = _trace(tmp_path, manifest, "kpis_monthly")
+    assert "Source trace · kpis_monthly" in hint
+    assert "Select a column in the contract panel" in hint
+    # colonne cliquee dans le panneau du contrat : trace complete raw -> core -> mart
+    trace = _trace(tmp_path, manifest, "kpis_monthly", "customer_key")
+    assert "<b>kpis_monthly</b>" in trace
     assert trace.index("<b>raw__orders__shopify</b>") < trace.index("<b>core__orders</b>") < trace.index("<b>kpis_monthly</b>")
     for text in ("Recopie du champ email", "Alimente customer_key", "from core__orders#customer_key", "TO_HEX"):
         assert text in trace, text
@@ -140,7 +140,7 @@ def test_trace_tab_reports_undocumented_step_and_ignores_cycles(tmp_path):
         # arete de retour : un contrat amont qui depend de lui-meme (cycle)
         {"id": 4, "source": "kpis_monthly", "target": "core__orders", "sourceColumn": "order_id", "targetColumn": "order_id"},
     ]
-    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "kpis_monthly")
+    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "kpis_monthly", "order_id")
     assert trace.count("<b>raw__orders__shopify</b>") == 1, "une colonne amont n'est listee qu'une fois"
     assert trace.count("<b>core__orders</b>") == 1
     assert "Transformation not documented" in trace
@@ -172,9 +172,7 @@ for (const id of Object.keys(window.colibriData.nodes)) {
     for (const fn of ["cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml"]) {
       try { window[fn](id, col); } catch (e) { errors.push(fn + " " + id + "." + col + " -> " + e.message); }
     }
-  }
-  if (cols.length) {
-    try { window.cpTraceSelect(id, cols[0]); } catch (e) { errors.push("cpTraceSelect " + id + " -> " + e.message); }
+    try { window.cpTraceColumnSet(id, col); window.cpTraceTabHtml(id); } catch (e) { errors.push("cpTraceTabHtml " + id + "." + col + " -> " + e.message); }
   }
 }
 process.stdout.write(JSON.stringify(errors));

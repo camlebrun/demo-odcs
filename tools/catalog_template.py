@@ -239,7 +239,12 @@ def _trace_tab(html: str) -> str:
         'children:R.jsx("div",{className:"flex-1 flex flex-col overflow-hidden",children:'
         'R.jsx("div",{className:"flex-1 overflow-auto p-4",dangerouslySetInnerHTML:{__html:window.cpTraceTabHtml(l)}})})})'
     )
-    return _sub(html, "setExpandedSchemas:J})})})]})", "setExpandedSchemas:J})})})," + trace_panel + "]})", 1)
+    html = _sub(html, "setExpandedSchemas:J})})})]})", "setExpandedSchemas:J})})})," + trace_panel + "]})", 1)
+    # d) Clic sur une ligne de colonne du panneau du contrat (ligne surlignee en bleu quand
+    #    selectionnee) : l'onglet Trace suit cette colonne.
+    row_click = "onClick:()=>{l&&s&&l(s,Y.columnName)}"
+    followed = "onClick:()=>{window.cpTraceColumnSet&&s&&window.cpTraceColumnSet(String(s),Y.columnName);l&&s&&l(s,Y.columnName)}"
+    return _sub(html, row_click, followed, 1)
 
 
 def _doc_tab(html: str) -> str:

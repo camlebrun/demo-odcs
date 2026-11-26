@@ -96,12 +96,12 @@
     }).join("") + "</div>";
   };
 
-  /* ---------- Onglet "Trace" : pour le contrat selectionne, liste de ses colonnes ; le clic sur
-     une colonne affiche toutes les transformations appliquees a cette colonne, des contrats raw
-     (sources) jusqu'a elle. Une colonne amont n'est listee qu'une fois (diamants, cycles bornes),
-     les contrats sont groupes par couche (raw, core, customer) dans le sens source -> contrat.
-     Les contrats ne sont pas tous documentes de la meme facon : une etape sans transformation est
-     signalee comme telle. ---------- */
+  /* ---------- Onglet "Trace" : pour le contrat selectionne, trace de la colonne selectionnee
+     dans la liste des colonnes du panneau (ligne surlignee en bleu). Toutes les transformations
+     appliquees a cette colonne, des contrats raw (sources) jusqu'a elle. Une colonne amont n'est
+     listee qu'une fois (diamants, cycles bornes), les contrats sont groupes par couche (raw,
+     core, customer) dans le sens source -> contrat. Les contrats ne sont pas tous documentes de
+     la meme facon : une etape sans transformation est signalee comme telle. ---------- */
   var PARENTS = null;
   var LAYER_RANK = { raw: 0, core: 1, customer: 2 };
   var TRACE_MAX = 400; /* garde-fou : contrat tres large ou lineage cyclique */
@@ -195,20 +195,13 @@
     }
     return h + traceGroupsHtml(steps);
   }
-  var TRACE_SEL = {}; /* contrat -> colonne choisie dans l'onglet Trace */
-  /* Clic sur une colonne de l'onglet Trace : re-rend le corps sans toucher au reste du panneau. */
-  window.cpTraceSelect = function (model, col) {
+  var TRACE_SEL = {}; /* contrat -> colonne selectionnee dans la liste des colonnes du panneau */
+  /* Appele par le clic sur une ligne de colonne du panneau du contrat (voir catalog_template.py) :
+     la selection existe deja (ligne surlignee), l'onglet Trace la reprend. */
+  window.cpTraceColumnSet = function (model, col) {
     TRACE_SEL[model] = col;
-    var body = document.getElementById && document.getElementById("cp-trace-body");
-    if (body) body.innerHTML = traceBodyHtml(model, col);
-    var chips = document.getElementById && document.getElementById("cp-trace-cols");
-    if (chips) {
-      for (var i = 0; i < chips.children.length; i++) {
-        chips.children[i].classList.toggle("on", chips.children[i].getAttribute("data-col") === col);
-      }
-    }
   };
-  /* Onglet "Trace" : liste les colonnes du contrat selectionne ; clic = trace de la colonne.
+  /* Onglet "Trace" : trace de la colonne selectionnee dans le panneau du contrat.
      Aucune exception ne remonte : une erreur ne doit pas faire tomber tout le rendu React. */
   window.cpTraceTabHtml = function (model) {
     try {
@@ -218,15 +211,11 @@
       if (n.nodeType === "source") {
         return head + '<div class="cp-note">Raw contract: no upstream in the catalog; its sources are the external systems documented in each column.</div></div>';
       }
-      var cols = Object.keys(n.columns || {});
-      if (!cols.length) return head + '<div class="cp-note">No columns in this contract.</div></div>';
-      var sel = TRACE_SEL[model] || cols[0];
-      if (cols.indexOf(sel) < 0) sel = cols[0];
-      var chips = '<div class="cp-trace-cols" id="cp-trace-cols">' + cols.map(function (c) {
-        return '<button type="button" class="cp-trace-col-btn' + (c === sel ? " on" : "") + '" data-col="' + esc(c) + '" onclick=\'window.cpTraceSelect(' +
-          JSON.stringify(model) + "," + JSON.stringify(c) + ")'>" + esc(c) + "</button>";
-      }).join("") + "</div>";
-      return head + chips + '<div id="cp-trace-body">' + traceBodyHtml(model, sel) + "</div></div>";
+      var sel = TRACE_SEL[model];
+      if (!sel || !((n.columns || {})[sel])) {
+        return head + '<div class="cp-note">Select a column in the contract panel to see every transformation applied to it, from the raw sources.</div></div>';
+      }
+      return head + '<div id="cp-trace-body">' + traceBodyHtml(model, sel) + "</div></div>";
     } catch (e) {
       return '<div class="cp-trace"><div class="cp-note">Source trace unavailable: ' + esc(e && e.message) + "</div></div>";
     }

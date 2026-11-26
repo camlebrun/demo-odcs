@@ -24,12 +24,8 @@
 html.cp-expert .cp-expert-toggle::after{content:" : on"}
 .cp-expert-toggle::after{content:" : off"}
 html.cp-expert .cp-expert-toggle{background:hsl(var(--purple-primary));border-color:hsl(var(--purple-primary));color:#fff}
-/* Onglet "Trace" : colonnes du contrat selectionne, clic = toutes les transformations de la colonne. */
+/* Onglet "Trace" : toutes les transformations de la colonne selectionnee, des raw jusqu'a elle. */
 .cp-trace{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.45}
-.cp-trace-cols{display:flex;flex-wrap:wrap;gap:4px}
-.cp-trace-col-btn{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:999px;padding:2px 9px}
-.cp-trace-col-btn:hover{background:hsl(var(--accent))}
-.cp-trace-col-btn.on{background:hsl(var(--purple-primary));border-color:hsl(var(--purple-primary));color:#fff}
 #cp-trace-body{display:flex;flex-direction:column;gap:8px}
 .cp-steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
 .cp-step{display:flex;flex-direction:column;gap:4px;border-bottom:1px dashed hsl(var(--border));padding-bottom:8px}
