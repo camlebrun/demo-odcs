@@ -11,7 +11,7 @@ import pytest
 
 import validate_lineage
 import validate_schema
-from common import REPO_ROOT
+from common import REPO_ROOT, load_yaml
 
 FIXTURES = Path(__file__).parent / "fixtures"
 VALID = sorted(p for p in (FIXTURES / "valid").iterdir() if p.is_dir())
@@ -48,7 +48,7 @@ def test_broken_fixture_fails_for_the_expected_reason(case):
 
 def test_each_rule_has_a_broken_fixture():
     codes = {expectation(c)[0] for c in BROKEN}
-    expected = {f"L{n:03d}" for n in range(1, 20)} | {"SCHEMA"}
+    expected = {f"L{n:03d}" for n in range(1, 21)} | {"SCHEMA"}
     assert expected <= codes, sorted(expected - codes)
 
 
@@ -82,3 +82,27 @@ def test_repository_contracts_pass_schema_and_lineage():
     """Les vrais contrats du depot (verifie aussi le contrat temoin)."""
     assert schema_errors(REPO_ROOT) == []
     assert validate_lineage.run(REPO_ROOT, count=False) == []
+
+
+def _columns(contract_id: str) -> dict:
+    path = next((REPO_ROOT / "contracts").rglob(f"{contract_id}.odcs.yaml"))
+    return {p["name"]: p for p in load_yaml(path)["schema"][0]["properties"]}
+
+
+def test_repository_hashed_key_expression_names_a_published_column():
+    key = _columns("core__customers")["customer_key"]
+    assert key["customProperties"][0]["value"] == "customer_key"
+
+
+def test_repository_ga4_event_id_is_pseudonymized():
+    event_id = _columns("core__web_events")["event_id"]
+    assert event_id["classification"] == "C2" and "pseudonymized" in event_id["tags"]
+
+
+def test_repository_lineage_lists_columns_that_filter_rows():
+    def sources(contract_id, column):
+        return {s.split(".", 1)[1] for s in _columns(contract_id)[column]["transformSourceObjects"]}
+
+    assert {"user_pseudo_id", "event_type", "is_analytics_consented", "web_order_id", "source_system"} <= sources("audiences", "customer_key")
+    for column in ("channel", "month_date"):
+        assert {"first_web_order_at", "customer_key", "event_type", "source_system"} <= sources("acquisition_monthly", column)

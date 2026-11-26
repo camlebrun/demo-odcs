@@ -5,7 +5,7 @@ Regles (code dans la sortie) :
   L001 decompte (14 raw dont 4/4/2/2/2 par source, 5 core, 3 customer) ; desactivable avec --no-count
   L002 nommage raw / core / customer, id == name == nom de fichier, dossier source == domaine (raw)
   L003 references transformSourceObjects (contrat, objet, property, chemins imbriques)
-  L004 couches : un core lit des raw ou des core ; un customer ne lit que des core
+  L004 couches : un core lit des raw ou des core ; un customer ne lit que des core (sources et SQL)
   L005 cycle dans le graphe de references
   L006 lineage raw : chaque champ de premier niveau est `map` depuis 1 champ de la source externe
        (<systeme>#<objet>.<champ>), sauf meta_loaded_at / meta_source_file en `create` sans source
@@ -14,15 +14,16 @@ Regles (code dans la sortie) :
   L009 un contrat customer vit dans contracts/customer/<flux>/ avec <flux> parmi acquisition, audiences, sales
   L010 PII : tag `pii` ET classification `C3`
   L011 map : renommage ou cast trivial uniquement
-  L012 customer_key conforme a la regle canonique (un customer reprend la cle d'un core sans la recalculer)
+  L012 *customer_key : regle canonique en core ; un customer reprend la cle d'un core sans la recalculer
   L013 metadonnees (apiVersion, status, version, domain, servers, team, support)
   L014 documentation et classification des properties
   L015 nommage des properties (snake_case, suffixes _at/_date/_amount/_eur/is_/has_ vs type physique)
-  L016 customer_key : classification C2 et tag pseudonymized
+  L016 *customer_key : classification C2 et tag pseudonymized
   L017 description du contrat (purpose, usage, limitations) et des objets : 350 caracteres maximum (5 lignes)
   L018 objet de schema : physicalType table|view ; customProperties loadStrategy (full_refresh|incremental|append) facultatif,
        incrementalKey (property existante) obligatoire si incremental
   L019 chaque objet d'un contrat core declare au moins une property primaryKey
+  L020 aucun e-mail en core : ni property `email`, ni tag pii, ni classification C3
 
 Code retour 1 s'il y a au moins une erreur.
 """
@@ -68,14 +69,17 @@ REF_RE = re.compile(r"^(?P<contract>[^#\s]+)#(?P<obj>[^.\s#]+)\.(?P<path>[^\s#]+
 # Regle customer_key (docs/conventions.md, section "customer_key"). {c} = colonne email.
 CUSTOMER_KEY_CANONICAL = "IF(NULLIF(TRIM({c}), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM({c})))))"
 _ck_parts = re.sub(r"\s+", "", CUSTOMER_KEY_CANONICAL).split("{c}")
-CUSTOMER_KEY_RE = re.compile(
+CUSTOMER_KEY_SQL_RE = re.compile(  # la meme regle, cherchee dans un SQL complet
     re.escape(_ck_parts[0])
     + r"(?P<c>[A-Za-z_][\w.]*)"
     + re.escape(_ck_parts[1])
     + r"(?P=c)"
     + re.escape(_ck_parts[2])
-    + "$"
 )
+CUSTOMER_KEY_RE = re.compile(CUSTOMER_KEY_SQL_RE.pattern + "$")
+HASHED_KEY = "customer_key"  # suffixe : customer_key, user_id_customer_key
+# L004 : tables que le SQL d'une couche n'a pas le droit de lire (datasets raw_<source>, customer).
+FORBIDDEN_SQL = {"core": re.compile(r"\bcustomer\.[a-z_]"), "customer": re.compile(r"\braw_[a-z0-9]+\.[a-z_]")}
 
 # map : identifiant (renommage) ou [SAFE_]CAST(identifiant AS type), rien d'autre.
 TRIVIAL_MAP_RE = re.compile(
@@ -368,11 +372,11 @@ def check_customer_key_class(c: Contract) -> list[Err]:
     if c.layer not in DERIVED_LAYERS:
         return errs
     for p in all_props(c):
-        if p.node.get("name") != "customer_key":
+        if not str(p.node.get("name", "")).endswith(HASHED_KEY):
             continue
         where = f"{c.rel} {p.path}"
         if p.node.get("classification") != "C2" or "pseudonymized" not in (p.node.get("tags") or []):
-            errs.append(Err("L016", where, "customer_key doit etre C2 avec le tag pseudonymized"))
+            errs.append(Err("L016", where, f"{p.node.get('name')} doit etre C2 avec le tag pseudonymized"))
     return errs
 
 
@@ -430,12 +434,41 @@ def check_primary_key(c: Contract) -> list[Err]:
     ]
 
 
-def reuses_core_key(c: Contract, expr: str, srcs: list, by_id: dict[str, Contract]) -> bool:
-    """L012 : un customer reprend le customer_key d'un core tel quel, le hachage n'est ecrit qu'en core."""
-    if c.layer != "customer" or not re.fullmatch(r"(?:\w+\.)?customer_key", expr):
+def reuses_core_key(expr: str, name: str, srcs: list, by_id: dict[str, Contract]) -> bool:
+    """L012 : un customer reprend la cle d'un core telle quelle, le hachage n'est ecrit qu'en core."""
+    if not re.fullmatch(rf"(?:\w+\.)?{re.escape(name)}", expr):
         return False
-    matches = [REF_RE.match(str(s)) for s in srcs]
-    return any(m and m["path"] == "customer_key" and by_id.get(m["contract"]) and by_id[m["contract"]].layer == "core" for m in matches)
+    matches = [REF_RE.match(str(src)) for src in srcs]
+    return any(m and m["path"] == name and by_id.get(m["contract"]) and by_id[m["contract"]].layer == "core" for m in matches)
+
+
+def core_key_is_canonical(c: Contract, expr: str, name: str) -> bool:
+    """L012 : expression canonique, ou nom de colonne dont le SQL intermediaire porte la regle canonique."""
+    if CUSTOMER_KEY_RE.match(expr):
+        return True
+    inputs = re.sub(r"\s+", "", str(custom_prop(c.data, "transformInputs") or ""))
+    return expr == name and bool(CUSTOMER_KEY_SQL_RE.search(inputs))
+
+
+def check_layer_sql(c: Contract) -> list[Err]:
+    """L004 : le SQL declare (transformInputs, transformExpression) respecte aussi les couches."""
+    forbidden = FORBIDDEN_SQL[c.layer]
+    texts = [("transformInputs", custom_prop(c.data, "transformInputs"))]
+    texts += [(p.path, custom_prop(p.node, "transformExpression")) for p in all_props(c)]
+    return [
+        Err("L004", f"{c.rel} {where}", f"le SQL d'un {c.layer} lit une table interdite ({forbidden.search(str(sql)).group(0)}...)")
+        for where, sql in texts
+        if forbidden.search(str(sql or ""))
+    ]
+
+
+def check_no_email(c: Contract) -> list[Err]:
+    """L020 : les e-mails restent dans raw."""
+    return [
+        Err("L020", f"{c.rel} {p.path}", "aucun e-mail ni donnee personnelle directe en core")
+        for p in all_props(c)
+        if p.node.get("name") == "email" or PII_TAG in (p.node.get("tags") or []) or p.node.get("classification") == PII_CLASSIFICATION
+    ]
 
 
 def check_derived_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list[Err], set[str]]:
@@ -467,10 +500,13 @@ def check_derived_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list[
             errs.append(Err("L007", where, f"create n'accepte aucune source ({len(srcs)} trouvee(s))"))
         if logic == "map" and expr_ok and not TRIVIAL_MAP_RE.match(expr):
             errs.append(Err("L011", where, f"map limite a un renommage ou un cast trivial, pas '{expr}' (utiliser transform)"))
-        if n.get("name") == "customer_key" and p.top:
+        name = str(n.get("name", ""))
+        if name.endswith(HASHED_KEY) and p.top:
             norm = re.sub(r"\s+", "", expr) if expr_ok else ""
-            if not (CUSTOMER_KEY_RE.match(norm) or reuses_core_key(c, norm, srcs, by_id)):
-                errs.append(Err("L012", where, f"customer_key doit suivre la regle canonique: {CUSTOMER_KEY_CANONICAL}"))
+            if c.layer == "customer" and not reuses_core_key(norm, name, srcs, by_id):
+                errs.append(Err("L012", where, f"un customer reprend {name} d'un core sans le recalculer"))
+            if c.layer == "core" and not core_key_is_canonical(c, norm, name):
+                errs.append(Err("L012", where, f"{name} doit suivre la regle canonique: {CUSTOMER_KEY_CANONICAL}"))
         for ref in srcs:
             m = REF_RE.match(ref) if isinstance(ref, str) else None
             if not m:
@@ -539,7 +575,8 @@ def run(root: Path, count: bool = True) -> list[Err]:
         elif c.layer in DERIVED_LAYERS:
             errs, referenced = check_derived_fields(c, by_id)
             errors += errs
-            errors += check_flow_folder(c) if c.layer == "customer" else check_primary_key(c)
+            errors += check_layer_sql(c)
+            errors += check_flow_folder(c) if c.layer == "customer" else check_primary_key(c) + check_no_email(c)
             if isinstance(c.cid, str):
                 graph[c.cid] = referenced
     for cycle in find_cycles(graph):

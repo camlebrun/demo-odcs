@@ -180,6 +180,15 @@ schema:
           - core__customers#customers.customer_key
           - core__customers#customers.is_marketing_consented
           - core__web_events#web_events.user_id_customer_key
+          - core__web_events#web_events.user_pseudo_id
+          - core__web_events#web_events.event_type
+          - core__web_events#web_events.is_analytics_consented
+          - core__web_events#web_events.web_order_id
+          - core__web_events#web_events.event_at
+          - core__sales_events#sales_events.web_order_id
+          - core__sales_events#sales_events.source_system
+          - core__sales_events#sales_events.event_type
+          - core__sales_events#sales_events.event_at
         transformDescription: Cle client reprise de la couche core, sans recalcul.
         customProperties:
           - property: transformExpression

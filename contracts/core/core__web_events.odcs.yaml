@@ -127,7 +127,9 @@ schema:
         primaryKey: true
         primaryKeyPosition: 1
         required: true
-        classification: C1
+        classification: C2
+        tags:
+          - pseudonymized
         transformLogic: transform
         transformSourceObjects:
           - raw__purchases__ga4#events.event_name

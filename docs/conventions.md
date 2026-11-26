@@ -28,7 +28,8 @@ Sources du lot 1 : `shopify`, `pos`, `ga4`, `googleads`, `metaads`. Un fichier p
 
 - Couche entre raw et customer : chaque règle métier partagée y est écrite une seule fois.
 - Id `core__<nom>` (`core__sales_events`), sans sous-dossier ; `domain: core` et dataset `core`. L'objet de schéma porte le nom sans `core__` (`sales_events`).
-- Chaque objet déclare sa clé primaire (L019). Aucun e-mail : seulement `customer_key`.
+- Chaque objet déclare sa clé primaire (L019). Aucun e-mail : seulement des clés hachées (L020).
+- Exception : GA4 n'a pas d'identifiant d'événement, la clé composée de `core__web_events` est déclarée mais non garantie (unicité en avertissement).
 - Un core lit des raw ou d'autres core, sans cycle (L004, L005).
 
 ### Customer (L002, L009)
@@ -138,7 +139,7 @@ Exemple :
 Autres règles :
 - tout champ core ou customer de premier niveau a `transformLogic` et `transformDescription` (L008) ;
 - toutes les références doivent exister : contrat, objet de schéma, property, y compris chemins imbriqués (L003) ;
-- pas de cycle (L005) ; un core lit des raw ou des core, un customer uniquement des core (L004) ;
+- pas de cycle (L005) ; un core lit des raw ou des core, un customer uniquement des core ; la règle porte sur les sources déclarées et sur le SQL (`transformInputs`, `transformExpression`) (L004) ;
 - raw (L006) : tout champ de premier niveau porte `transformLogic: map`, une source externe `<système>#<objet>.<champ>` et `transformDescription` ; `meta_loaded_at` et `meta_source_file` sont en `create`, sans source. Systèmes : `shopify_admin_api`, `pos_export`, `ga4_bigquery_export`, `googleads_api`, `metaads_api`. Pas de `transformExpression` ni de calcul.
 
 ### Règle `customer_key` (définie ici, une seule fois) (L012)
@@ -152,7 +153,7 @@ IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
 - `SHA256` renvoie des `BYTES` ; `TO_HEX` produit la chaîne.
 - Email `NULL` ou vide (après `TRIM`) : `customer_key` vaut `NULL`. On ne hache jamais la chaîne vide, sinon tous les clients sans e-mail partageraient la même clé.
 - Aucune normalisation supplémentaire (pas de suppression de `+tag`, pas de traitement du domaine) : ce que la règle ne dit pas n'est pas fait.
-- Tout champ nommé `customer_key` dans un core reprend cette expression à l'identique (même colonne aux deux emplacements de l'expression). Un customer ne la recalcule pas : son expression est `customer_key`, avec pour source le `customer_key` d'un core. Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `C2`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
+- Tout champ dont le nom finit par `customer_key` dans un core reprend cette expression à l'identique (même colonne aux deux emplacements), ou porte son propre nom quand le calcul est écrit dans `transformInputs`. Un customer ne la recalcule pas : son expression est `customer_key`, avec pour source le `customer_key` d'un core. Les espaces et retours à la ligne sont libres. `tools/validate_lineage.py` le vérifie. Classification : `C2`, tag `pseudonymized` (une clé hachée reste une donnée personnelle au sens RGPD).
 
 ## 5. Versionnement et breaking changes
 

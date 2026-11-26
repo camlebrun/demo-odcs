@@ -172,6 +172,10 @@ schema:
           - core__ad_spend#ad_spend.spend_date
           - core__sales_events#sales_events.event_at
           - core__customers#customers.first_web_order_at
+          - core__customers#customers.customer_key
+          - core__sales_events#sales_events.customer_key
+          - core__sales_events#sales_events.event_type
+          - core__sales_events#sales_events.source_system
         transformDescription: Mois du jour de depense Google Ads ou Meta, ou de la premiere commande Shopify convertie en Europe/Paris.
         customProperties:
           - property: transformExpression
@@ -197,6 +201,12 @@ schema:
           - core__web_events#web_events.event_type
           - core__web_events#web_events.event_at
           - core__sales_events#sales_events.web_order_id
+          - core__customers#customers.first_web_order_at
+          - core__customers#customers.customer_key
+          - core__sales_events#sales_events.customer_key
+          - core__sales_events#sales_events.event_type
+          - core__sales_events#sales_events.source_system
+          - core__sales_events#sales_events.event_at
         transformDescription: Canal deduit de la source collectee sur l'evenement purchase GA4 (gclid ou UTM), google_ads et meta_ads pour la depense de la plateforme correspondante.
         customProperties:
           - property: transformExpression
@@ -267,7 +277,7 @@ schema:
           - core__ad_spend#ad_spend.spend_date
           - core__ad_spend#ad_spend.platform
           - core__ad_spend#ad_spend.campaign_id
-        transformDescription: Somme des micros Google Ads divises par 1 000 000 et de la depense Meta decimale, en EUR.
+        transformDescription: Somme de la depense quotidienne de core__ad_spend, en EUR.
         customProperties:
           - property: transformExpression
             value: IFNULL(SUM(spend_eur), 0)
