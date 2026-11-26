@@ -50,3 +50,11 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     for text in forbidden:
         assert text not in html, text
     assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType"))
+
+
+def test_render_writes_lineage_page_linked_from_dashboard(tmp_path):
+    pytest.importorskip("dbt_colibri")
+    html = build_catalog.render_html(build_catalog.build_manifest(Path(build_catalog.REPO_ROOT)), tmp_path)
+    assert (tmp_path / "lineage.html").is_file()
+    assert (tmp_path / "lineage.fr.html").is_file()
+    assert 'href="lineage.html"' in html.read_text(encoding="utf-8")

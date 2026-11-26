@@ -9,6 +9,7 @@ dans le `index.html` de colibri avec sa fonction publique `inject_data_into_html
 Sorties (par defaut dist/catalog/) :
   colibri-manifest.json   lineage complet (noeuds, aretes colonne a colonne, parents, enfants)
   index.html              dashboard autonome (telemetrie colibri desactivee)
+  lineage[.fr].html       explication du lineage (EN et FR), liee depuis le dashboard
 
 Usage : python tools/build_catalog.py [--root .] [--out dist/catalog] [--json-only]
 """
@@ -17,11 +18,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from catalog_template import TemplateMismatch, patch_template
+from catalog_template import ASSETS, TemplateMismatch, patch_template
 from common import REPO_ROOT
 from validate_lineage import all_props, custom_prop, load_contracts, schema_objects, sources_of
 
@@ -296,6 +298,8 @@ def render_html(manifest: dict, out_dir: Path) -> Path:
     # La telemetrie (PostHog) de l'interface colibri est toujours desactivee.
     gen.inject_data_into_html(stripped, str(patched), str(html), disable_telemetry=True)
     patched.unlink()
+    for name in ("lineage.html", "lineage.fr.html"):
+        shutil.copyfile(ASSETS / name, out_dir / name)
     return html
 
 

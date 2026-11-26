@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comment fonctionne le lineage</title>
+<style>
+:root{--bg:#fff;--fg:#18181b;--muted:#63636e;--line:#e4e4e7;--soft:#f4f4f5;--accent:#6d28d9}
+@media (prefers-color-scheme:dark){:root{--bg:#111113;--fg:#ededef;--muted:#a1a1aa;--line:#2e2e33;--soft:#1c1c1f;--accent:#a78bfa}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+h1{font-size:26px;margin:16px 0 4px}
+h2{font-size:18px;margin:32px 0 8px}
+p.lead{color:var(--muted);margin-top:0}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:12px;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,monospace}
+code{font:13px ui-monospace,Menlo,monospace;background:var(--soft);padding:0 4px;border-radius:4px}
+pre code{background:none;padding:0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);text-align:left;padding:6px 10px 6px 0;vertical-align:top}
+</style>
+</head>
+<body>
+<main>
+<a href="index.html">&larr; Retour au catalogue</a> &middot; <a href="lineage.html" lang="en">English</a>
+<h1>Comment fonctionne le lineage</h1>
+<p class="lead">Le lineage est déclaré à la main dans les data contracts. Il n'est pas déduit du SQL, et rien n'est exécuté sur l'entrepôt.</p>
+
+<h2>1. Déclarer le lineage des colonnes dans le contrat</h2>
+<p>Chaque champ customer indique d'où il vient :</p>
+<pre><code>- name: first_order_at
+  logicalType: timestamp
+  physicalType: TIMESTAMP
+  transformLogic: transform
+  transformSourceObjects:
+    - raw__orders__shopify#orders.created_at
+  transformDescription: Plus ancienne date de cr&eacute;ation parmi les commandes du client.
+  customProperties:
+    - property: transformExpression
+      value: MIN(created_at)</code></pre>
+<p>Une référence source s'écrit <code>&lt;contract_id&gt;#&lt;objet&gt;.&lt;property&gt;</code>. Les champs imbriqués utilisent le chemin complet.</p>
+<div class="scroll">
+<table>
+<tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression SQL</th></tr>
+<tr><td><code>map</code></td><td>exactement une</td><td>facultative, renommage ou cast trivial uniquement</td></tr>
+<tr><td><code>transform</code></td><td>au moins une</td><td>obligatoire, SQL BigQuery exact</td></tr>
+<tr><td><code>create</code></td><td>aucune</td><td>facultative</td></tr>
+</table>
+</div>
+<p>Les champs raw sont en <code>map</code> depuis le système externe (par exemple <code>shopify_admin_api#...</code>). Les champs techniques <code>meta_loaded_at</code> et <code>meta_source_file</code> sont en <code>create</code>.</p>
+
+<h2>2. Le lineage des tables est dérivé</h2>
+<p>Aucune déclaration séparée au niveau table. Un contrat dépend d'un autre dès qu'une de ses colonnes référence une colonne de celui-ci.</p>
+<p>Les systèmes sources externes ne sont pas des contrats : ils n'apparaissent pas comme nœuds dans le graphe.</p>
+
+<p>La légende du graphe est calculée à partir de la déclaration : <b>Pass-through</b> est un <code>map</code> qui garde le nom, <b>Rename</b> un <code>map</code> qui le change, <b>Transformation</b> un <code>transform</code>.</p>
+
+<h2>3. Contrôles avant publication</h2>
+<p><code>make check</code> valide les contrats. Pour le lineage, il vérifie que :</p>
+<ul>
+<li>chaque contrat, objet et property référencé existe ;</li>
+<li>un contrat customer ne référence que des contrats raw ;</li>
+<li>il n'y a pas de cycle ;</li>
+<li><code>transformLogic</code>, ses sources et son expression sont cohérents ;</li>
+<li>chaque champ customer a <code>transformLogic</code> et <code>transformDescription</code>.</li>
+</ul>
+<p>Les expressions SQL ne sont pas exécutées : une référence valide ne prouve pas que le pipeline fait réellement ce que dit le contrat.</p>
+
+<h2>4. Comment il est exposé</h2>
+<p><code>make catalog</code> lit les contrats et écrit notamment :</p>
+<ul>
+<li><a href="colibri-manifest.json"><code>colibri-manifest.json</code></a> : contrats, colonnes, liens colonne à colonne et contrat à contrat, parents et enfants. D'autres outils peuvent le lire.</li>
+<li><code>index.html</code> : ce catalogue, un dashboard statique basé sur <a href="https://github.com/b-ned/dbt-colibri">dbt-colibri</a> (MIT).</li>
+</ul>
+<p>Dans le catalogue, la vue lineage permet de suivre les tables et les colonnes en amont et en aval. Ouvrez une colonne et activez <b>Expert mode</b> pour voir la description de la transformation et son SQL.</p>
+<p>Chaque push sur <code>main</code> lance les contrôles, reconstruit le catalogue et le déploie sur Cloudflare Pages si le jeton de déploiement est configuré.</p>
+</main>
+</body>
+</html>

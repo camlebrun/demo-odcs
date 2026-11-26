@@ -8,6 +8,7 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 - 14 contrats raw (shopify 4, pos 4, ga4 2, googleads 2, metaads 2) et 3 contrats customer avec lineage par property, et leurs fiches `docs/use-cases/`.
 - Catalogue de données : `tools/build_catalog.py` génère le JSON et le dashboard statique de [dbt-colibri](https://github.com/b-ned/dbt-colibri) (MIT) à partir des contrats, sans dbt (`make catalog`).
 - Règles L015 (nommage des properties) et L016 (`customer_key` pseudonymisé).
+- Catalogue : page d'explication du lineage en anglais (`lineage.html`) et en français (`lineage.fr.html`), liée depuis le dashboard.
 
 ### Modifié
 - Catalogue : interface en anglais (hors contenu des contrats), bloc « Quality checks » lisible (règle, dimension, SQL), bloc « BigQuery schema » sans retour à ligne avec type de l'objet et stratégie de chargement lus dans les contrats.

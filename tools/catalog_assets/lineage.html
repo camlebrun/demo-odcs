@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How lineage works</title>
+<style>
+:root{--bg:#fff;--fg:#18181b;--muted:#63636e;--line:#e4e4e7;--soft:#f4f4f5;--accent:#6d28d9}
+@media (prefers-color-scheme:dark){:root{--bg:#111113;--fg:#ededef;--muted:#a1a1aa;--line:#2e2e33;--soft:#1c1c1f;--accent:#a78bfa}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+h1{font-size:26px;margin:16px 0 4px}
+h2{font-size:18px;margin:32px 0 8px}
+p.lead{color:var(--muted);margin-top:0}
+pre{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:12px;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,monospace}
+code{font:13px ui-monospace,Menlo,monospace;background:var(--soft);padding:0 4px;border-radius:4px}
+pre code{background:none;padding:0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);text-align:left;padding:6px 10px 6px 0;vertical-align:top}
+</style>
+</head>
+<body>
+<main>
+<a href="index.html">&larr; Back to the catalog</a> &middot; <a href="lineage.fr.html" lang="fr">Français</a>
+<h1>How lineage works</h1>
+<p class="lead">Lineage is declared by hand in the data contracts. It is not parsed from SQL, and nothing is run against the warehouse.</p>
+
+<h2>1. Declare column lineage in the contract</h2>
+<p>Each customer field says where it comes from:</p>
+<pre><code>- name: first_order_at
+  logicalType: timestamp
+  physicalType: TIMESTAMP
+  transformLogic: transform
+  transformSourceObjects:
+    - raw__orders__shopify#orders.created_at
+  transformDescription: Plus ancienne date de cr&eacute;ation parmi les commandes du client.
+  customProperties:
+    - property: transformExpression
+      value: MIN(created_at)</code></pre>
+<p>A source reference reads <code>&lt;contract_id&gt;#&lt;object&gt;.&lt;property&gt;</code>. Nested fields use the full path.</p>
+<div class="scroll">
+<table>
+<tr><th><code>transformLogic</code></th><th>Sources</th><th>SQL expression</th></tr>
+<tr><td><code>map</code></td><td>exactly one</td><td>optional, rename or trivial cast only</td></tr>
+<tr><td><code>transform</code></td><td>at least one</td><td>required, exact BigQuery SQL</td></tr>
+<tr><td><code>create</code></td><td>none</td><td>optional</td></tr>
+</table>
+</div>
+<p>Raw fields are <code>map</code> from the external system (for example <code>shopify_admin_api#...</code>). The technical fields <code>meta_loaded_at</code> and <code>meta_source_file</code> are <code>create</code>.</p>
+
+<h2>2. Table lineage is derived</h2>
+<p>There is no separate table-level declaration. A contract depends on another as soon as one of its columns references one of that contract's columns.</p>
+<p>External source systems are not contracts, so they do not appear as nodes in the graph.</p>
+
+<p>The graph legend is computed from the declaration: <b>Pass-through</b> is a <code>map</code> that keeps the name, <b>Rename</b> a <code>map</code> that changes it, <b>Transformation</b> a <code>transform</code>.</p>
+
+<h2>3. Checks before publication</h2>
+<p><code>make check</code> validates the contracts. For lineage it verifies that:</p>
+<ul>
+<li>every referenced contract, object and property exists;</li>
+<li>a customer contract references raw contracts only;</li>
+<li>there is no cycle;</li>
+<li><code>transformLogic</code>, its sources and its expression are consistent;</li>
+<li>every customer field has <code>transformLogic</code> and <code>transformDescription</code>.</li>
+</ul>
+<p>The SQL expressions are not executed: a valid reference does not prove that the pipeline really does what the contract says.</p>
+
+<h2>4. How it is exposed</h2>
+<p><code>make catalog</code> reads the contracts and writes, among others:</p>
+<ul>
+<li><a href="colibri-manifest.json"><code>colibri-manifest.json</code></a>: contracts, columns, column-to-column and contract-to-contract edges, parents and children. Other tools can read it.</li>
+<li><code>index.html</code>: this catalog, a static dashboard built on <a href="https://github.com/b-ned/dbt-colibri">dbt-colibri</a> (MIT).</li>
+</ul>
+<p>In the catalog, use the lineage view to follow tables and columns upstream and downstream. Open a column and turn on <b>Expert mode</b> to see its transformation description and SQL.</p>
+<p>Every push to <code>main</code> runs the checks, rebuilds the catalog and deploys it to Cloudflare Pages when the deployment token is configured.</p>
+</main>
+</body>
+</html>
