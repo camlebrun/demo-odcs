@@ -1,0 +1,301 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: core__web_events
+name: core__web_events
+version: 1.0.0
+status: active
+domain: core
+tags:
+  - core
+description:
+  purpose: Les achats web et les pages vues GA4, rattachés quand c'est possible à une commande ou à un client. La règle du canal marketing est écrite ici.
+  usage: Sert à attribuer les commandes aux campagnes et à reconnaître les visiteurs. Le dédoublonnage du premier achat par commande reste dans acquisition_monthly.
+  limitations: 'GA4 ne fournit pas d''identifiant d''événement : la clé est composée, des doublons de l''export restent possibles.'
+servers:
+  - server: bigquery_prod
+    type: bigquery
+    environment: prod
+    description: Dataset BigQuery de la couche core.
+    project: retail-data-prod
+    dataset: core
+team:
+  name: team-core
+  description: Equipe propriétaire de la couche core.
+  members:
+    - username: '@org/team-core'
+      role: owner
+support:
+  - channel: data-core
+    tool: email
+    scope: issues
+    url: mailto:data-core@retail.example
+    description: Questions et incidents sur la couche core.
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: web_events
+    driver: analytics
+    description: Un recalcul complet par jour.
+  - property: latency
+    value: 24
+    unit: h
+    element: web_events.meta_computed_at
+    driver: analytics
+    description: Données disponibles au plus tard 24 h après la fin du jour, comme la source la plus lente.
+  - property: retention
+    value: 3
+    unit: y
+    element: web_events
+    description: Historique conservé 3 ans.
+customProperties:
+  - property: transformInputs
+    value: |-
+      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
+      -- Colonnes de web : celles de la table.
+      WITH valid_orders AS (
+        -- La commande web valide est définie dans core.sales_events ; le nom vient du raw.
+        SELECT o.id, o.name
+        FROM raw_shopify.orders o
+        JOIN core.sales_events s ON s.web_order_id = o.id AND s.source_system = 'shopify' AND s.event_type = 'sale'
+      ),
+      web AS (
+        SELECT CONCAT('purchase:', IFNULL(p.user_pseudo_id, ''), ':', CAST(p.event_timestamp AS STRING), ':',
+                      IFNULL(CAST(p.event_bundle_sequence_id AS STRING), ''), ':', IFNULL(p.ecommerce.transaction_id, '')) AS event_id,
+               'purchase' AS event_type, TIMESTAMP_MICROS(p.event_timestamp) AS event_at, p.user_pseudo_id,
+               wo.id AS web_order_id, CAST(NULL AS STRING) AS user_id_customer_key,
+               -- Règle « canal marketing ».
+               CASE WHEN p.collected_traffic_source.gclid IS NOT NULL
+                      OR (LOWER(p.collected_traffic_source.manual_source) = 'google'
+                          AND LOWER(p.collected_traffic_source.manual_medium) IN ('cpc', 'ppc', 'paid')) THEN 'google_ads'
+                    WHEN LOWER(p.collected_traffic_source.manual_source) IN ('facebook', 'instagram', 'meta', 'fb', 'ig')
+                      AND LOWER(p.collected_traffic_source.manual_medium) IN ('cpc', 'paid', 'paid_social', 'cpm') THEN 'meta_ads'
+                    ELSE 'other_web' END AS marketing_channel,
+               LOWER(TRIM(p.collected_traffic_source.manual_campaign_name)) AS utm_campaign,
+               p.privacy_info.analytics_storage = 'Yes' AS is_analytics_consented
+        FROM raw_ga4.purchase_events p
+        LEFT JOIN valid_orders wo ON p.ecommerce.transaction_id IN (CAST(wo.id AS STRING), wo.name, LTRIM(wo.name, '#'))
+        UNION ALL
+        SELECT CONCAT(v.event_name, ':', IFNULL(v.user_pseudo_id, ''), ':', CAST(v.event_timestamp AS STRING), ':',
+                      IFNULL(CAST(v.event_bundle_sequence_id AS STRING), '')),
+               v.event_name, TIMESTAMP_MICROS(v.event_timestamp), v.user_pseudo_id,
+               NULL, IF(NULLIF(TRIM(c.email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(c.email))))),
+               NULL, NULL, v.privacy_info.analytics_storage = 'Yes'
+        FROM raw_ga4.page_view_events v
+        LEFT JOIN raw_shopify.customers c ON v.user_id = CAST(c.id AS STRING)
+      )
+      -- Chaque champ : SELECT <champs> FROM web
+schema:
+  - name: web_events
+    physicalName: web_events
+    physicalType: table
+    description: Une ligne par achat web ou page vue GA4.
+    dataGranularityDescription: Une ligne par achat web ou page vue GA4.
+    customProperties:
+      - property: loadStrategy
+        value: full_refresh
+    quality:
+      - type: library
+        metric: rowCount
+        mustBeGreaterThan: 0
+        dimension: completeness
+        severity: error
+        description: La table n'est jamais vide après un calcul.
+      - type: sql
+        query: SELECT COUNT(*) FROM (SELECT event_id FROM ${table} GROUP BY event_id HAVING COUNT(*) > 1)
+        mustBe: 0
+        dimension: uniqueness
+        severity: warning
+        description: La clé primaire (event_id) est unique.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE event_id IS NULL
+        mustBe: 0
+        dimension: completeness
+        severity: error
+        description: La clé primaire (event_id) n'est jamais nulle.
+      - type: sql
+        query: SELECT COUNT(*) FROM ${table} WHERE event_type != 'purchase' AND (web_order_id IS NOT NULL OR marketing_channel IS NOT NULL)
+        mustBe: 0
+        dimension: consistency
+        severity: error
+        description: Seul un achat porte une commande et un canal.
+    properties:
+      - name: event_id
+        physicalType: STRING
+        logicalType: string
+        description: Identifiant composé de l'événement GA4.
+        primaryKey: true
+        primaryKeyPosition: 1
+        required: true
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__purchases__ga4#events.event_name
+          - raw__purchases__ga4#events.event_timestamp
+          - raw__purchases__ga4#events.user_pseudo_id
+          - raw__purchases__ga4#events.event_bundle_sequence_id
+          - raw__purchases__ga4#events.ecommerce.transaction_id
+          - raw__pages_views__ga4#events.event_name
+          - raw__pages_views__ga4#events.event_timestamp
+          - raw__pages_views__ga4#events.user_pseudo_id
+          - raw__pages_views__ga4#events.event_bundle_sequence_id
+        transformDescription: Concaténation du type, du visiteur, de l'horodatage, du lot et de la transaction.
+        customProperties:
+          - property: transformExpression
+            value: event_id
+      - name: event_type
+        physicalType: STRING
+        logicalType: string
+        description: Achat (purchase), page vue (page_view) ou consultation produit (view_item).
+        required: true
+        classification: C1
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues:
+                - purchase
+                - page_view
+                - view_item
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            description: 'Valeurs autorisées : purchase, page_view, view_item.'
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__pages_views__ga4#events.event_name
+          - raw__purchases__ga4#events.event_name
+        transformDescription: Nom de l'événement GA4.
+        customProperties:
+          - property: transformExpression
+            value: event_type
+      - name: event_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure de l'événement, en UTC.
+        required: true
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__pages_views__ga4#events.event_timestamp
+          - raw__purchases__ga4#events.event_timestamp
+        transformDescription: Conversion des microsecondes GA4.
+        customProperties:
+          - property: transformExpression
+            value: event_at
+      - name: user_pseudo_id
+        physicalType: STRING
+        logicalType: string
+        description: Identifiant pseudonyme du navigateur ou de l'appareil.
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__pages_views__ga4#events.user_pseudo_id
+          - raw__purchases__ga4#events.user_pseudo_id
+        transformDescription: Identifiant GA4 tel quel.
+        customProperties:
+          - property: transformExpression
+            value: user_pseudo_id
+      - name: web_order_id
+        physicalType: INT64
+        logicalType: integer
+        description: Commande web valide correspondant à l'achat ; vide sinon.
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__purchases__ga4#events.event_name
+          - raw__purchases__ga4#events.event_timestamp
+          - raw__purchases__ga4#events.user_pseudo_id
+          - raw__purchases__ga4#events.event_bundle_sequence_id
+          - raw__purchases__ga4#events.ecommerce.transaction_id
+          - raw__orders__shopify#orders.id
+          - raw__orders__shopify#orders.name
+          - core__sales_events#sales_events.web_order_id
+          - core__sales_events#sales_events.source_system
+          - core__sales_events#sales_events.event_type
+        transformDescription: Rapprochement de la transaction GA4 avec le numéro d'une commande valide.
+        customProperties:
+          - property: transformExpression
+            value: web_order_id
+      - name: user_id_customer_key
+        physicalType: STRING
+        logicalType: string
+        description: Client connu par sa connexion au site ; vide sinon.
+        classification: C2
+        tags:
+          - pseudonymized
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__pages_views__ga4#events.user_id
+          - raw__customers__shopify#customers.id
+          - raw__customers__shopify#customers.email
+        transformDescription: Hachage de l'e-mail du client Shopify dont l'identifiant est le user_id.
+        customProperties:
+          - property: transformExpression
+            value: user_id_customer_key
+      - name: marketing_channel
+        physicalType: STRING
+        logicalType: string
+        description: 'Canal de l''achat : google_ads, meta_ads ou other_web ; vide hors achat.'
+        classification: C1
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues:
+                - google_ads
+                - meta_ads
+                - other_web
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            description: 'Valeurs autorisées : google_ads, meta_ads, other_web.'
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__purchases__ga4#events.collected_traffic_source.gclid
+          - raw__purchases__ga4#events.collected_traffic_source.manual_source
+          - raw__purchases__ga4#events.collected_traffic_source.manual_medium
+        transformDescription: Règle gclid, source et medium.
+        customProperties:
+          - property: transformExpression
+            value: marketing_channel
+      - name: utm_campaign
+        physicalType: STRING
+        logicalType: string
+        description: Nom de campagne de l'achat, en minuscules et sans espaces autour.
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__purchases__ga4#events.collected_traffic_source.manual_campaign_name
+        transformDescription: Minuscules et suppression des espaces autour.
+        customProperties:
+          - property: transformExpression
+            value: utm_campaign
+      - name: is_analytics_consented
+        physicalType: BOOL
+        logicalType: boolean
+        description: Vrai si le visiteur a accepté la mesure d'audience.
+        classification: C1
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__pages_views__ga4#events.privacy_info.analytics_storage
+          - raw__purchases__ga4#events.privacy_info.analytics_storage
+        transformDescription: analytics_storage vaut Yes.
+        customProperties:
+          - property: transformExpression
+            value: is_analytics_consented
+      - name: meta_computed_at
+        physicalType: TIMESTAMP
+        logicalType: timestamp
+        description: Date et heure du calcul de la ligne, en UTC.
+        required: true
+        classification: C1
+        transformLogic: create
+        transformDescription: Horodatage ajouté au calcul.
+        customProperties:
+          - property: transformExpression
+            value: CURRENT_TIMESTAMP()

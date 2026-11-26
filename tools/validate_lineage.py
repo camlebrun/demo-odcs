@@ -2,7 +2,7 @@
 """Valide le lineage et les conventions des data contracts (voir docs/conventions.md).
 
 Regles (code dans la sortie) :
-  L001 decompte (14 raw dont 4/4/2/2/2 par source, 3 customer) ; desactivable avec --no-count
+  L001 decompte (14 raw dont 4/4/2/2/2 par source, 5 core, 3 customer) ; desactivable avec --no-count
   L002 nommage raw / core / customer, id == name == nom de fichier, dossier source == domaine (raw)
   L003 references transformSourceObjects (contrat, objet, property, chemins imbriques)
   L004 couches : un core et un customer ne referencent que des raw ou des core
@@ -38,6 +38,7 @@ from typing import Iterator
 from common import REPO_ROOT, find_contracts, load_yaml
 
 RAW_COUNTS = {"shopify": 4, "pos": 4, "ga4": 2, "googleads": 2, "metaads": 2}
+CORE_COUNT = 5
 CUSTOMER_COUNT = 3
 SOURCES = tuple(RAW_COUNTS)
 FLOWS = ("acquisition", "audiences", "sales")  # flux metier : un sous-dossier de contracts/customer/ par flux
@@ -206,6 +207,9 @@ def check_count(contracts: list[Contract]) -> list[Err]:
         n = sum(1 for c in raw if c.folder == src)
         if n != expected:
             errs.append(Err("L001", f"contracts/raw/{src}", f"{n} contrat(s) trouve(s), {expected} attendus"))
+    core = [c for c in contracts if c.layer == "core"]
+    if len(core) != CORE_COUNT:
+        errs.append(Err("L001", "contracts/core", f"{len(core)} contrat(s) core trouve(s), {CORE_COUNT} attendus"))
     if len(cust) != CUSTOMER_COUNT:
         errs.append(Err("L001", "contracts/customer", f"{len(cust)} contrat(s) customer trouve(s), {CUSTOMER_COUNT} attendus"))
     return errs

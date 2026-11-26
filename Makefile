@@ -30,7 +30,7 @@ catalog-open: catalog
 schema:
 	$(PYTHON) tools/validate_schema.py
 
-# Strict : exige le decompte final (14 raw + 3 customer).
+# Strict : exige le decompte final (14 raw + 5 core + 3 customer).
 lineage:
 	$(PYTHON) tools/validate_lineage.py
 

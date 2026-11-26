@@ -4,6 +4,7 @@
 /contracts/raw/ga4/         @org/team-ga4
 /contracts/raw/googleads/   @org/team-googleads
 /contracts/raw/metaads/     @org/team-metaads
+/contracts/core/            @org/team-core
 /contracts/customer/        @org/team-customer
 
 # Standard, conventions et outillage.
