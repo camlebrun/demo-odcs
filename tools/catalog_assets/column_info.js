@@ -196,16 +196,36 @@
     return h + traceGroupsHtml(steps);
   }
   var TRACE_SEL = {}; /* contrat -> colonne selectionnee dans la liste des colonnes du panneau */
+  var TRACE_MODEL = null; /* dernier contrat connu (clic de colonne) : la carte de colonnes de la
+     vue lineage garde son propre etat interne, le rendu React du panneau peut donc rester sur un
+     contrat absent. Sans ce repli, le panneau afficherait une invite vide. */
+  /* Contrat affiche : la selection React, sinon le dernier contrat clique, sinon l'URL (?model=)
+     que colibri met a jour. */
+  function traceModelOf(model) {
+    if (model) return model;
+    if (TRACE_MODEL) return TRACE_MODEL;
+    try {
+      var p = new URLSearchParams((window.location || {}).search || "").get("model");
+      if (p && data().nodes[p]) return p;
+    } catch (e) { /* pas de window.location hors navigateur */ }
+    return null;
+  }
   /* Appele par le clic sur une ligne de colonne du panneau du contrat (voir catalog_template.py) :
-     la selection existe deja (ligne surlignee), l'onglet Trace la reprend. */
+     la selection existe deja (ligne surlignee en bleu), l'onglet Trace la reprend et se met a
+     jour immediatement, sans attendre un re-rendu React qui ne vient pas. */
   window.cpTraceColumnSet = function (model, col) {
+    if (!model) return;
+    TRACE_MODEL = model;
     TRACE_SEL[model] = col;
+    var panel = document.getElementById && document.getElementById("cp-trace-panel");
+    if (panel) panel.innerHTML = window.cpTraceTabHtml(model);
   };
   /* Onglet "Trace" : trace de la colonne selectionnee dans le panneau du contrat.
      Aucune exception ne remonte : une erreur ne doit pas faire tomber tout le rendu React. */
   window.cpTraceTabHtml = function (model) {
     try {
-      var n = data().nodes[model];
+      model = traceModelOf(model);
+      var n = model && data().nodes[model];
       if (!n) return '<div class="cp-trace"><div class="cp-note">Select a contract to see its source trace.</div></div>';
       var head = '<div class="cp-trace"><div class="cp-h">Source trace · ' + esc(model) + "</div>";
       if (n.nodeType === "source") {

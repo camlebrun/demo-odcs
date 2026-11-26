@@ -237,7 +237,7 @@ def _trace_tab(html: str) -> str:
     trace_panel = (
         'R.jsx("div",{className:`absolute inset-0 flex flex-col isolate ${i!=="trace"?"invisible pointer-events-none":""}`,'
         'children:R.jsx("div",{className:"flex-1 flex flex-col overflow-hidden",children:'
-        'R.jsx("div",{className:"flex-1 overflow-auto p-4",dangerouslySetInnerHTML:{__html:window.cpTraceTabHtml(l)}})})})'
+        'R.jsx("div",{id:"cp-trace-panel",className:"flex-1 overflow-auto p-4",dangerouslySetInnerHTML:{__html:window.cpTraceTabHtml(l)}})})})'
     )
     html = _sub(html, "setExpandedSchemas:J})})})]})", "setExpandedSchemas:J})})})," + trace_panel + "]})", 1)
     # d) Clic sur une ligne de colonne du panneau du contrat (ligne surlignee en bleu quand

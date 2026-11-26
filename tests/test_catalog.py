@@ -15,21 +15,25 @@ ASSETS = Path(build_catalog.__file__).parent / "catalog_assets"
 # injecte comme dans l'index.html (metadata, nodes, lineage.edges, tree).
 HARNESS = """
 const fs = require("fs");
-const [asset, manifestPath, model, column] = process.argv.slice(2);
+const [asset, manifestPath, model, column, clickModel] = process.argv.slice(2);
 global.window = {};
 global.document = { documentElement: { classList: { toggle() {} } }, addEventListener() {} };
 global.navigator = {};
 eval(fs.readFileSync(asset, "utf8"));
 const src = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 window.colibriData = { metadata: src.metadata, nodes: src.nodes, lineage: { edges: src.lineage.edges }, tree: src.tree };
-if (column) window.cpTraceColumnSet(model, column);
-process.stdout.write(window.cpTraceTabHtml(model));
+if (column) window.cpTraceColumnSet(clickModel || model, column);
+process.stdout.write(window.cpTraceTabHtml(model === "" ? null : model));
 """
 
 
-def _trace(tmp_path, manifest: dict, model: str, column: str | None = None) -> str:
+def _trace(
+    tmp_path, manifest: dict, model: str, column: str | None = None, click_model: str | None = None
+) -> str:
     """Rend l'onglet Trace d'un contrat avec node (le JS du catalogue n'est pas reimplemente en Python).
-    `column` simule la colonne selectionnee dans la liste des colonnes du panneau du contrat."""
+    `model=""` simule un rendu React dont l'etat contrat est absent (vue lineage) ; `column` simule
+    la colonne cliquee dans la liste des colonnes du panneau du contrat, `click_model` le contrat
+    de ce clic quand il differe de l'etat React."""
     node = shutil.which("node")
     if not node:
         pytest.skip("node est necessaire pour executer le JS du catalogue")
@@ -39,7 +43,7 @@ def _trace(tmp_path, manifest: dict, model: str, column: str | None = None) -> s
     data.write_text(json.dumps(manifest), encoding="utf-8")
     args = [node, str(harness), str(ASSETS / "column_info.js"), str(data), model]
     if column:
-        args.append(column)
+        args += [column, click_model or model]
     out = subprocess.run(args, capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr
     return out.stdout
@@ -99,7 +103,7 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
-    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace"'))
+    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace"', 'id:"cp-trace-panel"'))
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
 
@@ -115,6 +119,18 @@ def test_trace_tab_follows_the_column_selected_in_the_contract_panel(tmp_path):
     assert trace.index("<b>raw__orders__shopify</b>") < trace.index("<b>core__orders</b>") < trace.index("<b>kpis_monthly</b>")
     for text in ("Recopie du champ email", "Alimente customer_key", "from core__orders#customer_key", "TO_HEX"):
         assert text in trace, text
+
+
+def test_trace_tab_survives_a_stale_react_model_state(tmp_path):
+    """Reproduit le bug vu en ligne : la carte de colonnes de la vue lineage garde son etat interne,
+    le rendu React du panneau Trace ne connait pas le contrat (l = null). Le panneau retombe sur le
+    dernier contrat clique, et le clic met a jour le panneau sans re-rendu React."""
+    manifest = build_catalog.build_manifest(FIXTURE)
+    empty = _trace(tmp_path, manifest, "")
+    assert "Select a contract to see its source trace." in empty
+    stale = _trace(tmp_path, manifest, "", "customer_key", click_model="kpis_monthly")
+    assert "Source trace · kpis_monthly" in stale
+    assert "Alimente customer_key" in stale and "TO_HEX" in stale
 
 
 def test_trace_tab_on_a_raw_contract_says_its_sources_are_external(tmp_path):
@@ -172,7 +188,7 @@ for (const id of Object.keys(window.colibriData.nodes)) {
     for (const fn of ["cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml"]) {
       try { window[fn](id, col); } catch (e) { errors.push(fn + " " + id + "." + col + " -> " + e.message); }
     }
-    try { window.cpTraceColumnSet(id, col); window.cpTraceTabHtml(id); } catch (e) { errors.push("cpTraceTabHtml " + id + "." + col + " -> " + e.message); }
+    try { window.cpTraceColumnSet(id, col); window.cpTraceTabHtml(id); window.cpTraceTabHtml(null); } catch (e) { errors.push("cpTraceTabHtml " + id + "." + col + " -> " + e.message); }
   }
 }
 process.stdout.write(JSON.stringify(errors));

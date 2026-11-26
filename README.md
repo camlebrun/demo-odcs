@@ -56,7 +56,7 @@ Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrang
 
 Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le "Expert mode" affiche dans les fiches de colonne la transformation (description et SQL) et les contrôles qualité avec leur SQL.
 
-L'onglet **Trace** du panneau d'un contrat affiche toutes les transformations appliquées à la colonne sélectionnée dans la liste des colonnes du contrat (la ligne surlignée en bleu) : la chaîne des contrats raw jusqu'à cette colonne, groupée par couche (raw, core, customer), chaque étape avec sa description et son SQL, une colonne amont listée une seule fois, étape non documentée signalée au lieu d'être masquée. Sans colonne sélectionnée, l'onglet invite à en choisir une ; il n'affiche rien d'autre qu'une invite tant qu'aucun contrat n'est sélectionné.
+L'onglet **Trace** du panneau d'un contrat affiche toutes les transformations appliquées à la colonne sélectionnée dans la liste des colonnes du contrat (la ligne surlignée en bleu) : la chaîne des contrats raw jusqu'à cette colonne, groupée par couche (raw, core, customer), chaque étape avec sa description et son SQL, une colonne amont listée une seule fois, étape non documentée signalée au lieu d'être masquée. Le contrat affiché est résolu depuis la sélection de l'interface, sinon le dernier contrat cliqué, sinon le paramètre d'URL — le clic sur une colonne met l'onglet à jour immédiatement.
 
 ## Contribuer
 
