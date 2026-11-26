@@ -3,14 +3,14 @@ apiVersion: v3.2.0
 kind: DataContract
 id: audiences
 name: audiences
-version: 1.0.0
+version: 1.0.1
 status: active
 domain: customer
 tags: [customer]
 description:
   purpose: Audiences marketing a activer (exclusion acquisition, reactivation, retargeting, graine lookalike), uniquement pour des clients consentants. Une ligne par client (customer_key), segment et jour de calcul.
   usage: Alimente Google Customer Match et Meta Custom Audiences (CRM / marketing), chaque jour. Segments buyers_90d, inactive_12m, product_viewers_no_purchase, top_customers. 30 jours d'instantanes. Seul le hash customer_key est expose, jamais l'e-mail.
-  limitations: Identite deterministe via customer_key (SHA256 de l'e-mail). Tickets sans carte (environ 50 %) anonymes, hors audiences. Consentement = accepts_marketing Shopify + opt-in fidelite en caisse, sans CRM ni ESP. Lien GA4 vers client partiel (achat web passe ou user_id suppose), donc product_viewers_no_purchase minoritaire. Voir details.
+  limitations: customer_key = SHA256 de l'e-mail. Tickets sans carte (environ 50 %) hors audiences. Consentement = Shopify accepts_marketing + opt-in caisse, sans CRM ni ESP. Il porte sur l'e-mail ; l'usage publicitaire reste une decision juridique du proprietaire. Lien GA4-client partiel (achat web ou user_id suppose), product_viewers_no_purchase minoritaire.
 
 servers:
   - server: bigquery_prod
@@ -60,18 +60,6 @@ slaProperties:
     description: Instantanes quotidiens conserves 30 jours (minimisation des donnees personnelles).
 
 customProperties:
-  - property: consumers
-    value: Google Customer Match, Meta Custom Audiences
-  - property: details
-    value: |-
-      Alimente Google Customer Match et Meta Custom Audiences (sponsor CRM / marketing) chaque jour. Segments - buyers_90d (achat dans les 90 derniers jours, a exclure de l'acquisition), inactive_12m (aucun achat depuis plus de 12 mois, reactivation), product_viewers_no_purchase (consultation d'une fiche produit dans les 14 derniers jours sans achat depuis, retargeting), top_customers (10 % des clients au CA net 12 mois le plus eleve parmi ceux ayant au moins 2 achats sur 12 mois, graine lookalike). La table conserve 30 jours d'instantanes quotidiens (audience_date) ; les audiences a activer sont celles du jour le plus recent. Seul le hash customer_key est expose, jamais l'e-mail en clair (minimisation).
-      Limites assumees du lot 1.
-      (1) Identite client deterministe : customer_key = SHA256(LOWER(TRIM(email))), sans rapprochement flou. Les tickets sans carte fidelite sont anonymes (environ 50 % des tickets) : ils n'alimentent aucune audience, car sans e-mail aucune activation n'est possible. Cote caisse l'e-mail vient de raw__loyalty_members__pos via loyalty_card_id ; cote Shopify de orders puis customers.
-      (2) Consentement = accepts_marketing Shopify + opt-in fidelite en caisse (marketing_opt_in), pas de CRM ni d'ESP. Le signal le plus recent (horodate) l'emporte : un retrait plus recent que l'opt-in exclut le client. Sans signal de consentement connu, le client est exclu (cas des commandes invite Shopify, dont le consentement n'est pas dans orders). Le consentement porte sur des communications par e-mail ; son usage pour le ciblage publicitaire est une decision juridique du proprietaire.
-      (3) Lien GA4 vers client : GA4 ne contient aucun e-mail. Un visiteur n'est rattache a un client que (a) s'il a deja achete sur le web, par le pont ecommerce.transaction_id (identifiant de commande Shopify, rapproche de orders.id ou orders.name, avec ou sans # ) puis le user_pseudo_id de l'achat, ou (b) s'il s'est connecte, via user_id suppose egal a l'identifiant client Shopify (hypothese a confirmer par team-ga4). Les visiteurs anonymes, sans consentement analytics ou sans cookie ne sont pas rattachables : product_viewers_no_purchase est donc un sous-ensemble minoritaire des vrais visiteurs de fiches produit.
-      (4) Montants en EUR TTC (caisse en centimes convertis, Shopify decimal) et dates en UTC ; seules les lignes EUR sont retenues. Les retours (caisse, retours en magasin d'achats web, remboursements Shopify) sont deduits du CA net 12 mois.
-      (5) Les plateformes de diffusion appliquent leur propre normalisation d'e-mail (par exemple Google pour les adresses Gmail) ; la regle du depot n'en ajoute aucune, ce qui peut reduire le taux de correspondance.
-      (6) Aucune suppression automatique des clients ayant retire leur consentement chez les plateformes : la table ne liste que les consentants du jour, la resynchronisation complete des audiences est a la charge de l'activation.
   - property: sponsor
     value: CRM / marketing
   - property: segments

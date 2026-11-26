@@ -3,14 +3,14 @@ apiVersion: v3.2.0
 kind: DataContract
 id: acquisition_monthly
 name: acquisition_monthly
-version: 1.0.0
+version: 1.0.1
 status: active
 domain: customer
 tags: [customer]
 description:
   purpose: Efficacite de l'acquisition de nouveaux clients web par canal et campagne paid media (Google Ads, Meta Ads). Une ligne par mois x canal x campagne - depense, nouveaux clients, CAC, CA du premier achat, ROAS nouveaux clients, valeur de cohorte a 90 jours.
   usage: Alimente la revue paid media hebdomadaire sous Power BI. Canaux google_ads, meta_ads, other_web ; campaign_id 0 si achat non rapproche. Le ROAS des plateformes n'est pas utilise car non deduplique, seul le ROAS nouveaux clients calcule sur Shopify est publie.
-  limitations: Attribution web uniquement, last-click GA4, magasins exclus. Identite deterministe customer_key (SHA256 de l'e-mail) - un client deja vu en magasin peut compter comme nouveau ; tickets sans carte anonymes. Consentement hors perimetre. Campagne rapprochee par nom UTM. ROAS en TTC contre depense plateforme non confirmee. Voir details.
+  limitations: Attribution web uniquement, last-click GA4, magasins exclus. Identite deterministe customer_key (SHA256 de l'e-mail) - un client deja vu en magasin peut compter comme nouveau ; tickets sans carte anonymes. Consentement hors perimetre. Campagne rapprochee par nom UTM. ROAS en TTC contre depense plateforme non confirmee.
 
 servers:
   - server: bigquery_prod
@@ -54,19 +54,6 @@ slaProperties:
     description: Historique mensuel conserve 3 ans.
 
 customProperties:
-  - property: consumers
-    value: Power BI revue paid media hebdomadaire
-  - property: details
-    value: |-
-      Alimente la revue paid media hebdomadaire sous Power BI (sponsor acquisition). Le canal vaut google_ads, meta_ads ou other_web (trafic web sans clic payant reconnu, sans depense). campaign_id vaut 0 quand l'achat n'est pas rapproche d'une campagne (other_web ou campagne payante non retrouvee). Le ROAS des plateformes (conversions Google Ads, actions et purchase_roas de Meta) n'est volontairement pas utilise car il n'est pas deduplique entre canaux et surestime la valeur, seul le ROAS nouveaux clients calcule a partir des commandes Shopify est publie.
-      Limites assumees du lot 1.
-      (1) Attribution web uniquement, last-click GA4 : les ventes en magasin ne sont jamais attribuees a une campagne (aucun lien caisse - GA4 dans ce lot). Le last-click est approxime par la source collectee sur l'evenement purchase (collected_traffic_source : UTM et gclid), faute de source de session last-click dans l'export reduit ; sans consentement analytics ou avec bloqueur, l'achat n'est pas vu et tombe en other_web.
-      (2) Pont GA4 vers Shopify : ecommerce.transaction_id est l'identifiant de commande Shopify, rapproche de orders.id (texte) ou de orders.name avec ou sans le caractere #. GA4 peut dupliquer un achat : on garde l'evenement le plus ancien par transaction_id.
-      (3) Rapprochement avec les campagnes par le nom de campagne UTM (utm_campaign egal au nom de campagne, ou a l'identifiant de campagne Meta), sans table de correspondance officielle : un ecart de nommage fait tomber l'achat sur campaign_id 0.
-      (4) Identite client deterministe : customer_key = SHA256(LOWER(TRIM(email))), e-mail de orders puis de customers. Un nouveau client est un client dont la premiere commande Shopify (web) est celle de la ligne ; un client ayant deja achete en magasin (carte fidelite ou non) est donc compte a tort comme nouveau, car la caisse n'est pas dans ce contrat. Tickets sans carte : anonymes, hors scope. Une commande sans e-mail ne compte pas comme nouveau client.
-      (5) Unites normalisees en EUR decimal : micros Google Ads divises par 1 000 000, depense Meta decimale ; seules les lignes en EUR sont retenues. Le CA du premier achat est le total TTC de la commande Shopify, avant retours. La valeur de cohorte a 90 jours est le CA net TTC de retours (remboursements Shopify reussis) des seules commandes web du client, sur 90 jours apres la premiere commande ; elle ne contient pas le CA magasin. Elle est NULL tant que tous les clients de la ligne n'ont pas 90 jours de recul.
-      (6) La depense est celle des plateformes, corrigee retroactivement (conversions tardives, clics invalides) sur les jours recents.
-      (7) Le ROAS nouveaux clients rapporte un CA TTC (total_price Shopify) a une depense plateforme dont le caractere TTC ou HT n'est pas confirme : le ratio est donc indicatif et pas strictement comparable entre canaux, a valider avec l'acquisition avant tout arbitrage au centime. (8) Le mois d'une ligne est celui du jour de depense (fuseau du compte publicitaire) et celui de la premiere commande (Europe/Paris) ; une commande suit sa campagne le jour de l'achat, pas le jour du clic.
   - property: sponsor
     value: Acquisition
   - property: attributionModel

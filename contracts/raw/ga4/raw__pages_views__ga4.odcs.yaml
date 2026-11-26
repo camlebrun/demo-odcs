@@ -3,7 +3,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: raw__pages_views__ga4
 name: raw__pages_views__ga4
-version: 1.0.0
+version: 1.0.1
 status: active
 domain: ga4
 tags:
@@ -491,6 +491,3 @@ schema:
     classification: C1
     transformLogic: create
     transformDescription: URI du fichier de depot d'origine, renseignee par l'ingestion (aucune source).
-customProperties:
-- property: details
-  value: Export limite par quotas (1 million d'evenements par jour en version standard). Sessions reconstruites via event_params (ga_session_id) et user_pseudo_id. event_date dans le fuseau du compte, event_timestamp en UTC.
