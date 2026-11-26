@@ -5,7 +5,7 @@ Regles (code dans la sortie) :
   L001 decompte (14 raw dont 4/4/2/2/2 par source, 5 core, 3 customer) ; desactivable avec --no-count
   L002 nommage raw / core / customer, id == name == nom de fichier, dossier source == domaine (raw)
   L003 references transformSourceObjects (contrat, objet, property, chemins imbriques)
-  L004 couches : un core et un customer ne referencent que des raw ou des core
+  L004 couches : un core lit des raw ou des core ; un customer ne lit que des core
   L005 cycle dans le graphe de references
   L006 lineage raw : chaque champ de premier niveau est `map` depuis 1 champ de la source externe
        (<systeme>#<objet>.<champ>), sauf meta_loaded_at / meta_source_file en `create` sans source
@@ -14,7 +14,7 @@ Regles (code dans la sortie) :
   L009 un contrat customer vit dans contracts/customer/<flux>/ avec <flux> parmi acquisition, audiences, sales
   L010 PII : tag `pii` ET classification `C3`
   L011 map : renommage ou cast trivial uniquement
-  L012 customer_key conforme a la regle canonique
+  L012 customer_key conforme a la regle canonique (un customer reprend la cle d'un core sans la recalculer)
   L013 metadonnees (apiVersion, status, version, domain, servers, team, support)
   L014 documentation et classification des properties
   L015 nommage des properties (snake_case, suffixes _at/_date/_amount/_eur/is_/has_ vs type physique)
@@ -50,6 +50,8 @@ TECH_FIELDS = ("meta_loaded_at", "meta_source_file")
 # Systeme source externe cite dans transformSourceObjects d'un raw : <systeme>#<objet>.<champ>.
 RAW_SYSTEMS = {"shopify": "shopify_admin_api", "pos": "pos_export", "ga4": "ga4_bigquery_export", "googleads": "googleads_api", "metaads": "metaads_api"}
 DERIVED_LAYERS = ("core", "customer")  # couches calculees : lineage par colonne vers le depot
+READS = {"core": ("raw", "core"), "customer": ("core",)}  # L004 : couches lisibles par couche
+READS_LABEL = {"core": "des raw ou des core", "customer": "des core"}
 LOGICS = ("map", "transform", "create")
 OBJECT_TYPES = ("table", "view")
 LOAD_STRATEGIES = ("full_refresh", "incremental", "append")
@@ -428,6 +430,14 @@ def check_primary_key(c: Contract) -> list[Err]:
     ]
 
 
+def reuses_core_key(c: Contract, expr: str, srcs: list, by_id: dict[str, Contract]) -> bool:
+    """L012 : un customer reprend le customer_key d'un core tel quel, le hachage n'est ecrit qu'en core."""
+    if c.layer != "customer" or not re.fullmatch(r"(?:\w+\.)?customer_key", expr):
+        return False
+    matches = [REF_RE.match(str(s)) for s in srcs]
+    return any(m and m["path"] == "customer_key" and by_id.get(m["contract"]) and by_id[m["contract"]].layer == "core" for m in matches)
+
+
 def check_derived_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list[Err], set[str]]:
     """L003, L004, L007, L008, L011, L012 pour un core ou un customer. Retourne aussi les ids references."""
     errs, referenced = [], set()
@@ -459,7 +469,7 @@ def check_derived_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list[
             errs.append(Err("L011", where, f"map limite a un renommage ou un cast trivial, pas '{expr}' (utiliser transform)"))
         if n.get("name") == "customer_key" and p.top:
             norm = re.sub(r"\s+", "", expr) if expr_ok else ""
-            if not CUSTOMER_KEY_RE.match(norm):
+            if not (CUSTOMER_KEY_RE.match(norm) or reuses_core_key(c, norm, srcs, by_id)):
                 errs.append(Err("L012", where, f"customer_key doit suivre la regle canonique: {CUSTOMER_KEY_CANONICAL}"))
         for ref in srcs:
             m = REF_RE.match(ref) if isinstance(ref, str) else None
@@ -471,8 +481,8 @@ def check_derived_fields(c: Contract, by_id: dict[str, Contract]) -> tuple[list[
                 errs.append(Err("L003", where, f"contrat '{m['contract']}' introuvable (reference '{ref}')"))
                 continue
             referenced.add(target.cid)
-            if target.layer not in ("raw", "core"):
-                errs.append(Err("L004", where, f"un {c.layer} ne reference que des raw ou des core, pas '{target.cid}'"))
+            if target.layer not in READS[c.layer]:
+                errs.append(Err("L004", where, f"un {c.layer} ne reference que {READS_LABEL[c.layer]}, pas '{target.cid}'"))
             obj = next((o for o in schema_objects(target) if o.get("name") == m["obj"]), None)
             if obj is None:
                 errs.append(Err("L003", where, f"objet de schema '{m['obj']}' introuvable dans '{target.cid}'"))

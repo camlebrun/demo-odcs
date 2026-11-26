@@ -1,0 +1,2 @@
+L004
+un customer ne reference que des core

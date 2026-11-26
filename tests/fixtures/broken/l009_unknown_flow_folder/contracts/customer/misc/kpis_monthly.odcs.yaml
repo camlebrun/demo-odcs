@@ -37,10 +37,10 @@ schema:
     tags:
     - pseudonymized
     transformSourceObjects:
-    - raw__orders__shopify#orders.email
+    - core__orders#orders.customer_key
     customProperties:
     - property: transformExpression
-      value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
+      value: customer_key
   - name: order_total
     physicalType: NUMERIC
     logicalType: number
@@ -49,7 +49,7 @@ schema:
     transformLogic: map
     transformDescription: Alimente order_total.
     transformSourceObjects:
-    - raw__orders__shopify#orders.total_price
+    - core__orders#orders.total_price
     customProperties:
     - property: transformExpression
       value: total_price
@@ -61,7 +61,7 @@ schema:
     transformLogic: transform
     transformDescription: Alimente first_order_at.
     transformSourceObjects:
-    - raw__orders__shopify#orders.created_at
+    - core__orders#orders.created_at
     customProperties:
     - property: transformExpression
       value: MIN(created_at)
@@ -73,7 +73,7 @@ schema:
     transformLogic: transform
     transformDescription: Alimente last_param_key.
     transformSourceObjects:
-    - raw__orders__shopify#orders.id
+    - core__orders#orders.id
     customProperties:
     - property: transformExpression
       value: MAX(key)
