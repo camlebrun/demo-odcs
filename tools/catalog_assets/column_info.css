@@ -20,17 +20,14 @@
 .cp-sql pre{margin:0;padding:8px;overflow:auto;max-height:240px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;background:hsl(var(--muted)/.4)}
 .cp-btn{font:inherit;font-size:10.5px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:5px;padding:0 7px}
 .cp-btn:hover{background:hsl(var(--accent))}
-.cp-expert-toggle,.cp-trace-toggle{font-size:11px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:6px;padding:2px 8px;white-space:nowrap}
-/* En-tete du panneau : les deux bascules passent a la ligne plutot que de pousser la recherche hors du panneau. */
-.cp-toggles{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;min-width:0}
-html.cp-expert .cp-expert-toggle::after,html.cp-trace .cp-trace-toggle::after{content:" : on"}
-.cp-expert-toggle::after,.cp-trace-toggle::after{content:" : off"}
-html.cp-expert .cp-expert-toggle,html.cp-trace .cp-trace-toggle{background:hsl(var(--purple-primary));border-color:hsl(var(--purple-primary));color:#fff}
-/* Trace des sources : masquee tant que le bouton "Source trace" n'est pas active. */
-.cp-trace{display:none!important}
-html.cp-trace .cp-trace{display:flex!important;flex-direction:column;gap:6px;margin-top:8px;border-left:2px solid hsl(var(--purple-primary));padding-left:8px}
-.cp-steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
-.cp-step{display:flex;flex-direction:column;gap:4px;border-bottom:1px dashed hsl(var(--border));padding-bottom:6px}
+.cp-expert-toggle{font-size:11px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:6px;padding:2px 8px;white-space:nowrap}
+html.cp-expert .cp-expert-toggle::after{content:" : on"}
+.cp-expert-toggle::after{content:" : off"}
+html.cp-expert .cp-expert-toggle{background:hsl(var(--purple-primary));border-color:hsl(var(--purple-primary));color:#fff}
+/* Onglet "Trace" : toutes les transformations des contrats raw jusqu'au contrat selectionne. */
+.cp-trace{display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.45}
+.cp-steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.cp-step{display:flex;flex-direction:column;gap:4px;border-bottom:1px dashed hsl(var(--border));padding-bottom:8px}
 .cp-step:last-child{border-bottom:0;padding-bottom:0}
 .cp-cols{margin:0;padding:0 0 0 10px;list-style:none;display:flex;flex-direction:column;gap:6px}
 .cp-tracecol{display:flex;flex-direction:column;gap:2px;border-left:1px solid hsl(var(--border));padding-left:8px}

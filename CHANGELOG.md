@@ -10,7 +10,7 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 - Couche core : 5 contrats (`core__sales_events`, `core__customers`, `core__ad_spend`, `core__campaigns`, `core__web_events`) et règle L019 (clé primaire en core).
 - Règles L015 (nommage des properties) et L016 (`customer_key` pseudonymisé).
 - Catalogue : page d'explication du lineage en anglais (`lineage.html`) et en français (`lineage.fr.html`), liée depuis le dashboard.
-- Catalogue : bouton « Source trace » dans le panneau d'un contrat et dans l'onglet Columns. Il concatène, pour chaque colonne d'un contrat core ou customer, toutes les transformations des contrats raw jusqu'à elle : contrats amont groupés par couche, une colonne amont listée une fois, étapes non documentées signalées.
+- Catalogue : onglet « Trace » dans le panneau d'un contrat, à côté de « Model Info » et « Lineage ». Pour le contrat sélectionné, il concatène toutes les transformations des contrats raw jusqu'à lui : contrats amont groupés par couche, une colonne amont listée une fois, étapes non documentées signalées.
 
 ### Modifié
 - **Cassant** : les 3 contrats customer passent en 2.0.0 et ne lisent plus que core (L004) ; colonnes inchangées. Un customer reprend `customer_key` sans le recalculer (L012). L004 contrôle aussi le SQL ; nouvelle règle L020 (aucun e-mail en core) ; L012 et L016 couvrent tout champ finissant par `customer_key`.

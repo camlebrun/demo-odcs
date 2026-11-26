@@ -22,12 +22,12 @@ global.navigator = {};
 eval(fs.readFileSync(asset, "utf8"));
 const src = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 window.colibriData = { metadata: src.metadata, nodes: src.nodes, lineage: { edges: src.lineage.edges }, tree: src.tree };
-process.stdout.write(window.cpSourceTraceHtml(model, column));
+process.stdout.write(window.cpTraceTabHtml(model));
 """
 
 
-def _trace(tmp_path, manifest: dict, model: str, column: str) -> str:
-    """Rend la trace d'une colonne avec node (le JS du catalogue n'est pas reimplemente en Python)."""
+def _trace(tmp_path, manifest: dict, model: str) -> str:
+    """Rend l'onglet Trace d'un contrat avec node (le JS du catalogue n'est pas reimplemente en Python)."""
     node = shutil.which("node")
     if not node:
         pytest.skip("node est necessaire pour executer le JS du catalogue")
@@ -36,7 +36,7 @@ def _trace(tmp_path, manifest: dict, model: str, column: str) -> str:
     data = tmp_path / "manifest.json"
     data.write_text(json.dumps(manifest), encoding="utf-8")
     out = subprocess.run(
-        [node, str(harness), str(ASSETS / "column_info.js"), str(data), model, column],
+        [node, str(harness), str(ASSETS / "column_info.js"), str(data), model],
         capture_output=True,
         text=True,
         timeout=60,
@@ -99,28 +99,27 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
-    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpToggleTrace", "cpSourceTraceHtml", "Source trace"))
+    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", 'id:"trace",label:"Trace"'))
+    assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
 
-def test_source_trace_goes_raw_core_customer(tmp_path):
-    """La trace concatene les transformations des sources jusqu'au contrat affiche."""
-    trace = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "kpis_monthly", "customer_key")
-    assert "Source trace" in trace
-    assert "2 upstream steps" in trace and "3 contracts" in trace
+def test_trace_tab_goes_raw_core_customer(tmp_path):
+    """L'onglet Trace du contrat selectionne concatene les transformations des sources jusqu'a lui."""
+    trace = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "kpis_monthly")
+    assert "Source trace · kpis_monthly" in trace
+    assert "upstream columns" in trace and "contracts" in trace
     # ordre source -> mart, avec la transformation declaree a chaque etape
-    assert trace.index("raw__orders__shopify") < trace.index("core__orders") < trace.index("kpis_monthly")
+    assert trace.index("<b>raw__orders__shopify</b>") < trace.index("<b>core__orders</b>") < trace.index("<b>kpis_monthly</b>")
     for text in ("Recopie du champ email", "Alimente customer_key", "from core__orders#customer_key", "TO_HEX"):
         assert text in trace, text
 
 
-def test_source_trace_reports_create_and_missing_upstream(tmp_path):
-    manifest = build_catalog.build_manifest(FIXTURE)
-    create = _trace(tmp_path, manifest, "kpis_monthly", "computed_at")
-    assert "Created in this contract, no upstream source." in create
-    assert "upstream steps" not in create
+def test_trace_tab_on_a_raw_contract_says_its_sources_are_external(tmp_path):
+    trace = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "raw__orders__shopify")
+    assert "Raw contract: no upstream in the catalog" in trace
 
 
-def test_source_trace_reports_undocumented_step_and_ignores_cycles(tmp_path):
+def test_trace_tab_reports_undocumented_step_and_ignores_cycles(tmp_path):
     """Qualite variable : une colonne amont sans transformation est signalee, un cycle ne boucle pas."""
     nodes = {
         "raw__orders__shopify": {"id": "raw__orders__shopify", "nodeType": "source", "columns": {"id": {}}},
@@ -138,11 +137,48 @@ def test_source_trace_reports_undocumented_step_and_ignores_cycles(tmp_path):
         # arete de retour : un contrat amont qui depend de lui-meme (cycle)
         {"id": 4, "source": "kpis_monthly", "target": "core__orders", "sourceColumn": "order_id", "targetColumn": "order_id"},
     ]
-    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "kpis_monthly", "order_id")
+    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "kpis_monthly")
     assert trace.count("<b>raw__orders__shopify</b>") == 1, "une colonne amont n'est listee qu'une fois"
     assert trace.count("<b>core__orders</b>") == 1
     assert "Transformation not documented" in trace
     assert "Copie de order_id." in trace
+
+
+def test_trace_tab_and_column_panels_render_for_every_contract_of_the_repo(tmp_path):
+    """Aucune fiche du repo ne fait planter le rendu React (page blanche)."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node est necessaire pour executer le JS du catalogue")
+    harness = tmp_path / "all.js"
+    harness.write_text(
+        """
+const fs = require("fs");
+const [asset, manifestPath] = process.argv.slice(2);
+global.window = {};
+global.document = { documentElement: { classList: { toggle() {} } }, addEventListener() {} };
+global.navigator = {};
+eval(fs.readFileSync(asset, "utf8"));
+const src = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+window.colibriData = { metadata: src.metadata, nodes: src.nodes, lineage: { edges: src.lineage.edges }, tree: src.tree };
+const errors = [];
+for (const id of Object.keys(window.colibriData.nodes)) {
+  try { window.cpTraceTabHtml(id); } catch (e) { errors.push("cpTraceTabHtml " + id + " -> " + e.message); }
+  const n = window.colibriData.nodes[id];
+  for (const col of Object.keys(n.columns || {})) {
+    for (const fn of ["cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml"]) {
+      try { window[fn](id, col); } catch (e) { errors.push(fn + " " + id + "." + col + " -> " + e.message); }
+    }
+  }
+}
+process.stdout.write(JSON.stringify(errors));
+""",
+        encoding="utf-8",
+    )
+    data = tmp_path / "manifest.json"
+    data.write_text(json.dumps(build_catalog.build_manifest(Path(build_catalog.REPO_ROOT))), encoding="utf-8")
+    out = subprocess.run([node, str(harness), str(ASSETS / "column_info.js"), str(data)], capture_output=True, text=True, timeout=120)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == []
 
 
 def test_render_writes_lineage_page_linked_from_dashboard(tmp_path):

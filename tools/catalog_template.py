@@ -10,8 +10,8 @@ Retraits :
 - le vocabulaire dbt (commandes `dbt build`, aides `dbt compile`, titre) ;
 - l'onglet "Compiled" (pas de code compile dans un contrat).
 Ajouts dans le panneau natif "Model info" (catalog_assets/column_info.js et .css) : infos du
-contrat, types logique et physique en accordeon, SQL de transformation, mode expert, trace des
-sources (toutes les transformations, des contrats raw jusqu'au contrat affiche).
+contrat, types logique et physique en accordeon, SQL de transformation, mode expert, onglet
+"Trace" (toutes les transformations, des contrats raw jusqu'au contrat selectionne).
 """
 from __future__ import annotations
 
@@ -21,13 +21,6 @@ from pathlib import Path
 ASSETS = Path(__file__).parent / "catalog_assets"
 UPSELL_START = "R.jsx($c,{delayDuration:200,"
 UPSELL_END = 'Try this feature on Colibri Cloud"})]})})'
-# Bascule CSS pure : la classe est posee sur <html>, les blocs sont deja rendus, pas de re-rendu React.
-TOGGLES = (
-    '[R.jsx("button",{className:"cp-expert-toggle",title:"Show technical properties",'
-    'onClick:()=>window.cpToggleExpert(),children:"Expert mode"}),'
-    'R.jsx("button",{className:"cp-trace-toggle",title:"Show every transformation, from the source contracts",'
-    'onClick:()=>window.cpToggleTrace(),children:"Source trace"})]'
-)
 
 
 class TemplateMismatch(RuntimeError):
@@ -94,14 +87,17 @@ def _patch_model_info(html: str) -> str:
     at = m.start(2)
     html = html[:at] + extra + html[at:]
 
-    # b) Boutons "Mode expert" et "Source trace" dans l'en-tete de la liste des colonnes.
+    # b) Bouton "Mode expert" dans l'en-tete de la liste des colonnes.
     k = html.find('placeholder:"Find...",value:')
     box = 'R.jsxs("div",{className:"relative w-32",children:['
     j = html.rfind(box, 0, k) if k >= 0 else -1
     if k < 0 or j < 0 or k - j > 600:
         raise TemplateMismatch("en-tete de la liste des colonnes introuvable")
-    toggles = f'R.jsx("div",{{className:"cp-toggles",children:{TOGGLES}}}),'
-    html = html[:j] + toggles + html[j:]
+    button = (
+        'R.jsx("button",{className:"cp-expert-toggle",title:"Show technical properties",'
+        'onClick:()=>window.cpToggleExpert(),children:"Expert mode"}),'
+    )
+    html = html[:j] + button + html[j:]
 
     # c) Infos du contrat avant la liste des colonnes (apercu du noeud).
     head = 'R.jsxs("div",{children:[R.jsxs("div",{className:"flex items-center justify-between mb-2",children:[R.jsxs(pk,{children:["Columns ("'
@@ -153,8 +149,8 @@ def _patch_columns_tab(html: str) -> str:
     if html.count(anchor) != 1:
         raise TemplateMismatch("barre de recherche de l'onglet Columns introuvable")
     toggle = (
-        'R.jsx("div",{className:"flex justify-end mb-2",children:'
-        f'R.jsx("div",{{className:"cp-toggles",children:{TOGGLES}}})}}),'
+        'R.jsx("div",{className:"flex justify-end mb-2",children:R.jsx("button",{className:"cp-expert-toggle",'
+        'title:"Show technical properties",onClick:()=>window.cpToggleExpert(),children:"Expert mode"})}),'
     )
     return html.replace(anchor, toggle + anchor)
 
@@ -223,6 +219,29 @@ def _drop_lineage_warning(html: str) -> str:
     return html[:a] + "null" + html[b + len(end_marker) :]
 
 
+def _trace_tab(html: str) -> str:
+    """Onglet "Trace" a cote de "Model Info" et "Lineage" : pour le contrat selectionne, toutes les
+    transformations des contrats raw jusqu'a lui, rendues par window.cpTraceTabHtml(selectedModelId)."""
+    # a) Entree de la barre d'onglets (le rendu du bouton est natif : f.map(...)).
+    tabs = 'const f=[{id:"docs",label:"Model Info",icon:_De},{id:"lineage",label:"Lineage",icon:xqt}];'
+    trace_entry = ',{id:"trace",label:"Trace",icon:xqt}];'
+    html = _sub(html, tabs, tabs[:-2] + trace_entry, 1)
+    # b) L'onglet actif suit l'etat de la vue : "trace" est un etat comme "docs" et "lineage".
+    html = _sub(
+        html,
+        'activeContext:i==="lineage"?"lineage":"docs"',
+        'activeContext:i==="trace"?"trace":i==="lineage"?"lineage":"docs"',
+        1,
+    )
+    # c) Panneau de contenu de l'onglet, frere du panneau docs (selectedModelId = l dans cette portee).
+    trace_panel = (
+        'R.jsx("div",{className:`absolute inset-0 flex flex-col isolate ${i!=="trace"?"invisible pointer-events-none":""}`,'
+        'children:R.jsx("div",{className:"flex-1 flex flex-col overflow-hidden",children:'
+        'R.jsx("div",{className:"flex-1 overflow-auto p-4",dangerouslySetInnerHTML:{__html:window.cpTraceTabHtml(l)}})})})'
+    )
+    return _sub(html, "setExpandedSchemas:J})})})]})", "setExpandedSchemas:J})})})," + trace_panel + "]})", 1)
+
+
 def _doc_tab(html: str) -> str:
     """Onglet "Doc" a cote de "Model Info" et "Lineage" : ouvre catalog_assets/lineage.fr.html (lien vers l'anglais dans la page)."""
     anchor = "p.label]},p.id)}),"
@@ -288,5 +307,6 @@ def patch_template(html: str) -> str:
     html = _bigquery_info(html)
     css = (ASSETS / "column_info.css").read_text(encoding="utf-8")
     js = (ASSETS / "column_info.js").read_text(encoding="utf-8")
+    html = _trace_tab(html)
     html = _doc_tab(html)
     return _sub(html, "</head>", f"<style>{css}</style><script>{js}</script></head>", 1)

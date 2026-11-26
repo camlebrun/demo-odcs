@@ -56,7 +56,7 @@ Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrang
 
 Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le "Expert mode" affiche dans les fiches de colonne la transformation (description et SQL) et les contrôles qualité avec leur SQL.
 
-Le bouton « Source trace » concatène, pour chaque colonne d'un contrat core ou customer, toutes les transformations des contrats raw jusqu'à elle. Les contrats amont sont groupés par couche (raw, core, customer), une colonne amont n'apparaît qu'une fois même quand plusieurs chemins y mènent, et une étape non documentée est signalée au lieu d'être masquée.
+L'onglet **Trace** du panneau d'un contrat concatène, pour le contrat sélectionné, toutes les transformations des contrats raw jusqu'à lui. Les contrats amont sont groupés par couche (raw, core, customer), une colonne amont n'apparaît qu'une fois même quand plusieurs chemins y mènent, et une étape non documentée est signalée au lieu d'être masquée.
 
 ## Contribuer
 
