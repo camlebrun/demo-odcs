@@ -19,6 +19,7 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 - GA4 : `raw__purchases__ga4` et `raw__pages_views__ga4` pointent des vues filtrées (`purchase_events`, `page_view_events`).
 - Audiences : `audience_date` fait partie de la clé primaire (historique de 30 jours).
 - Montants customer en `NUMERIC` explicite (`CAST(... AS NUMERIC)`).
+- Contrats : suppression de `customProperties.consumers` et `customProperties.details` ; la réserve juridique sur le consentement passe dans `description.limitations` d'`audiences`.
 
 ### Backlog catalogue
 Comparaison avec `main` (changements cassants dans la PR), glossaire des KPI, indicateurs de complétude, recherche et filtres par domaine, équipe, statut.
