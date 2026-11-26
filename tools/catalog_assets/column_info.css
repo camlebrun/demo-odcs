@@ -39,4 +39,3 @@ div.truncate:has(>span.max-w-\[300px\]){overflow:visible;text-overflow:clip;whit
 div.max-w-\[250px\]{max-width:100%}
 .cp-tests{display:flex;flex-direction:column;gap:12px}
 .cp-test{border:1px solid hsl(var(--border));border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.45}
-.cp-doc-link{position:fixed;right:12px;bottom:12px;z-index:50;font-size:12px;padding:4px 10px;border:1px solid hsl(var(--border));border-radius:999px;background:hsl(var(--background));color:hsl(var(--foreground))}

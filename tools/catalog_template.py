@@ -218,6 +218,16 @@ def _drop_lineage_warning(html: str) -> str:
     return html[:a] + "null" + html[b + len(end_marker) :]
 
 
+def _doc_tab(html: str) -> str:
+    """Onglet "Doc" a cote de "Model Info" et "Lineage" : ouvre catalog_assets/lineage.html."""
+    anchor = "p.label]},p.id)}),"
+    link = (
+        'R.jsx("a",{href:"lineage.html",className:"flex items-center gap-2 px-3 py-1.5 text-xs font-medium '
+        'rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/50",children:"Doc"}),'
+    )
+    return _sub(html, anchor, anchor + link, 1)
+
+
 def patch_template(html: str) -> str:
     # 0. Bulle d'avertissement "Column lineage unavailable" (fausse pour un raw).
     html = _drop_lineage_warning(html)
@@ -273,9 +283,5 @@ def patch_template(html: str) -> str:
     html = _bigquery_info(html)
     css = (ASSETS / "column_info.css").read_text(encoding="utf-8")
     js = (ASSETS / "column_info.js").read_text(encoding="utf-8")
-    html = _sub(html, "</head>", f"<style>{css}</style><script>{js}</script></head>", 1)
-    # 5. Lien vers la page d'explication du lineage (catalog_assets/lineage.html).
-    head, tag, tail = html.rpartition("</body>")
-    if not tag:
-        raise TemplateMismatch("balise </body> introuvable")
-    return head + '<a class="cp-doc-link" href="lineage.html">How lineage works</a>' + tag + tail
+    html = _doc_tab(html)
+    return _sub(html, "</head>", f"<style>{css}</style><script>{js}</script></head>", 1)

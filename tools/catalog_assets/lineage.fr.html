@@ -6,7 +6,7 @@
 <title>Comment fonctionne le lineage</title>
 <style>
 :root{--bg:#fff;--fg:#18181b;--muted:#63636e;--line:#e4e4e7;--soft:#f4f4f5;--accent:#6d28d9}
-@media (prefers-color-scheme:dark){:root{--bg:#111113;--fg:#ededef;--muted:#a1a1aa;--line:#2e2e33;--soft:#1c1c1f;--accent:#a78bfa}}
+html.dark{--bg:#111113;--fg:#ededef;--muted:#a1a1aa;--line:#2e2e33;--soft:#1c1c1f;--accent:#a78bfa}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,sans-serif}
 main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
 a{color:var(--accent)}
@@ -19,62 +19,82 @@ pre code{background:none;padding:0}
 .scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{border-bottom:1px solid var(--line);text-align:left;padding:6px 10px 6px 0;vertical-align:top}
+nav{position:sticky;top:0;display:flex;gap:4px;align-items:center;padding:6px 16px;background:var(--bg);border-bottom:1px solid var(--line);font-size:13px}
+nav strong{margin-right:12px;font-weight:500}
+nav a{padding:4px 12px;border-radius:6px;color:var(--muted);text-decoration:none}
+nav a:hover,nav a[aria-current]{background:var(--soft);color:var(--fg)}
+nav .lang{margin-left:auto}
+.pipe{list-style:none;padding:0;margin:12px auto;max-width:480px;text-align:center}
+.pipe .down{color:var(--muted);line-height:1.4}
+.box{border:1px solid var(--line);border-radius:8px;background:var(--soft);padding:8px 12px;font-size:13px}
+.box b{display:block}
+.graph-box{border:1px solid var(--line);border-radius:10px;background:var(--soft);touch-action:none;user-select:none}
+.graph-box svg{display:block;width:100%;height:auto;cursor:grab}
+.graph-box line{stroke:var(--muted);stroke-opacity:.3}
+.graph-box line.own{stroke-opacity:.18}
+.graph-box line.lit{stroke:var(--accent);stroke-opacity:.9}
+.graph-box line.dim{stroke-opacity:.05}
+.graph-box .n{cursor:pointer;transition:opacity .15s}
+.graph-box .raw circle{fill:var(--muted)}
+.graph-box .customer circle{fill:var(--accent)}
+.graph-box .column circle{fill:var(--fg);fill-opacity:.55}
+.graph-box text{fill:var(--fg);font-size:11px;text-anchor:middle}
+.graph-box .column text{font-size:9px;opacity:0}
+.graph-box .column:hover text,.graph-box .column.lit text{opacity:1}
+.graph-box .dim{opacity:.12}
+#graph-info{font:12px ui-monospace,Menlo,monospace;color:var(--muted);min-height:3.2em;overflow-wrap:anywhere}
 </style>
+<script>try{var t=localStorage.getItem('vite-ui-theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.className='dark'}catch(e){}</script>
 </head>
 <body>
+<nav><strong>data-contracts</strong><a href="index.html">Catalogue</a><a href="lineage.fr.html" aria-current="page">Doc</a><a class="lang" href="lineage.html" lang="en">English</a></nav>
 <main>
-<a href="index.html">&larr; Retour au catalogue</a> &middot; <a href="lineage.html" lang="en">English</a>
 <h1>Comment fonctionne le lineage</h1>
-<p class="lead">Le lineage est déclaré à la main dans les data contracts. Il n'est pas déduit du SQL, et rien n'est exécuté sur l'entrepôt.</p>
-
-<h2>1. Déclarer le lineage des colonnes dans le contrat</h2>
-<p>Chaque champ customer indique d'où il vient :</p>
-<pre><code>- name: first_order_at
-  logicalType: timestamp
-  physicalType: TIMESTAMP
+<p class="lead">Le lineage dit d'où vient un chiffre et ce qui casse si on modifie un champ. Il tient en une règle : <b>chaque source déclarée devient une flèche entre deux colonnes</b>.</p>
+<p><b>Data contract</b> : un fichier YAML qui décrit une table. <b>Raw</b> : table recopiée d'un système (Shopify, GA4…). <b>Customer</b> : table calculée à partir des raw.</p>
+<h2>Le graphe</h2>
+<p>Chaque point est un contrat (violet : customer, gris : raw). <b>Cliquez</b> sur un contrat pour déplier ses colonnes, <b>survolez</b> un point pour voir d’où il vient et où il va, <b>glissez-le</b> pour le déplacer.</p>
+<div class="graph-box" id="graph"></div>
+<p id="graph-info">Survolez un point pour voir ses sources.</p>
+<h2>1. Déclarer une colonne</h2><p>Exemple : <code>spend_amount</code>, la dépense publicitaire mensuelle, additionne Google Ads et Meta Ads.</p>
+<pre><code># contracts/customer/acquisition/acquisition_monthly.odcs.yaml (extrait)
+- name: spend_amount
   transformLogic: transform
   transformSourceObjects:
-    - raw__orders__shopify#orders.created_at
-  transformDescription: Plus ancienne date de cr&eacute;ation parmi les commandes du client.
+    - raw__ad_spend__googleads#ad_spend.metrics_cost_micros
+    - raw__ad_spend__metaads#ad_spend.spend
+    # + 8 (10 sources)
+  transformDescription: Somme des micros Google Ads divises par 1 000 000 et de la depense Meta decimale, en EUR.
   customProperties:
     - property: transformExpression
-      value: MIN(created_at)</code></pre>
-<p>Une référence source s'écrit <code>&lt;contract_id&gt;#&lt;objet&gt;.&lt;property&gt;</code>. Les champs imbriqués utilisent le chemin complet.</p>
-<div class="scroll">
-<table>
-<tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression SQL</th></tr>
-<tr><td><code>map</code></td><td>exactement une</td><td>facultative, renommage ou cast trivial uniquement</td></tr>
-<tr><td><code>transform</code></td><td>au moins une</td><td>obligatoire, SQL BigQuery exact</td></tr>
-<tr><td><code>create</code></td><td>aucune</td><td>facultative</td></tr>
-</table>
-</div>
-<p>Les champs raw sont en <code>map</code> depuis le système externe (par exemple <code>shopify_admin_api#...</code>). Les champs techniques <code>meta_loaded_at</code> et <code>meta_source_file</code> sont en <code>create</code>.</p>
+      value: IFNULL(SUM(spend_eur), 0)</code></pre>
+<ul><li><code>transformSourceObjects</code> : toutes les colonnes utilisées, y compris pour filtrer ou joindre. <b>C’est la seule chose qui dessine le graphe.</b></li><li><code>transformDescription</code> : une phrase lisible par tous.</li><li><code>transformExpression</code> : le SQL BigQuery. Il n’est ni exécuté ni comparé aux sources ; ici <code>spend_eur</code> est un nom intermédiaire.</li></ul>
+<div class="scroll"><table><tr><th>transformLogic</th><th>Quand</th><th>Sources</th><th>SQL</th></tr><tr><td><code>map</code></td><td>valeur recopiée</td><td>exactement une</td><td>facultatif : renommage ou cast simple seulement</td></tr><tr><td><code>transform</code></td><td>valeur calculée, agrégée, jointe</td><td>au moins une</td><td>obligatoire</td></tr><tr><td><code>create</code></td><td>valeur sans source</td><td>aucune</td><td>facultatif</td></tr></table></div>
+<h2>2. Du YAML au graphe</h2><p>Le code découpe chaque référence et en fait un lien entre deux colonnes. Il ne lit pas le SQL pour cela.</p>
+<pre><code>raw__ad_spend__metaads # ad_spend . spend
+        contrat           objet     colonne
 
-<h2>2. Le lineage des tables est dérivé</h2>
-<p>Aucune déclaration séparée au niveau table. Un contrat dépend d'un autre dès qu'une de ses colonnes référence une colonne de celui-ci.</p>
-<p>Les systèmes sources externes ne sont pas des contrats : ils n'apparaissent pas comme nœuds dans le graphe.</p>
-
-<p>La légende du graphe est calculée à partir de la déclaration : <b>Pass-through</b> est un <code>map</code> qui garde le nom, <b>Rename</b> un <code>map</code> qui le change, <b>Transformation</b> un <code>transform</code>.</p>
-
-<h2>3. Contrôles avant publication</h2>
-<p><code>make check</code> valide les contrats. Pour le lineage, il vérifie que :</p>
-<ul>
-<li>chaque contrat, objet et property référencé existe ;</li>
-<li>un contrat customer ne référence que des contrats raw ;</li>
-<li>il n'y a pas de cycle ;</li>
-<li><code>transformLogic</code>, ses sources et son expression sont cohérents ;</li>
-<li>chaque champ customer a <code>transformLogic</code> et <code>transformDescription</code>.</li>
-</ul>
-<p>Les expressions SQL ne sont pas exécutées : une référence valide ne prouve pas que le pipeline fait réellement ce que dit le contrat.</p>
-
-<h2>4. Comment il est exposé</h2>
-<p><code>make catalog</code> lit les contrats et écrit notamment :</p>
-<ul>
-<li><a href="colibri-manifest.json"><code>colibri-manifest.json</code></a> : contrats, colonnes, liens colonne à colonne et contrat à contrat, parents et enfants. D'autres outils peuvent le lire.</li>
-<li><code>index.html</code> : ce catalogue, un dashboard statique basé sur <a href="https://github.com/b-ned/dbt-colibri">dbt-colibri</a> (MIT).</li>
-</ul>
-<p>Dans le catalogue, la vue lineage permet de suivre les tables et les colonnes en amont et en aval. Ouvrez une colonne et activez <b>Expert mode</b> pour voir la description de la transformation et son SQL.</p>
-<p>Chaque push sur <code>main</code> lance les contrôles, reconstruit le catalogue et le déploie sur Cloudflare Pages si le jeton de déploiement est configuré.</p>
+{"source": "raw__ad_spend__metaads", "sourceColumn": "spend",
+ "target": "acquisition_monthly",    "targetColumn": "spend_amount"}</code></pre>
+<p>Le lineage des tables ne se déclare pas : dès qu’une colonne de B cite une colonne de A, le catalogue trace A &rarr; B.</p>
+<ol class="pipe">
+<li class="box"><b>Contrats YAML</b>les sources de chaque colonne</li>
+<li class="down" aria-hidden="true">&darr;</li>
+<li class="box"><b>make check</b>vérifie les références (étape séparée)</li>
+<li class="down" aria-hidden="true">&darr;</li>
+<li class="box"><b>make catalog</b>crée les traits, sans vérifier</li>
+<li class="down" aria-hidden="true">&darr;</li>
+<li class="box"><b>index.html + colibri-manifest.json</b>le catalogue et la copie des données</li>
+</ol>
+<p><b>Attention :</b> <code>make catalog</code> et <code>make publish</code> ne vérifient rien. Une référence fausse passe dans le graphe. Lancer <code>make check</code> avant ; la CI le fait avant de déployer depuis <code>main</code>.</p>
+<h2>3. Où le voir</h2>
+<ul><li>Onglet <b>Lineage</b> : le bouton <code>+</code> et les flèches élargissent le graphe. <b>T</b> = transformation, <b>R</b> = renommage, <b>P</b> = recopie.</li><li>SQL et description : <b>Model Info</b>, onglet <b>Columns</b>, déplier la colonne, activer <b>Expert mode</b>.</li></ul>
+<h2>4. Modifier un lineage</h2>
+<ol><li>Modifier la colonne dans son contrat.</li><li>Monter la version du contrat. Changer les sources d’une colonne customer est un changement cassant : version MAJOR et revue.</li><li>Lancer <code>make check</code>, puis <code>make catalog-open</code>.</li><li>Ouvrir une pull request. Le merge sur <code>main</code> publie, si le jeton de déploiement est configuré.</li></ol>
+<h2>5. Ce qui n’est pas vérifié</h2><p><code>make check</code> contrôle que les colonnes citées par les contrats customer existent, qu’il n’y a pas de cycle et que les champs obligatoires sont remplis. Pour les raw, le système externe est contrôlé, pas ses champs. Rien ne prouve que le SQL utilise les sources déclarées, ni que le pipeline fait ce que dit le contrat.</p>
+<p class="lead">Pour les développeurs : <code>tools/build_catalog.py</code> (<code>build_manifest</code>, <code>render_html</code>) et <code>tools/validate_lineage.py</code>.</p>
 </main>
+<script src="lineage_data.js"></script>
+<script src="lineage_graph.js"></script>
 </body>
 </html>
