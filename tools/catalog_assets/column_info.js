@@ -96,11 +96,12 @@
     }).join("") + "</div>";
   };
 
-  /* ---------- Onglet "Trace" : pour le contrat selectionne, toutes les modifications, des
-     contrats raw (sources) jusqu'a lui. Une colonne amont n'est listee qu'une fois (diamants,
-     cycles bornes), les contrats sont groupes par couche (raw, core, customer) dans le sens
-     source -> contrat. Les contrats ne sont pas tous documentes de la meme facon : une etape
-     sans transformation est signalee comme telle. ---------- */
+  /* ---------- Onglet "Trace" : pour le contrat selectionne, liste de ses colonnes ; le clic sur
+     une colonne affiche toutes les transformations appliquees a cette colonne, des contrats raw
+     (sources) jusqu'a elle. Une colonne amont n'est listee qu'une fois (diamants, cycles bornes),
+     les contrats sont groupes par couche (raw, core, customer) dans le sens source -> contrat.
+     Les contrats ne sont pas tous documentes de la meme facon : une etape sans transformation est
+     signalee comme telle. ---------- */
   var PARENTS = null;
   var LAYER_RANK = { raw: 0, core: 1, customer: 2 };
   var TRACE_MAX = 400; /* garde-fou : contrat tres large ou lineage cyclique */
@@ -161,8 +162,54 @@
     if (m.transformExpression) h += acc("SQL", sql(m.transformExpression, "Transformation SQL"), false);
     return h + "</li>";
   }
-  /* Onglet "Trace" : trace du contrat selectionne. Aucune exception ne remonte : une erreur ne
-     doit pas faire tomber tout le rendu React (page blanche). */
+  /* Trace d'une colonne, groupee par contrat dans l'ordre des couches (raw, core, customer). */
+  function traceGroupsHtml(steps) {
+    var groups = [], byContract = {};
+    steps.forEach(function (s) {
+      var g = byContract[s.c] || (byContract[s.c] = { c: s.c, steps: [] });
+      if (!g.steps.length) groups.push(g);
+      g.steps.push(s);
+    });
+    var up = 0;
+    steps.forEach(function (s) { if (s.d > 0) up++; });
+    var h = '<div class="cp-note">' + up + " upstream column" + (up > 1 ? "s" : "") + " · " + groups.length + " contracts</div>" + '<ol class="cp-steps">';
+    groups.forEach(function (g) {
+      var ly = layerOf(g.c);
+      h += '<li class="cp-step"><div class="cp-stepline">' + badge(ly, ly === "raw" ? "mid" : ly === "customer" ? "ok" : "") +
+        "<b>" + esc(g.c) + "</b>" + '<span class="cp-note">' + g.steps.length + (g.steps.length > 1 ? " columns" : " column") +
+        '</span></div><ul class="cp-cols">';
+      g.steps.forEach(function (s) { h += traceColumnHtml(s, s.d === 0); });
+      h += "</ul></li>";
+    });
+    return h + "</ol>";
+  }
+  /* Corps de l'onglet Trace pour une colonne : toutes les transformations, des raw jusqu'a elle. */
+  function traceBodyHtml(model, col) {
+    var n = data().nodes[model] || {}, c = (n.columns || {})[col] || {}, m = c.meta || {};
+    var h = '<div class="cp-h">' + esc(col) + "</div>";
+    var steps = traceSteps([{ c: model, col: col }]);
+    if (steps.length < 2) {
+      return h + '<div class="cp-note">' +
+        (m.transformLogic === "create" ? "Created in this contract, no upstream source." : "No upstream lineage declared for this column.") +
+        '</div><ul class="cp-cols">' + traceColumnHtml({ c: model, col: col, d: 0 }, true) + "</ul>";
+    }
+    return h + traceGroupsHtml(steps);
+  }
+  var TRACE_SEL = {}; /* contrat -> colonne choisie dans l'onglet Trace */
+  /* Clic sur une colonne de l'onglet Trace : re-rend le corps sans toucher au reste du panneau. */
+  window.cpTraceSelect = function (model, col) {
+    TRACE_SEL[model] = col;
+    var body = document.getElementById && document.getElementById("cp-trace-body");
+    if (body) body.innerHTML = traceBodyHtml(model, col);
+    var chips = document.getElementById && document.getElementById("cp-trace-cols");
+    if (chips) {
+      for (var i = 0; i < chips.children.length; i++) {
+        chips.children[i].classList.toggle("on", chips.children[i].getAttribute("data-col") === col);
+      }
+    }
+  };
+  /* Onglet "Trace" : liste les colonnes du contrat selectionne ; clic = trace de la colonne.
+     Aucune exception ne remonte : une erreur ne doit pas faire tomber tout le rendu React. */
   window.cpTraceTabHtml = function (model) {
     try {
       var n = data().nodes[model];
@@ -172,30 +219,14 @@
         return head + '<div class="cp-note">Raw contract: no upstream in the catalog; its sources are the external systems documented in each column.</div></div>';
       }
       var cols = Object.keys(n.columns || {});
-      var steps = traceSteps(cols.map(function (c) { return { c: model, col: c }; }));
-      var upstream = steps.filter(function (s) { return s.d > 0; });
-      if (!upstream.length) {
-        return head + '<div class="cp-note">No upstream lineage declared for this contract.</div></div>';
-      }
-      /* Un groupe par contrat, dans l'ordre des couches : la concatenation reste courte meme
-         quand le contrat brasse tout le lineage (une colonne amont n'apparait qu'une fois). */
-      var groups = [], byContract = {};
-      steps.forEach(function (s) {
-        var g = byContract[s.c] || (byContract[s.c] = { c: s.c, steps: [] });
-        if (!g.steps.length) groups.push(g);
-        g.steps.push(s);
-      });
-      var h = head + '<div class="cp-note">' + upstream.length + " upstream column" + (upstream.length > 1 ? "s" : "") +
-        " · " + groups.length + " contracts</div>" + '<ol class="cp-steps">';
-      groups.forEach(function (g) {
-        var ly = layerOf(g.c);
-        h += '<li class="cp-step"><div class="cp-stepline">' + badge(ly, ly === "raw" ? "mid" : ly === "customer" ? "ok" : "") +
-          "<b>" + esc(g.c) + "</b>" + '<span class="cp-note">' + g.steps.length + (g.steps.length > 1 ? " columns" : " column") +
-          '</span></div><ul class="cp-cols">';
-        g.steps.forEach(function (s) { h += traceColumnHtml(s, s.d === 0); });
-        h += "</ul></li>";
-      });
-      return h + "</ol></div>";
+      if (!cols.length) return head + '<div class="cp-note">No columns in this contract.</div></div>';
+      var sel = TRACE_SEL[model] || cols[0];
+      if (cols.indexOf(sel) < 0) sel = cols[0];
+      var chips = '<div class="cp-trace-cols" id="cp-trace-cols">' + cols.map(function (c) {
+        return '<button type="button" class="cp-trace-col-btn' + (c === sel ? " on" : "") + '" data-col="' + esc(c) + '" onclick=\'window.cpTraceSelect(' +
+          JSON.stringify(model) + "," + JSON.stringify(c) + ")'>" + esc(c) + "</button>";
+      }).join("") + "</div>";
+      return head + chips + '<div id="cp-trace-body">' + traceBodyHtml(model, sel) + "</div></div>";
     } catch (e) {
       return '<div class="cp-trace"><div class="cp-note">Source trace unavailable: ' + esc(e && e.message) + "</div></div>";
     }

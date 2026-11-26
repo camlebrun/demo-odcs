@@ -103,11 +103,14 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
 
-def test_trace_tab_goes_raw_core_customer(tmp_path):
-    """L'onglet Trace du contrat selectionne concatene les transformations des sources jusqu'a lui."""
+def test_trace_tab_lists_columns_and_traces_the_selected_one(tmp_path):
+    """L'onglet Trace liste les colonnes du contrat ; la colonne choisie affiche sa trace raw -> mart."""
     trace = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "kpis_monthly")
     assert "Source trace · kpis_monthly" in trace
-    assert "upstream columns" in trace and "contracts" in trace
+    # chaque colonne du contrat est un bouton cliquable, la premiere est selectionnee par defaut
+    for col in ("customer_key", "order_total", "first_order_at", "last_param_key", "computed_at"):
+        assert f'data-col="{col}"' in trace and "cpTraceSelect" in trace
+    assert 'cp-trace-col-btn on" data-col="customer_key"' in trace
     # ordre source -> mart, avec la transformation declaree a chaque etape
     assert trace.index("<b>raw__orders__shopify</b>") < trace.index("<b>core__orders</b>") < trace.index("<b>kpis_monthly</b>")
     for text in ("Recopie du champ email", "Alimente customer_key", "from core__orders#customer_key", "TO_HEX"):
@@ -164,10 +167,14 @@ const errors = [];
 for (const id of Object.keys(window.colibriData.nodes)) {
   try { window.cpTraceTabHtml(id); } catch (e) { errors.push("cpTraceTabHtml " + id + " -> " + e.message); }
   const n = window.colibriData.nodes[id];
-  for (const col of Object.keys(n.columns || {})) {
+  const cols = Object.keys(n.columns || {});
+  for (const col of cols) {
     for (const fn of ["cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml"]) {
       try { window[fn](id, col); } catch (e) { errors.push(fn + " " + id + "." + col + " -> " + e.message); }
     }
+  }
+  if (cols.length) {
+    try { window.cpTraceSelect(id, cols[0]); } catch (e) { errors.push("cpTraceSelect " + id + " -> " + e.message); }
   }
 }
 process.stdout.write(JSON.stringify(errors));
