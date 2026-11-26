@@ -57,14 +57,5 @@ def test_render_writes_lineage_page_linked_from_dashboard(tmp_path):
     html = build_catalog.render_html(build_catalog.build_manifest(Path(build_catalog.REPO_ROOT)), tmp_path)
     assert (tmp_path / "lineage.html").is_file()
     assert (tmp_path / "lineage.fr.html").is_file()
-    assert (tmp_path / "lineage_graph.js").is_file()
-    assert (tmp_path / "lineage_data.js").read_text(encoding="utf-8").startswith("window.LINEAGE=")
     assert 'href:"lineage.html"' in html.read_text(encoding="utf-8")
 
-
-def test_graph_data_edges_point_to_known_columns():
-    data = build_catalog.graph_data(build_catalog.build_manifest(Path(build_catalog.REPO_ROOT)))
-    columns = {c["id"]: set(c["columns"]) for c in data["contracts"]}
-    assert data["edges"]
-    for source, source_column, target, target_column in data["edges"]:
-        assert source_column in columns[source] and target_column in columns[target]

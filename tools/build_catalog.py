@@ -274,21 +274,6 @@ def _colibri_version() -> str | None:
         return None
 
 
-def graph_data(manifest: dict) -> dict:
-    """Donnees du graphe de la page Doc : contrats, colonnes et liens colonne a colonne."""
-    return {
-        "contracts": [
-            {"id": n["id"], "layer": "raw" if n["nodeType"] == "source" else "customer", "columns": list(n["columns"])}
-            for n in manifest["nodes"].values()
-        ],
-        "edges": [
-            [e["source"], e["sourceColumn"], e["target"], e["targetColumn"]]
-            for e in manifest["lineage"]["edges"]
-            if e["sourceColumn"]
-        ],
-    }
-
-
 def render_html(manifest: dict, out_dir: Path) -> Path:
     try:
         import dbt_colibri.report.generator as gen
@@ -313,11 +298,8 @@ def render_html(manifest: dict, out_dir: Path) -> Path:
     # La telemetrie (PostHog) de l'interface colibri est toujours desactivee.
     gen.inject_data_into_html(stripped, str(patched), str(html), disable_telemetry=True)
     patched.unlink()
-    for name in ("lineage.html", "lineage.fr.html", "lineage_graph.js"):
+    for name in ("lineage.html", "lineage.fr.html"):
         shutil.copyfile(ASSETS / name, out_dir / name)
-    # Fichier JS et non JSON : la page doit aussi fonctionner ouverte en file://.
-    data = json.dumps(graph_data(manifest), ensure_ascii=False)
-    (out_dir / "lineage_data.js").write_text(f"window.LINEAGE={data};\n", encoding="utf-8")
     return html
 
 

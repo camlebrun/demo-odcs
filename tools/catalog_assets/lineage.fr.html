@@ -28,21 +28,6 @@ nav .lang{margin-left:auto}
 .pipe .down{color:var(--muted);line-height:1.4}
 .box{border:1px solid var(--line);border-radius:8px;background:var(--soft);padding:8px 12px;font-size:13px}
 .box b{display:block}
-.graph-box{border:1px solid var(--line);border-radius:10px;background:var(--soft);touch-action:none;user-select:none}
-.graph-box svg{display:block;width:100%;height:auto;cursor:grab}
-.graph-box line{stroke:var(--muted);stroke-opacity:.3}
-.graph-box line.own{stroke-opacity:.18}
-.graph-box line.lit{stroke:var(--accent);stroke-opacity:.9}
-.graph-box line.dim{stroke-opacity:.05}
-.graph-box .n{cursor:pointer;transition:opacity .15s}
-.graph-box .raw circle{fill:var(--muted)}
-.graph-box .customer circle{fill:var(--accent)}
-.graph-box .column circle{fill:var(--fg);fill-opacity:.55}
-.graph-box text{fill:var(--fg);font-size:11px;text-anchor:middle}
-.graph-box .column text{font-size:9px;opacity:0}
-.graph-box .column:hover text,.graph-box .column.lit text{opacity:1}
-.graph-box .dim{opacity:.12}
-#graph-info{font:12px ui-monospace,Menlo,monospace;color:var(--muted);min-height:3.2em;overflow-wrap:anywhere}
 </style>
 <script>try{var t=localStorage.getItem('vite-ui-theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.className='dark'}catch(e){}</script>
 </head>
@@ -52,10 +37,6 @@ nav .lang{margin-left:auto}
 <h1>Comment fonctionne le lineage</h1>
 <p class="lead">Le lineage dit d'où vient un chiffre et ce qui casse si on modifie un champ. Il tient en une règle : <b>chaque source déclarée devient une flèche entre deux colonnes</b>.</p>
 <p><b>Data contract</b> : un fichier YAML qui décrit une table. <b>Raw</b> : table recopiée d'un système (Shopify, GA4…). <b>Customer</b> : table calculée à partir des raw.</p>
-<h2>Le graphe</h2>
-<p>Chaque point est un contrat (violet : customer, gris : raw). <b>Cliquez</b> sur un contrat pour déplier ses colonnes, <b>survolez</b> un point pour voir d’où il vient et où il va, <b>glissez-le</b> pour le déplacer.</p>
-<div class="graph-box" id="graph"></div>
-<p id="graph-info">Survolez un point pour voir ses sources.</p>
 <h2>1. Déclarer une colonne</h2><p>Exemple : <code>spend_amount</code>, la dépense publicitaire mensuelle, additionne Google Ads et Meta Ads.</p>
 <pre><code># contracts/customer/acquisition/acquisition_monthly.odcs.yaml (extrait)
 - name: spend_amount
@@ -94,7 +75,5 @@ nav .lang{margin-left:auto}
 <h2>5. Ce qui n’est pas vérifié</h2><p><code>make check</code> contrôle que les colonnes citées par les contrats customer existent, qu’il n’y a pas de cycle et que les champs obligatoires sont remplis. Pour les raw, le système externe est contrôlé, pas ses champs. Rien ne prouve que le SQL utilise les sources déclarées, ni que le pipeline fait ce que dit le contrat.</p>
 <p class="lead">Pour les développeurs : <code>tools/build_catalog.py</code> (<code>build_manifest</code>, <code>render_html</code>) et <code>tools/validate_lineage.py</code>.</p>
 </main>
-<script src="lineage_data.js"></script>
-<script src="lineage_graph.js"></script>
 </body>
 </html>
