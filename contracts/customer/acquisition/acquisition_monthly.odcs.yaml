@@ -9,7 +9,7 @@ domain: customer
 tags: [customer]
 description:
   purpose: Efficacite de l'acquisition de nouveaux clients web par canal et campagne paid media (Google Ads, Meta Ads). Une ligne par mois x canal x campagne - depense, nouveaux clients, CAC, CA du premier achat, ROAS nouveaux clients, valeur de cohorte a 90 jours.
-  usage: Alimente la revue paid media hebdomadaire sous Power BI. Canaux google_ads, meta_ads, other_web ; campaign_id 0 si achat non rapproche. Le ROAS des plateformes n'est pas utilise car non deduplique, seul le ROAS nouveaux clients calcule sur Shopify est publie.
+  usage: Alimente la revue paid media hebdomadaire sous Power BI. Canaux google_ads, meta_ads, other_web ; campaign_id 0 si achat non rapproche. Le ROAS des plateformes n'est pas utilise car non deduplique, seul le ROAS nouveaux clients calcule sur Shopify est publie. Une commande suit sa campagne au jour de l'achat, pas du clic.
   limitations: Attribution web uniquement, last-click GA4, magasins exclus. Identite deterministe customer_key (SHA256 de l'e-mail) - un client deja vu en magasin peut compter comme nouveau ; tickets sans carte anonymes. Consentement hors perimetre. Campagne rapprochee par nom UTM. ROAS en TTC contre depense plateforme non confirmee.
 
 servers:

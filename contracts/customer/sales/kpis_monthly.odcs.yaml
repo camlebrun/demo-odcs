@@ -9,7 +9,7 @@ domain: customer
 tags: [customer]
 description:
   purpose: Indicateurs clients et CA net de retours TTC par mois, canal (store ou web) et magasin (store_code, WEB pour le web), pour le controle de gestion et le comex. Une ligne par mois x canal x magasin.
-  usage: Alimente le Power BI comex (DAF / controle de gestion). Rafraichi chaque jour (J+1), mois fige a M+3 jours ouvres. Montants en EUR TTC. Les clients distincts ne sont pas additifs entre lignes.
+  usage: Alimente le Power BI comex (DAF / controle de gestion). Rafraichi chaque jour (J+1), mois fige a M+3 jours ouvres. Montants en EUR TTC. Les clients distincts ne sont pas additifs entre lignes. Historique de depart limite aux raw (3 ans). Nouveaux clients et omnicanalite peuvent etre sous ou sur-estimes.
   limitations: Identite deterministe customer_key = SHA256(LOWER(TRIM(email))). Tickets sans carte (environ 50 %) anonymes, comptes dans le CA mais pas par client. Pas d'attribution marketing ni de consentement. CA TTC, EUR uniquement, rapproche du CA comptable (ecart < 0,5 %, controle hors lot 1).
 
 servers:

@@ -12,7 +12,7 @@ tags:
 description:
   purpose: Evenements de navigation (page_view et view_item) du site, extraits de l'export BigQuery GA4 et exposes par la vue page_view_events du dataset raw_ga4 (objet de schema events), une ligne par evenement.
   usage: Source des contrats customer (parcours web, acquisition, interet produit). Ne pas exposer directement aux consommateurs metier.
-  limitations: 'Donnees incompletes (Consent Mode : visiteurs sans consentement absents ou sans user_pseudo_id, bloqueurs de publicite). traffic_source est la premiere acquisition. Les colonnes meta_loaded_at et meta_source_file n''existent pas dans l''export natif : la vue ou la copie les ajoute.'
+  limitations: 'Donnees incompletes (Consent Mode : visiteurs sans consentement absents ou sans user_pseudo_id, bloqueurs de publicite). traffic_source est la premiere acquisition. Les colonnes meta_loaded_at et meta_source_file n''existent pas dans l''export natif : la vue ou la copie les ajoute. Export limite a 1 million d''evenements par jour.'
 servers:
 - server: bigquery_prod
   type: bigquery

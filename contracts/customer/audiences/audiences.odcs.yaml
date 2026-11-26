@@ -9,7 +9,7 @@ domain: customer
 tags: [customer]
 description:
   purpose: Audiences marketing a activer (exclusion acquisition, reactivation, retargeting, graine lookalike), uniquement pour des clients consentants. Une ligne par client (customer_key), segment et jour de calcul.
-  usage: Alimente Google Customer Match et Meta Custom Audiences (CRM / marketing), chaque jour. Segments buyers_90d, inactive_12m, product_viewers_no_purchase, top_customers. 30 jours d'instantanes. Seul le hash customer_key est expose, jamais l'e-mail.
+  usage: Alimente Google Customer Match et Meta Custom Audiences (CRM / marketing), chaque jour. Segments buyers_90d, inactive_12m, product_viewers_no_purchase, top_customers. 30 jours d'instantanes. Seul le hash customer_key est expose, jamais l'e-mail. Retrait de consentement non repercute chez Google et Meta, resynchroniser toute l'audience.
   limitations: customer_key = SHA256 de l'e-mail. Tickets sans carte (environ 50 %) hors audiences. Consentement = Shopify accepts_marketing + opt-in caisse, sans CRM ni ESP. Il porte sur l'e-mail ; l'usage publicitaire reste une decision juridique du proprietaire. Lien GA4-client partiel (achat web ou user_id suppose), product_viewers_no_purchase minoritaire.
 
 servers:
