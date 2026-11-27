@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 import build_catalog
 
@@ -107,7 +108,7 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
-    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace",icon:cpTraceIcon', 'cpTraceIcon=pi("route"', 'id:"cp-trace-panel"', "data-cp-col", "cp-trace-wrap bg-background", ".cp-trace-wrap{pointer-events:auto}"))
+    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", "window.cpFilterMatch(", 'id:"trace",label:"Trace",icon:cpTraceIcon', 'cpTraceIcon=pi("route"', 'id:"cp-trace-panel"', "data-cp-col", "cp-trace-wrap bg-background", ".cp-trace-wrap{pointer-events:auto}"))
     assert "data-sidebar-column]{" not in html, "plus de contournement CSS sur le panneau natif"
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
@@ -140,16 +141,14 @@ def test_trace_tree_goes_from_result_to_external_source(tmp_path):
     t = _trace(tmp_path, m, "kpis_monthly", "customer_key")
     order = [t.index(f'data-cp-node-model="{c}"') for c in ("kpis_monthly", "core__orders", "raw__orders__shopify")]
     assert order == sorted(order)
-    assert "shopify_admin_api#Order.email" in t
+    assert '<div class="cp-ext">shopify_admin_api#Order.email</div>' in t, "systeme source toujours affiche"
     assert "<details open" in t and 'class="cp-detail"' in t
-    assert "TO_HEX" in t.split('<details class="cp-deep">')[0], "le SQL d'une etape amont est affiche"
     assert "TO_HEX" in _trace(tmp_path, m, "kpis_monthly", "customer_key", node=("core__orders", "customer_key"))
 
 
-def test_trace_tree_on_a_raw_contract_shows_the_external_system(tmp_path):
+def test_trace_tree_on_a_raw_contract_has_no_missing_upstream_note(tmp_path):
     t = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "raw__pages_views__ga4", "event_name")
-    assert "ga4_bigquery_export#events.event_name" in t
-    assert "Raw contract: no upstream" not in t
+    assert "Raw contract: no upstream" not in t and "ga4_bigquery_export#events.event_name" in t
 
 
 def test_trace_tree_shows_a_shared_column_once_and_survives_cycles(tmp_path):
@@ -161,7 +160,6 @@ def test_trace_tree_shows_a_shared_column_once_and_survives_cycles(tmp_path):
     g["nodes"]["raw__x"]["columns"]["k"] = {"meta": {"externalSources": ["sys#o.k"]}}
     t = _trace(tmp_path, g, "mart", "k")
     assert t.count("shown above") == 2  # raw__x sous b, et le retour sur mart
-    assert t.count('class="cp-ext"') == 1
     assert "not documented" in t
 
 
@@ -264,40 +262,7 @@ def test_manifest_exposes_external_sources_of_raw_columns_only():
     assert "externalSources" not in nodes["core__orders"]["columns"]["customer_key"]["meta"]
 
 
-def test_trace_summary_lists_changes_from_sources_to_result_with_tree_closed(tmp_path):
-    g = _graph(
-        {"raw__x": ["k"], "core__a": ["k"], "core__b": ["k"], "mart": ["k"]},
-        [("core__a", "k", "mart", "k"), ("core__b", "k", "mart", "k"), ("raw__x", "k", "core__a", "k"),
-         ("core__a", "k", "core__b", "k")],
-    )
-    cols = {c: n["columns"] for c, n in g["nodes"].items()}
-    cols["raw__x"]["k"] = {"meta": {"transformLogic": "map", "transformDescription": "Recopie brute.",
-                                    "externalSources": ["sys_api#o.k", "sys_api#o.j"]}}
-    cols["core__a"]["k"] = _col("transform", "Etape A.")
-    cols["core__b"]["k"] = _col("transform", "Etape B.")
-    cols["mart"]["k"] = _col("transform", "Resultat final.")
-    t = _trace(tmp_path, g, "mart", "k")
-    summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
-    assert summary.index("Resultat final.") < summary.index("Etape B.") < summary.index("Etape A."), \
-        "resultat en haut, puis du plus proche au plus lointain"
-    assert summary.count("Etape A.") == 1, "une colonne partagee n'est resumee qu'une fois"
-    assert "Recopie brute." not in summary, "les recopies sont omises du resume"
-    assert '<details class="cp-deep" open' not in t and 'class="cp-tree"' in t
-    assert '<details class="cp-deep" open>' in _trace(tmp_path, g, "mart", "k", node=("core__a", "k")), \
-        "un re-rendu apres un clic dans l'arbre ne referme pas la vue detaillee"
-
-
-def test_trace_summary_reports_undocumented_steps_and_plain_copies(tmp_path):
-    g = _graph({"src": ["x"], "mart": ["k"]}, [("src", "x", "mart", "k")])
-    g["nodes"]["src"]["columns"]["x"] = {}
-    g["nodes"]["mart"]["columns"]["k"] = _col("map", "Copie de x.")
-    t = _trace(tmp_path, g, "mart", "k")
-    assert "No transformation declared: plain copies only." in t
-    assert "1 step not documented" in t
-
-
-def test_trace_summary_shows_classification_and_sources_by_sensitivity(tmp_path):
-    """Classification declaree et la plus haute en amont ; champs sources les plus sensibles d'abord, C1 replies."""
+def test_trace_header_shows_declared_and_highest_upstream_classification(tmp_path):
     g = _graph(
         {"raw__x": ["cost", "cur", "nested"], "core__a": ["spend"], "core__copy": ["spend_copy"], "mart": ["total"]},
         [("raw__x", "cost", "core__a", "spend"), ("raw__x", "cur", "core__a", "spend"),
@@ -318,102 +283,86 @@ def test_trace_summary_shows_classification_and_sources_by_sensitivity(tmp_path)
     cols["mart"]["total"] = {"meta": {"transformLogic": "transform", "transformDescription": "Somme.",
                                       "transformExpression": "mart_sql_here", "classification": "C1"}}
     t = _trace(tmp_path, g, "mart", "total")
-    s = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
-    order = [s.index(x) for x in ("Declared: ", "Highest upstream: ", "Somme.", "mart_sql_here", ">Sources<", ">Transformations<", "Conversion en euros.")]
-    assert order == sorted(order)
-    assert 'Highest upstream: <span class="cp-badge hi">C3' in s
-    sources = s.split(">Sources<")[1].split(">Transformations<")[0]
-    visible, folded = sources.split("<summary>C1 and lower · 1 field</summary>")
-    assert "C3 · pii" in visible and "<b>ads_api</b> campaign.cur" in visible
-    assert "<b>raw__x</b> nested" in visible and "unclassified" in visible, "sans classification : jamais replie"
-    assert "campaign.cost" in folded and "campaign.cost" not in visible
-    assert ">core__copy<" not in s and "<div>core__copy: spend_copy</div>" in s, "entree declaree, pas une etape"
-    assert "core_sql_here" in s and "Step inputs" not in s
+    head = t[t.index('class="cp-head"'):t.index('<div class="cp-deep"')]
+    assert head.index("Declared: ") < head.index("Highest upstream: ")
+    assert 'Highest upstream: <span class="cp-badge hi">C3' in head
+    assert 'class="cp-summary"' not in t, "plus de bloc sous l'arbre"
     assert '<span class="cp-t"><span class="cp-badge ">C1' in t, "la liste affiche la classification"
-
-
-def test_trace_steps_show_the_table_id(tmp_path):
-    g = _graph({"core__a": ["k"], "core__multi": ["obj.k"], "mart": ["k"]},
-               [("core__a", "k", "mart", "k"), ("core__multi", "obj.k", "mart", "k")])
-    g["nodes"]["core__a"]["relationName"] = "proj.core.a"
-    g["nodes"]["core__multi"]["relationName"] = "proj.core.{obj,other}"
-    t = _trace(tmp_path, g, "mart", "k")
-    steps = t.split(">Transformations<")[1].split('<details class="cp-deep">')[0]
-    assert ">proj.core.a</div>" in steps
-    assert ">proj.core.obj</div>" in steps and '<span class="cp-hopcol">k</span>' in steps, "contrat a plusieurs tables"
-    assert "core__a" not in steps
-
-
-def test_trace_shows_table_queries_with_column_lines_highlighted(tmp_path):
-    g = _graph({"core__a": ["flag"], "mart": ["is_ok"]}, [("core__a", "flag", "mart", "is_ok")])
-    g["nodes"]["mart"]["columns"]["is_ok"]["meta"]["transformExpression"] = "IFNULL(latest.opted, FALSE)"
-    g["nodes"]["mart"]["meta"] = {"customProperties": {"transformInputs": "SELECT a\nFROM t\nWHERE latest.opted"}}
-    g["nodes"]["core__a"]["meta"] = {"customProperties": {"transformInputs": "-- regle <b>\nSELECT x AS opted\nFROM raw"}}
-    t = _trace(tmp_path, g, "mart", "is_ok")
-    block = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
-    assert block.count('<details class="cp-acc cp-query"><summary>Full table SQL</summary>') == 1, "un seul bloc, replie"
-    assert block.index(">Transformations<") < block.index("Full table SQL") < block.index(">mart</span>", block.index("Full table SQL")) < block.index(">core__a</span>", block.index("Full table SQL"))
-    block = block[block.index("Full table SQL"):]
-    hits = block.split('class="cp-line cp-hit"')[1:]
-    assert len(hits) == 2, "latest/opted ; ni IFNULL ni FALSE"
-    assert block.count('class="cp-line') == 6, "une ligne rendue par ligne de requete"
-    assert "regle &lt;b&gt;" in block and "<b>\n" not in block
-    assert "Full table SQL" not in _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "kpis_monthly", "customer_key")
-
-
-def test_trace_shows_column_description_first_and_hides_trivial_sql(tmp_path):
-    g = _graph({"core__a": ["flag"], "mart": ["is_ok"]}, [("core__a", "flag", "mart", "is_ok")])
-    top = g["nodes"]["mart"]["columns"]["is_ok"]
-    top["description"] = "Regle metier. Toujours vrai ici."
-    top["meta"]["transformExpression"] = "latest.opted"
-    step = g["nodes"]["core__a"]["columns"]["flag"]
-    step["description"] = "Description de l'etape."
-    step["meta"]["transformExpression"] = "flag"
-    t = _trace(tmp_path, g, "mart", "is_ok")
-    summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
-    header = summary.split(">Transformations<")[0]
-    assert header.index("Toujours vrai ici.") < header.index(">transformDescription<") < header.index("Calcul is_ok.") < header.index(">transformExpression<") < header.index("latest")
-    assert "Calcul flag." in summary and "Description de l" not in summary, "une etape dit comment la colonne est calculee"
-    assert summary.count("Transformation SQL") == 2, "affiche meme quand il reprend le nom de la colonne"
-    del top["description"]
-    assert "Calcul is_ok." in _trace(tmp_path, g, "mart", "is_ok"), "repli sur transformDescription"
-
-
-def test_trace_steps_list_their_source_objects(tmp_path):
-    g = _graph({"raw__x": ["a", "b"], "core__a": ["k"], "mart": ["k"]},
-               [("raw__x", "a", "core__a", "k"), ("raw__x", "b", "core__a", "k"), ("core__a", "k", "mart", "k")])
-    g["nodes"]["raw__x"]["columns"] = {"a": _col("map"), "b": _col("map")}
-    g["nodes"]["raw__x"]["relationName"] = "proj.raw.x"
-    g["nodes"]["core__a"]["relationName"] = "proj.core.a"
-    t = _trace(tmp_path, g, "mart", "k")
-    summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
-    header, steps = summary.split(">Transformations<")
-    assert '<div class="cp-fname">transformSourceObjects</div><div class="cp-from"><div>proj.core.a: k</div></div>' in header
-    assert '<div class="cp-from"><div>proj.raw.x: a, b</div></div>' in steps
-
-
-def test_trace_shows_sources_unfolded_when_none_is_sensitive(tmp_path):
-    g = _graph({"raw__x": ["a"], "mart": ["k"]}, [("raw__x", "a", "mart", "k")])
-    g["nodes"]["raw__x"]["columns"]["a"] = {"meta": {"classification": "C1", "externalSources": ["sys#o.a"]}}
-    t = _trace(tmp_path, g, "mart", "k")
-    sources = t.split(">Sources<")[1].split(">Transformations<")[0].split('<details class="cp-acc cp-query">')[0]
-    assert "o.a" in sources and "C1 and lower" not in sources
 
 
 def test_trace_column_without_upstream_says_it_once(tmp_path):
     g = _graph({"raw__x": ["nested"]}, [])
     g["nodes"]["raw__x"]["nodeType"] = "source"
     g["nodes"]["raw__x"]["columns"]["nested"] = {}
-    t = _trace(tmp_path, g, "raw__x", "nested").split('<details class="cp-deep">')[0]
+    t = _trace(tmp_path, g, "raw__x", "nested")
     assert "No upstream lineage declared" in t
-    assert "plain copies only" not in t and "step not documented" not in t and ">Sources<" not in t
 
 
-def test_trace_shows_the_same_three_fields_for_every_column_and_step(tmp_path):
-    g = _graph({"core__a": ["k"], "mart": ["k", "cur"]}, [("core__a", "k", "mart", "k")])
-    g["nodes"]["mart"]["columns"]["cur"] = {"meta": {"transformLogic": "create", "transformDescription": "Constante."}}
-    for col, blocks in (("k", 2), ("cur", 1)):
-        summary = _trace(tmp_path, g, "mart", col).split('<details class="cp-deep">')[0]
-        for name in ("transformDescription", "transformExpression", "transformSourceObjects"):
-            assert summary.count(f'>{name}<') == blocks, (col, name)
-    assert summary.count("not declared") == 1 and ">none<" in summary and ">create<" in summary
+def test_trace_always_shows_the_source_system(tmp_path):
+    g = _graph({"raw__x": ["a"], "mart": ["k"]}, [("raw__x", "a", "mart", "k")])
+    g["nodes"]["raw__x"]["columns"]["a"] = {"meta": {"externalSources": ["sys_api#o.a"]}}
+    t = _trace(tmp_path, g, "mart", "k")
+    assert "data-cp-expert" in t and "Data engineer mode" in t
+    assert '<div class="cp-ext">sys_api#o.a</div>' in t and 'cp-expert-only"><div class="cp-ext' not in t
+
+
+def test_sidebar_filter_matches_columns_and_folders(tmp_path):
+    node_bin = shutil.which("node")
+    if not node_bin:
+        pytest.skip("node est necessaire pour executer le JS du catalogue")
+    script = tmp_path / "filter.js"
+    script.write_text("""
+global.window = {}; global.document = { addEventListener() {} }; global.navigator = {};
+eval(require("fs").readFileSync(process.argv[2], "utf8"));
+window.colibriData = { nodes: { kpis: { path: "contracts/customer/sales/kpis.odcs.yaml", columns: { Email_Hash: {} } } } };
+process.stdout.write(JSON.stringify(["email", "sales", "contracts", "odcs", "zzz"].map(function (q) { return window.cpFilterMatch("kpis", q); })));
+""", encoding="utf-8")
+    out = subprocess.run([node_bin, str(script), str(ASSETS / "column_info.js")], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == [True, True, False, False, False]
+
+
+def test_trace_shows_no_sql_outside_data_engineer_mode(tmp_path):
+    g = _graph({"core__a": ["k"], "mart": ["k"]}, [("core__a", "k", "mart", "k")])
+    for c in ("core__a", "mart"):
+        g["nodes"][c]["columns"]["k"]["meta"]["transformExpression"] = f"sql_{c}"
+    t = _trace(tmp_path, g, "mart", "k")
+    blocks = t.count('<div class="cp-sql">')
+    assert blocks == 1, "detail de l'arbre"
+    assert t.count('<div class="cp-expert-only"><div class="cp-sql">') == blocks
+
+
+def test_trace_shows_owner_and_tree_size(tmp_path):
+    g = _graph({"raw__x": ["a"], "core__a": ["k"], "mart": ["k"]},
+               [("raw__x", "a", "core__a", "k"), ("core__a", "k", "mart", "k")])
+    g["nodes"]["raw__x"]["nodeType"] = "source"
+    g["nodes"]["core__a"]["meta"] = {"team": "team-core", "support": [{"url": "mailto:core@x.example"}]}
+    t = _trace(tmp_path, g, "core__a", "k")
+    assert "Owner: <b>team-core</b> core@x.example" in t
+    assert "Lineage tree · 1 upstream column, 1 raw" in t
+
+
+def test_trace_tree_names_the_table_of_every_column(tmp_path):
+    g = _graph({"raw__x": ["a"], "mart": ["k"]}, [("raw__x", "a", "mart", "k")])
+    g["nodes"]["raw__x"]["relationName"] = "proj.raw.x"
+    g["nodes"]["mart"]["relationName"] = "proj.customer.mart_table"
+    t = _trace(tmp_path, g, "mart", "k")
+    deep = t[t.index('<div class="cp-deep"'):]
+    assert '<span class="cp-tname">raw.x</span>' in deep, "table de l'entree"
+    assert '<span class="cp-tname">customer.mart_table</span>' in deep, "table de la colonne choisie"
+    assert '<div class="cp-dtitle">mart.k</div><div class="cp-from">proj.customer.mart_table</div>' in deep
+
+
+def test_quality_check_sql_is_visible_outside_data_engineer_mode(tmp_path):
+    node_bin = shutil.which("node")
+    if not node_bin:
+        pytest.skip("node est necessaire pour executer le JS du catalogue")
+    script = tmp_path / "checks.js"
+    script.write_text("""
+global.window = {}; global.document = { addEventListener() {} }; global.navigator = {};
+eval(require("fs").readFileSync(process.argv[2], "utf8"));
+process.stdout.write(window.cpModelTestsHtml([{ name: "sql", kwargs: { query: "SELECT 1" } }]));
+""", encoding="utf-8")
+    out = subprocess.run([node_bin, str(script), str(ASSETS / "column_info.js")], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert 'class="cp-sql"' in out.stdout and "cp-expert-only" not in out.stdout

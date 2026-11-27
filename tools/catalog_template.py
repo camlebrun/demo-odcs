@@ -95,7 +95,7 @@ def _patch_model_info(html: str) -> str:
         raise TemplateMismatch("en-tete de la liste des colonnes introuvable")
     button = (
         'R.jsx("button",{className:"cp-expert-toggle",title:"Show technical properties",'
-        'onClick:()=>window.cpToggleExpert(),children:"Expert mode"}),'
+        'onClick:()=>window.cpToggleExpert(),children:"Data engineer mode"}),'
     )
     html = html[:j] + button + html[j:]
 
@@ -150,7 +150,7 @@ def _patch_columns_tab(html: str) -> str:
         raise TemplateMismatch("barre de recherche de l'onglet Columns introuvable")
     toggle = (
         'R.jsx("div",{className:"flex justify-end mb-2",children:R.jsx("button",{className:"cp-expert-toggle",'
-        'title:"Show technical properties",onClick:()=>window.cpToggleExpert(),children:"Expert mode"})}),'
+        'title:"Show technical properties",onClick:()=>window.cpToggleExpert(),children:"Data engineer mode"})}),'
     )
     return html.replace(anchor, toggle + anchor)
 
@@ -267,9 +267,21 @@ def _doc_tab(html: str) -> str:
     return _sub(html, anchor, anchor + link, 1)
 
 
+def _filter_columns(html: str) -> str:
+    """Filtre de gauche : colibri ne compare que le nom du contrat et son dataset. On ajoute les
+    colonnes et le dossier (window.cpFilterMatch) a chacun de ses 7 predicats."""
+    pattern = (r"return (\w+)\.toLowerCase\(\)\.includes\((\w+)\)\|\|(\w+)\.toLowerCase\(\)\.includes\(\2\)"
+               r"\|\|(\w+)\.toLowerCase\(\)\.includes\(\2\)")
+    new, n = re.subn(pattern, lambda m: f"{m[0]}||window.cpFilterMatch({m[3]},{m[2]})", html)
+    if n != 7:
+        raise TemplateMismatch(f"filtre de gauche : 7 predicats attendus, {n} trouves")
+    return new
+
+
 def patch_template(html: str) -> str:
     # 0. Bulle d'avertissement "Column lineage unavailable" (fausse pour un raw).
     html = _drop_lineage_warning(html)
+    html = _filter_columns(html)
 
     # 1. Encarts "Try this feature on Colibri Cloud" : Recent Commits, Saved Views, ERD.
     html = _cut(
