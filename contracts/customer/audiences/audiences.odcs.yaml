@@ -3,7 +3,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: audiences
 name: audiences
-version: 2.1.0
+version: 3.0.0
 status: active
 domain: customer
 tags: [customer]
@@ -115,23 +115,13 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.customer_key
-          - core__customers#customers.customer_key
-          - core__customers#customers.is_marketing_consented
           - core__web_events#web_events.user_id_customer_key
-          - core__web_events#web_events.user_pseudo_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.is_analytics_consented
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
         transformDescription: >-
           Cle client (e-mail hache) calculee dans la couche core et reprise ici sans recalcul.
           Un client entre dans la table s'il appartient a au moins un segment (a partir de ses ventes,
           ou de ses consultations de fiches produit rattachees par achat web ou connexion) et si son
           consentement marketing le plus recent est positif. Jamais vide.
+          Les consultations ne comptent qu'avec le consentement analytics.
         customProperties:
           - property: transformExpression
             value: customer_key
@@ -157,26 +147,14 @@ schema:
           - value: top_customers
         transformLogic: transform
         transformSourceObjects:
-          - core__sales_events#sales_events.event_at
           - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_id
-          - core__sales_events#sales_events.amount_eur
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.web_order_id
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.user_pseudo_id
-          - core__web_events#web_events.user_id_customer_key
-          - core__customers#customers.customer_key
           - core__web_events#web_events.event_type
-          - core__web_events#web_events.is_analytics_consented
-          - core__sales_events#sales_events.source_system
-          - core__customers#customers.is_marketing_consented
         transformDescription: >-
           Nom du segment, ecrit en dur par chacune des quatre branches de l'union : buyers_90d (dernier
           achat de 90 jours ou moins), inactive_12m (dernier achat de plus de 365 jours), top_customers
           (au moins 2 achats sur 365 jours et CA net dans les 10 % les plus eleves),
           product_viewers_no_purchase (fiche produit vue sur 14 jours, sans achat depuis). Jamais vide.
+          Les consultations ne comptent qu'avec le consentement analytics, le visiteur etant rattache au client par un achat web ou sa connexion. Seuls les clients au consentement marketing positif sont gardes.
         customProperties:
           - property: transformExpression
             value: segment_name
@@ -213,7 +191,6 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__customers#customers.is_marketing_consented
-          - core__customers#customers.customer_key
         transformDescription: >-
           Consentement marketing le plus recent du client, entre Shopify et la caisse. La regle est
           appliquee dans core__customers ; la valeur est reprise telle quelle. Un client sans signal ou
@@ -234,8 +211,6 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__customers#customers.consent_source
-          - core__customers#customers.is_marketing_consented
-          - core__customers#customers.customer_key
         transformDescription: >-
           Systeme (shopify ou pos) qui a emis le signal de consentement le plus recent du client.
           Repris de core__customers, rattache par customer_key, pour les seuls clients consentants.
@@ -252,8 +227,6 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__customers#customers.consent_updated_at
-          - core__customers#customers.is_marketing_consented
-          - core__customers#customers.customer_key
         transformDescription: >-
           Date et heure (UTC) du signal de consentement le plus recent du client, entre Shopify et la
           caisse. Reprise de core__customers, rattachee par customer_key, pour les seuls clients
@@ -270,12 +243,11 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.customer_key
         transformDescription: >-
           Date et heure (UTC) de la vente la plus recente du client, tous canaux (tickets de caisse et
           commandes Shopify), sans limite d'anciennete. Les retours sont ignores. Vide pour un client
           present uniquement par ses consultations de fiches produit et qui n'a jamais achete.
+          Les ventes sont rattachees par customer_key.
         customProperties:
           - property: transformExpression
             value: MAX(IF(event_type = 'sale', event_at, NULL))
@@ -289,12 +261,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.event_id
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.customer_key
         transformDescription: >-
           Nombre de ventes distinctes (tickets de caisse et commandes Shopify) du client sur les
           365 jours precedant le calcul. Les retours ne sont pas comptes. Vaut 0 sans achat.
+          Les ventes sont rattachees par customer_key.
         customProperties:
           - property: transformExpression
             value: COUNT(DISTINCT IF(event_type = 'sale' AND event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY), event_id, NULL))
@@ -308,11 +278,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
         transformDescription: >-
           Chiffre d'affaires net du client en euros TTC sur les 365 jours precedant le calcul, tous
           canaux : somme des montants des ventes et des retours. Vaut 0 sans achat sur la periode.
+          Montants rattaches par customer_key.
         customProperties:
           - property: transformExpression
             value: SUM(IF(event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY), amount_eur, 0))
@@ -325,15 +294,6 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__web_events#web_events.event_at
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.user_pseudo_id
-          - core__web_events#web_events.user_id_customer_key
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.is_analytics_consented
-          - core__sales_events#sales_events.web_order_id
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.customer_key
         transformDescription: >-
           Date et heure (UTC) de la consultation de fiche produit (view_item) la plus recente des
           14 derniers jours, avec consentement analytics. Le visiteur GA4 est rattache au client par un

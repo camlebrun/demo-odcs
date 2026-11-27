@@ -3,7 +3,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: kpis_monthly
 name: kpis_monthly
-version: 2.1.0
+version: 3.0.0
 status: active
 domain: customer
 tags: [customer]
@@ -166,10 +166,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.store_id
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Identifiant du magasin du ticket, NULL pour le canal web.
+        transformDescription: Identifiant du magasin du ticket, NULL pour le canal web. Calcul par cellule mois x canal x magasin.
         customProperties:
           - property: transformExpression
             value: ANY_VALUE(store_id)
@@ -198,11 +195,7 @@ schema:
         classification: C1
         transformLogic: transform
         transformSourceObjects:
-          - core__sales_events#sales_events.event_type
           - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
         transformDescription: Comptage des customer_key distincts ayant une vente dans la cellule mois x canal x magasin.
         customProperties:
           - property: transformExpression
@@ -215,14 +208,8 @@ schema:
         classification: C1
         transformLogic: transform
         transformSourceObjects:
-          - core__customers#customers.first_sale_date
-          - core__customers#customers.customer_key
-          - core__sales_events#sales_events.event_type
           - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Clients actifs dont la date de premiere vente (minimum toutes sources) est dans le mois de la ligne.
+        transformDescription: Clients actifs dont la date de premiere vente (minimum toutes sources) est dans le mois de la ligne. Les ventes sont rattachees a core__customers par customer_key. Calcul par cellule mois x canal x magasin, sur les seuls evenements de type vente.
         customProperties:
           - property: transformExpression
             value: COUNT(DISTINCT IF(event_type = 'sale' AND DATE_TRUNC(first_order_date, MONTH) = month_date, customer_key, NULL))
@@ -234,14 +221,8 @@ schema:
         classification: C1
         transformLogic: transform
         transformSourceObjects:
-          - core__customers#customers.first_sale_date
-          - core__customers#customers.customer_key
-          - core__sales_events#sales_events.event_type
           - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Clients actifs dont la date de premiere vente est strictement anterieure au premier jour du mois.
+        transformDescription: Clients actifs dont la date de premiere vente est strictement anterieure au premier jour du mois. Les ventes sont rattachees a core__customers par customer_key. Calcul par cellule mois x canal x magasin, sur les seuls evenements de type vente.
         customProperties:
           - property: transformExpression
             value: COUNT(DISTINCT IF(event_type = 'sale' AND first_order_date < month_date, customer_key, NULL))
@@ -253,12 +234,8 @@ schema:
         classification: C1
         transformLogic: transform
         transformSourceObjects:
-          - core__sales_events#sales_events.event_type
           - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Clients actifs dont les ventes des 12 derniers mois couvrent les deux canaux.
+        transformDescription: Clients actifs dont les ventes des 12 derniers mois couvrent les deux canaux. Calcul par cellule mois x canal x magasin, sur les seuls evenements de type vente.
         customProperties:
           - property: transformExpression
             value: COUNT(DISTINCT IF(event_type = 'sale' AND is_omnichannel_12m, customer_key, NULL))
@@ -271,11 +248,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.event_id
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Comptage des tickets de vente et des commandes Shopify retenues.
+        transformDescription: Comptage des tickets de vente et des commandes Shopify retenues. Calcul par cellule mois x canal x magasin, sur les seuls evenements de type vente.
         customProperties:
           - property: transformExpression
             value: COUNT(DISTINCT IF(event_type = 'sale', order_id, NULL))
@@ -288,11 +261,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Somme des totaux TTC des ventes, centimes de la caisse divises par 100 et total Shopify en EUR.
+        transformDescription: Somme des totaux TTC des ventes, centimes de la caisse divises par 100 et total Shopify en EUR. Calcul par cellule mois x canal x magasin, sur les seuls evenements de type vente.
         customProperties:
           - property: transformExpression
             value: SUM(IF(event_type = 'sale', amount_eur, 0))
@@ -305,11 +274,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Valeur absolue de la somme des tickets de retour et des transactions de remboursement Shopify reussies.
+        transformDescription: Valeur absolue de la somme des tickets de retour et des transactions de remboursement Shopify reussies. Calcul par cellule mois x canal x magasin, sur les seuls evenements de type retour.
         customProperties:
           - property: transformExpression
             value: -SUM(IF(event_type = 'return', amount_eur, 0))
@@ -323,10 +288,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Somme algebrique des ventes (positives) et des retours (negatifs) en EUR TTC.
+        transformDescription: Somme algebrique des ventes (positives) et des retours (negatifs) en EUR TTC. Calcul par cellule mois x canal x magasin.
         customProperties:
           - property: transformExpression
             value: SUM(amount_eur)
@@ -339,11 +301,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Somme du CA net des evenements dont la customer_key n'est pas NULL.
+        transformDescription: Somme du CA net des evenements dont la customer_key n'est pas NULL. Calcul par cellule mois x canal x magasin.
         customProperties:
           - property: transformExpression
             value: SUM(IF(customer_key IS NOT NULL, amount_eur, 0))
@@ -356,11 +314,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Somme du CA net des evenements dont la customer_key est NULL.
+        transformDescription: Somme du CA net des evenements dont la customer_key est NULL. Calcul par cellule mois x canal x magasin.
         customProperties:
           - property: transformExpression
             value: SUM(IF(customer_key IS NULL, amount_eur, 0))
@@ -372,11 +326,7 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Rapport du CA net identifie sur le CA net, en pourcentage.
+        transformDescription: Rapport du CA net identifie sur le CA net, en pourcentage. Calcul par cellule mois x canal x magasin.
         customProperties:
           - property: transformExpression
             value: 100 * SAFE_DIVIDE(SUM(IF(customer_key IS NOT NULL, amount_eur, 0)), SUM(amount_eur))
@@ -389,11 +339,7 @@ schema:
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
           - core__sales_events#sales_events.event_id
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_date
-          - core__sales_events#sales_events.channel
-          - core__sales_events#sales_events.store_code
-        transformDescription: Ventes brutes divisees par le nombre de tickets de vente et de commandes.
+        transformDescription: Ventes brutes divisees par le nombre de tickets de vente et de commandes. Calcul par cellule mois x canal x magasin, sur les seuls evenements de type vente.
         customProperties:
           - property: transformExpression
             value: SAFE_DIVIDE(SUM(IF(event_type = 'sale', amount_eur, 0)), COUNT(DISTINCT IF(event_type = 'sale', order_id, NULL)))

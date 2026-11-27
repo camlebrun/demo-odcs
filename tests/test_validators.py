@@ -103,8 +103,11 @@ def test_repository_sources_are_the_fields_that_make_the_value():
     def sources(contract_id, column):
         return {s.split(".", 1)[1] for s in _columns(contract_id)[column]["transformSourceObjects"]}
 
-    assert {"user_pseudo_id", "event_type", "is_analytics_consented", "web_order_id", "source_system"} <= sources("audiences", "customer_key")
-    # audiences n'est pas encore passee a cette definition (assertion ci-dessus).
+    assert sources("audiences", "customer_key") == {"customer_key", "user_id_customer_key"}
+    assert sources("audiences", "segment_name") == {"event_type"}
+    assert sources("audiences", "net_revenue_12m_eur") == {"amount_eur"}
+    assert sources("kpis_monthly", "new_customers_count") == {"customer_key"}
+    assert sources("kpis_monthly", "avg_basket_amount") == {"amount_eur", "event_id"}
     assert sources("acquisition_monthly", "channel") == {"platform", "marketing_channel"}
     assert sources("acquisition_monthly", "month_date") == {"spend_date", "event_at"}
     assert sources("acquisition_monthly", "campaign_name") == {"campaign_name"}
