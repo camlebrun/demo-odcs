@@ -10,7 +10,8 @@ Retraits :
 - le vocabulaire dbt (commandes `dbt build`, aides `dbt compile`, titre) ;
 - l'onglet "Compiled" (pas de code compile dans un contrat).
 Ajouts dans le panneau natif "Model info" (catalog_assets/column_info.js et .css) : infos du
-contrat, types logique et physique en accordeon, SQL de transformation, mode expert.
+contrat, types logique et physique en accordeon, SQL de transformation, mode expert, onglet
+"Trace" (pour une colonne : classification, sources, transformations et arbre de lignage).
 """
 from __future__ import annotations
 
@@ -218,6 +219,44 @@ def _drop_lineage_warning(html: str) -> str:
     return html[:a] + "null" + html[b + len(end_marker) :]
 
 
+def _trace_tab(html: str) -> str:
+    """Onglet "Trace" a cote de "Model Info" et "Lineage" : le contenu, pour le contrat selectionne,
+    est rendu par window.cpTraceTabHtml(selectedModelId)."""
+    # a) Entree de la barre d'onglets (le rendu du bouton est natif : f.map(...)), avec sa propre
+    #    icone (lucide "route"), creee par la meme fabrique que les icones du bundle.
+    icon = '_De=pi("file-text",KSt)'
+    route = (
+        'cpTraceIcon=pi("route",[["circle",{cx:"6",cy:"19",r:"3",key:"a"}],'
+        '["path",{d:"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15",key:"b"}],'
+        '["circle",{cx:"18",cy:"5",r:"3",key:"c"}]])'
+    )
+    html = _sub(html, icon + ";", icon + "," + route + ";", 1)
+    tabs = 'const f=[{id:"docs",label:"Model Info",icon:_De},{id:"lineage",label:"Lineage",icon:xqt}];'
+    trace_entry = ',{id:"trace",label:"Trace",icon:cpTraceIcon}];'
+    html = _sub(html, tabs, tabs[:-2] + trace_entry, 1)
+    # b) L'onglet actif suit l'etat de la vue : "trace" est un etat comme "docs" et "lineage".
+    html = _sub(
+        html,
+        'activeContext:i==="lineage"?"lineage":"docs"',
+        'activeContext:i==="trace"?"trace":i==="lineage"?"lineage":"docs"',
+        1,
+    )
+    # c) Panneau de contenu de l'onglet, frere du panneau docs (selectedModelId = l dans cette portee).
+    #    Fond opaque : la vue lineage reste montee dessous et ses noeuds React Flow forcent
+    #    visibility:visible en inline, ils transparaitraient sinon a travers le panneau.
+    trace_panel = (
+        'R.jsx("div",{className:`absolute inset-0 flex flex-col isolate pointer-events-none ${i!=="trace"?"invisible":""}`,'
+        'children:R.jsxs("div",{className:"flex-1 flex flex-col overflow-hidden cp-trace-wrap bg-background",children:['
+        "Ee,"
+        'R.jsx("div",{id:"cp-trace-panel",className:"flex-1 min-h-0 overflow-hidden p-4",dangerouslySetInnerHTML:{__html:window.cpTraceTabHtml(l)}})]})})'
+    )
+    html = _sub(html, "setExpandedSchemas:J})})})]})", "setExpandedSchemas:J})})})," + trace_panel + "]})", 1)
+    # d) Clic sur une ligne de colonne du panneau du contrat : l'onglet Trace reprend cette colonne.
+    row_click = "onClick:()=>{l&&s&&l(s,Y.columnName)}"
+    followed = "onClick:()=>{window.cpTraceColumnSet&&s&&window.cpTraceColumnSet(String(s),Y.columnName);l&&s&&l(s,Y.columnName)}"
+    return _sub(html, row_click, followed, 1)
+
+
 def _doc_tab(html: str) -> str:
     """Onglet "Doc" a cote de "Model Info" et "Lineage" : ouvre catalog_assets/lineage.fr.html (lien vers l'anglais dans la page)."""
     anchor = "p.label]},p.id)}),"
@@ -283,5 +322,6 @@ def patch_template(html: str) -> str:
     html = _bigquery_info(html)
     css = (ASSETS / "column_info.css").read_text(encoding="utf-8")
     js = (ASSETS / "column_info.js").read_text(encoding="utf-8")
+    html = _trace_tab(html)
     html = _doc_tab(html)
     return _sub(html, "</head>", f"<style>{css}</style><script>{js}</script></head>", 1)

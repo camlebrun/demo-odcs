@@ -117,6 +117,8 @@ def build_manifest(root: Path) -> dict:
                     "transformLogic": node.get("transformLogic"),
                     "transformDescription": node.get("transformDescription"),
                     "transformExpression": custom_prop(node, "transformExpression"),
+                    # Les sources d'un raw sont hors catalogue (aucune arete) : on les expose telles quelles.
+                    "externalSources": (sources_of(node) or None) if c.layer == "raw" else None,
                 }.items()
                 if v is not None
             }

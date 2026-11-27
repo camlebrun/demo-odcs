@@ -56,6 +56,8 @@ Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrang
 
 Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le "Expert mode" affiche dans les fiches de colonne la transformation (description et SQL) et les contrôles qualité avec leur SQL.
 
+L'onglet **Trace** liste les colonnes du contrat avec leur classification. Pour la colonne choisie : classification déclarée et la plus haute en amont, sa description et son SQL, champs sources par sensibilité (C1 et moins repliés), puis les transformations par table sans les recopies. Le SQL complet des tables et l'arbre de lignage sont repliés.
+
 ## Contribuer
 
 1. Créer une branche, ajouter ou modifier le contrat dans le bon dossier. Partir du contrat modèle.
