@@ -235,3 +235,11 @@ def test_render_writes_lineage_page_linked_from_dashboard(tmp_path):
     assert (tmp_path / "lineage.fr.html").is_file()
     assert 'href:"lineage.fr.html"' in html.read_text(encoding="utf-8")
 
+
+
+def test_manifest_exposes_external_sources_of_raw_columns_only():
+    nodes = build_catalog.build_manifest(FIXTURE)["nodes"]
+    cols = nodes["raw__pages_views__ga4"]["columns"]
+    assert cols["event_name"]["meta"]["externalSources"] == ["ga4_bigquery_export#events.event_name"]
+    assert "externalSources" not in cols["meta_loaded_at"]["meta"]
+    assert "externalSources" not in nodes["core__orders"]["columns"]["customer_key"]["meta"]
