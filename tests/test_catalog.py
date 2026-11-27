@@ -419,8 +419,8 @@ def test_trace_tree_names_the_table_of_every_column(tmp_path):
     g["nodes"]["mart"]["relationName"] = "proj.customer.mart_table"
     t = _trace(tmp_path, g, "mart", "k")
     deep = t[t.index('<div class="cp-deep"'):]
-    assert '<span class="cp-tname">raw.x</span>' in deep, "table de l'entree"
-    assert '<span class="cp-tname">customer.mart_table</span>' in deep, "table de la colonne choisie"
+    assert '<span class="cp-tname">proj.raw.x</span>' in deep, "table de l'entree"
+    assert '<span class="cp-tname">proj.customer.mart_table</span>' in deep, "table de la colonne choisie"
     assert '<div class="cp-dtitle">mart.k</div><div class="cp-from">proj.customer.mart_table</div>' in deep
 
 

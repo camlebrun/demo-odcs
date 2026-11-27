@@ -18,7 +18,7 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 
 ### Modifié
 - Catalogue, onglet Trace : arbre de lignage toujours affiché (sans accordéon) et en premier, avec couche et classification de chaque source ; sources nommées par contrat raw ; SQL des expressions réservé au « Data engineer mode » (ex « Expert mode »), SQL des contrôles qualité toujours affiché ; références des systèmes externes retirées de l'arbre. Le filtre de gauche cherche aussi dans les colonnes et les dossiers. Tutoriel en tête de la page Doc française.
-- Onglet Trace : chaque colonne de l'arbre et du détail porte le nom de sa table (`dataset.table`). Couleurs : noms en noir, système source en gris, pâle réservé aux colonnes « shown above ».
+- Onglet Trace : chaque colonne de l'arbre et du détail porte l'identifiant complet de sa table (`projet.dataset.table`). Couleurs : noms en noir, système source en gris, pâle réservé aux colonnes « shown above ».
 - Onglet Trace : responsable de la table, nombre de colonnes amont dans le titre de l'arbre. `audiences.segment_name` déclare ses sources.
 - **Cassant** : le bloc `customProperties` des contrats (dont `transformInputs`, `sponsor`) est retiré des 8 contrats core et customer ; le « Full table SQL » disparaît donc du catalogue. `acquisition_monthly.campaign_name` porte son SQL complet et toutes ses sources. Les références de système source sont toujours affichées.
 - Lineage de la devise jusqu'aux raw : colonne `currency` dans `core__sales_events` et `core__ad_spend` (1.1.0) ; `currency` de `acquisition_monthly` et `kpis_monthly` en `transform` avec ses sources.

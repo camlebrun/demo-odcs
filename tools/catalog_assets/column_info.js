@@ -209,11 +209,10 @@
     if ((data().nodes[c] || {}).nodeType === "source") return "raw";
     return c.indexOf("core__") === 0 ? "core" : "customer";
   }
-  /* dataset.table (le projet est le meme partout) ; vide si le contrat ne declare pas de table. */
+  /* Identifiant complet projet.dataset.table ; vide si le contrat ne declare pas de table. */
   function tableName(c, col) {
     if (!(data().nodes[c] || {}).relationName) return "";
-    var parts = tableRef(c, col).table.split(".");
-    return '<span class="cp-tname">' + esc(parts.slice(parts.length > 2 ? 1 : 0).join(".")) + "</span> ";
+    return '<span class="cp-tname">' + esc(tableRef(c, col).table) + "</span> ";
   }
   /* Ligne de l'arbre (et du detail) : un bouton qui selectionne la colonne. */
   function nodeButton(c, col, cls, extra) {
