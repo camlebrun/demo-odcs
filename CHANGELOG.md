@@ -5,6 +5,8 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 ## [Unreleased]
 
 ### Ajouté
+- Catalogue : la recherche globale (⌘K) lit aussi les descriptions des contrats et des colonnes.
+- Catalogue : bouton « Copy link » dans l'onglet Trace ; le lien rouvre l'onglet sur la colonne (`?model=…&column=…&view=trace`).
 - 14 contrats raw (shopify 4, pos 4, ga4 2, googleads 2, metaads 2) et 3 contrats customer avec lineage par property, et leurs fiches `docs/use-cases/`.
 - Catalogue de données : `tools/build_catalog.py` génère le JSON et le dashboard statique de [dbt-colibri](https://github.com/b-ned/dbt-colibri) (MIT) à partir des contrats, sans dbt (`make catalog`).
 - Couche core : 5 contrats (`core__sales_events`, `core__customers`, `core__ad_spend`, `core__campaigns`, `core__web_events`) et règle L019 (clé primaire en core).

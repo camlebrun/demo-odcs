@@ -278,10 +278,21 @@ def _filter_columns(html: str) -> str:
     return new
 
 
+def _search_descriptions(html: str) -> str:
+    """Recherche globale : colibri ne compare que les noms. On ajoute la description du contrat et
+    celle de chaque colonne, classees apres les correspondances sur le nom (score 100)."""
+    html = _sub(html, "cue(i.id,s,40)]):null", "cue(i.id,s,40),cue(i.description,s,100)]):null", 1)
+    html = _sub(html, "gqt=(i,s)=>cue(i,s,0)", "gqt=(i,s,d)=>hqt([cue(i,s,0),cue(d,s,100)])", 1)
+    html = _sub(html, "gqt(Xe.columnName,Me)", "gqt(Xe.columnName,Me,Xe.description)", 1)
+    html = _sub(html, 'placeholder:"Search models, sources..."', 'placeholder:"Search contracts, columns, descriptions..."', 1)
+    return _sub(html, 'placeholder:"Search for models and columns..."', 'placeholder:"Search contracts, columns, descriptions..."', 1)
+
+
 def patch_template(html: str) -> str:
     # 0. Bulle d'avertissement "Column lineage unavailable" (fausse pour un raw).
     html = _drop_lineage_warning(html)
     html = _filter_columns(html)
+    html = _search_descriptions(html)
 
     # 1. Encarts "Try this feature on Colibri Cloud" : Recent Commits, Saved Views, ERD.
     html = _cut(

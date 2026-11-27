@@ -24,9 +24,46 @@
     if (ev.target.closest("[data-cp-expert]")) return window.cpToggleExpert();
     var btn = ev.target.closest("[data-cp-col]");
     if (btn) return window.cpTraceColumnSet(btn.getAttribute("data-cp-model"), btn.getAttribute("data-cp-col"));
+    btn = ev.target.closest("[data-cp-link]");
+    if (btn) return copyLink(btn);
     btn = ev.target.closest("[data-cp-node-col]");
     if (btn) window.cpTraceNodeSet(btn.getAttribute("data-cp-node-model"), btn.getAttribute("data-cp-node-col"));
   });
+
+  /* Lien vers une colonne : ouvre l'onglet Trace sur elle. view=trace le distingue des liens de
+     colibri (?model=&column=), qui ouvrent la vue lineage et gardent leur comportement. */
+  window.cpColumnLink = function (model, col) {
+    var base = String((window.location || {}).href || "").split("#")[0].split("?")[0];
+    return base + "?model=" + encodeURIComponent(model) + "&column=" + encodeURIComponent(col) + "&view=trace";
+  };
+  window.cpDeepLink = function (search) {
+    try {
+      var p = new URLSearchParams(search || "");
+      var model = p.get("model"), column = p.get("column");
+      return p.get("view") === "trace" && model && column ? { model: model, column: column } : null;
+    } catch (e) { return null; }
+  };
+  function copyLink(btn) {
+    var url = window.cpColumnLink(btn.getAttribute("data-cp-link"), btn.getAttribute("data-cp-link-col"));
+    var manual = function () { window.prompt("Copy this link:", url); };
+    if (!navigator.clipboard) return manual();
+    navigator.clipboard.writeText(url).then(function () { btn.textContent = "Link copied"; }, manual);
+  }
+  /* A lire tout de suite : colibri reecrit l'URL au montage et retire view=trace. */
+  var LINKED = window.cpDeepLink((window.location || {}).search);
+  /* Au chargement d'un lien de colonne : attendre l'onglet Trace (rendu par React), l'ouvrir,
+     puis selectionner la colonne. Abandon apres 15 s. */
+  function openLinked(tries) {
+    var tab = Array.prototype.filter.call(document.querySelectorAll("button"), function (b) {
+      return b.textContent.trim() === "Trace";
+    })[0];
+    if (tab && data().nodes[LINKED.model]) {
+      window.cpTraceColumnSet(LINKED.model, LINKED.column);
+      return tab.click();
+    }
+    if (tries > 0) setTimeout(function () { openLinked(tries - 1); }, 100);
+  }
+  if (LINKED) setTimeout(function () { openLinked(150); }, 0);
 
   function data() { return window.colibriData || { nodes: {}, lineage: { edges: [] } }; }
   function esc(s) {
@@ -222,7 +259,8 @@
       "<div>Declared: " + levelBadge(m.classification) +
       (walk.highest ? " Highest upstream: " + levelBadge(walk.highest) : "") + "</div>" +
       (columnOf(model, col).description ? "<div>" + esc(columnOf(model, col).description) + "</div>" : "") +
-      ownerHtml(model) + "</div>";
+      ownerHtml(model) +
+      '<button type="button" class="cp-link" data-cp-link="' + esc(model) + '" data-cp-link-col="' + esc(col) + '">Copy link</button></div>';
   }
   /* Colonne choisie : en-tete, puis l'arbre et le detail. `node` est la ligne
      choisie dans l'arbre, absente tant qu'on n'a rien clique. */
