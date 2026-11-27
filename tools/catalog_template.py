@@ -222,9 +222,17 @@ def _drop_lineage_warning(html: str) -> str:
 def _trace_tab(html: str) -> str:
     """Onglet "Trace" a cote de "Model Info" et "Lineage" : pour le contrat selectionne, toutes les
     transformations des contrats raw jusqu'a lui, rendues par window.cpTraceTabHtml(selectedModelId)."""
-    # a) Entree de la barre d'onglets (le rendu du bouton est natif : f.map(...)).
+    # a) Entree de la barre d'onglets (le rendu du bouton est natif : f.map(...)), avec sa propre
+    #    icone (lucide "route"), creee par la meme fabrique que les icones du bundle.
+    icon = '_De=pi("file-text",KSt)'
+    route = (
+        'cpTraceIcon=pi("route",[["circle",{cx:"6",cy:"19",r:"3",key:"a"}],'
+        '["path",{d:"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15",key:"b"}],'
+        '["circle",{cx:"18",cy:"5",r:"3",key:"c"}]])'
+    )
+    html = _sub(html, icon + ";", icon + "," + route + ";", 1)
     tabs = 'const f=[{id:"docs",label:"Model Info",icon:_De},{id:"lineage",label:"Lineage",icon:xqt}];'
-    trace_entry = ',{id:"trace",label:"Trace",icon:xqt}];'
+    trace_entry = ',{id:"trace",label:"Trace",icon:cpTraceIcon}];'
     html = _sub(html, tabs, tabs[:-2] + trace_entry, 1)
     # b) L'onglet actif suit l'etat de la vue : "trace" est un etat comme "docs" et "lineage".
     html = _sub(

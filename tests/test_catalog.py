@@ -103,7 +103,7 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
-    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace"', 'id:"cp-trace-panel"', "data-cp-col", "cp-trace-wrap bg-background", ".cp-trace-wrap{pointer-events:auto}"))
+    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace",icon:cpTraceIcon', 'cpTraceIcon=pi("route"', 'id:"cp-trace-panel"', "data-cp-col", "cp-trace-wrap bg-background", ".cp-trace-wrap{pointer-events:auto}"))
     assert "data-sidebar-column]{" not in html, "plus de contournement CSS sur le panneau natif"
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
