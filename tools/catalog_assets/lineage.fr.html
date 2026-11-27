@@ -100,13 +100,10 @@ summary{cursor:pointer;font-weight:600}
   transformLogic: transform
   transformSourceObjects:
     - core__ad_spend#ad_spend.spend_eur
-    - core__ad_spend#ad_spend.spend_date
-    - core__ad_spend#ad_spend.platform
-    - core__ad_spend#ad_spend.campaign_id
   customProperties:
     - property: transformExpression
       value: IFNULL(SUM(spend_eur), 0)</code></pre>
-<p>La dépense est la somme de <code>spend_eur</code>. Les trois autres colonnes servent à la grouper par mois, canal et campagne : <b>elles sont citées aussi</b>, pas seulement celle de l'expression.</p>
+<p>La dépense est la somme de <code>spend_eur</code> : c'est la seule source. <b>Une source est un champ qui fournit la valeur</b>. Les colonnes qui ne servent qu'à joindre, filtrer ou grouper (ici le mois, la plateforme et la campagne) ne sont pas listées : elles sont décrites en français dans <code>transformDescription</code>. Pour une constante selon l'origine, on liste l'identifiant ou le champ type de chaque table d'origine.</p>
 <details><summary>Nos règles d'écriture</summary>
 <ul><li>Un champ imbriqué s'écrit avec son chemin : <code>raw__refunds__shopify#refunds.transactions.amount</code>.</li><li><code>transformExpression</code> : le SQL BigQuery, propriété maison dans <code>customProperties</code>. Il est affiché, jamais exécuté.</li></ul><div class="scroll"><table><tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression</th></tr>
 <tr><td><code>map</code></td><td>exactement une</td><td>facultative : renommage ou cast simple seulement</td></tr>
@@ -122,7 +119,7 @@ summary{cursor:pointer;font-weight:600}
 <svg width="720" viewBox="0 0 720 308" role="img" aria-label="Une source transformSourceObjects declaree dans le contrat devient une arete dans lineage.edges, puis une fleche entre les tables core__ad_spend et acquisition_monthly dans le catalogue.">
 <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--accent)"/></marker></defs>
 <rect class="box" x="0" y="0" width="720" height="88" rx="8"/>
-<text class="cap" x="14" y="24">1. Dans le contrat — une des 4 sources de <tspan class="mono">spend_amount</tspan></text>
+<text class="cap" x="14" y="24">1. Dans le contrat — la source de <tspan class="mono">spend_amount</tspan></text>
 <text class="mono" x="14" y="46">- name: spend_amount</text>
 <text class="mono" x="14" y="64">  transformSourceObjects: <tspan class="hi">core__ad_spend#ad_spend.spend_eur</tspan></text>
 <text class="lab" x="219" y="80" text-anchor="middle">contrat</text>
