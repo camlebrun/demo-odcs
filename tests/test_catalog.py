@@ -109,6 +109,8 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     for text in forbidden:
         assert text not in html, text
     assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", "window.cpFilterMatch(", 'id:"trace",label:"Trace",icon:cpTraceIcon', 'cpTraceIcon=pi("route"', 'id:"cp-trace-panel"', "data-cp-col", "cp-trace-wrap bg-background", ".cp-trace-wrap{pointer-events:auto}"))
+    assert "f=window.cpFold(i),p=window.cpFold(s)" in html, "recherche sans accents"
+    assert "window.cpTagMatch(Me.tags,x)" in html and "window.cpColumnTags(Xe.tags,x)" in html, "filtres par tag jusqu'aux colonnes"
     assert "cue(i.description,s,100)" in html, "la recherche globale lit la description du contrat"
     assert "gqt(Xe.columnName,Me,Xe.description)" in html, "et la description de colonne"
     assert 'placeholder:"Search contracts, columns, descriptions..."' in html
@@ -127,6 +129,7 @@ global.window = { location: { href: "https://x.test/index.html?model=old#h", sea
 global.document = { documentElement: { classList: { toggle() {} } }, addEventListener() {} };
 global.navigator = {};
 eval(fs.readFileSync(process.argv[2], "utf8"));
+if (window.cpColumnLink("m") !== "https://x.test/index.html?model=m&view=trace") throw new Error("lien de contrat");
 const link = window.cpColumnLink("a b", "c&d");
 console.log(JSON.stringify([link, window.cpDeepLink(new URL(link).search),
   window.cpDeepLink("?model=m&column=c"), window.cpDeepLink("?view=trace&model=m")]));
@@ -136,9 +139,49 @@ console.log(JSON.stringify([link, window.cpDeepLink(new URL(link).search),
     link, back, native, partial = json.loads(out.stdout)
     assert link == "https://x.test/index.html?model=a%20b&column=c%26d&view=trace"
     assert back == {"model": "a b", "column": "c&d"}
-    assert native is None and partial is None, "un lien sans view=trace garde le comportement de colibri"
+    assert partial == {"model": "m", "column": None}, "un lien peut viser un contrat sans colonne"
+    assert native is None, "un lien sans view=trace garde le comportement de colibri"
     html = _trace(tmp_path, _graph({"core__a": ["x"]}, []), "core__a", "x")
     assert 'data-cp-link' in html and "Copy link" in html
+
+
+def test_search_folds_accents_and_combines_tag_groups(tmp_path):
+    node_bin = shutil.which("node")
+    if not node_bin:
+        pytest.skip("node est necessaire pour executer le JS du catalogue")
+    harness = tmp_path / "f.js"
+    harness.write_text("""
+const fs = require("fs");
+global.window = {}; global.document = { documentElement: { classList: { toggle() {} } }, addEventListener() {} }; global.navigator = {};
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const sel = new Set(["owner:a", "owner:b", "pii"]);
+console.log(JSON.stringify([window.cpFold("P\u00e9rim\u00e8tre"),
+  window.cpTagMatch(["owner:b", "pii"], sel), window.cpTagMatch(["owner:b"], sel), window.cpTagMatch([], new Set()),
+  window.cpColumnTags(["pii"], sel), window.cpColumnTags([], sel), window.cpColumnTags([], new Set(["owner:a"])),
+  window.cpColumnFiltered(sel), window.cpColumnFiltered(new Set(["owner:a"])),
+  window.cpColumnTags(["pseudonymized"], new Set(["pii", "pseudonymized"])), window.cpColumnTags(["pseudonymized"], new Set(["pii"]))]));
+""", encoding="utf-8")
+    out = subprocess.run([node_bin, str(harness), str(ASSETS / "column_info.js")], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == ["perimetre", True, False, True, True, False, True, True, False, True, False]
+
+
+def test_contract_tags_expose_owner_classification_and_pii():
+    m = build_catalog.build_manifest(ASSETS.parents[1])
+    tags = m["nodes"]["audiences"]["tags"]
+    assert "owner:team-customer" in tags and "classification:C2" in tags
+    levels = {t for c in m["nodes"]["audiences"]["columns"].values() for t in c.get("tags", []) if t.startswith("classification:") or t in ("pii", "pseudonymized")}
+    assert levels <= set(tags)
+    assert "pseudonymized" in tags
+
+
+def test_nested_field_inherits_the_documentation_of_its_parent(tmp_path):
+    parent = {"meta": {"transformLogic": "map", "transformDescription": "Recopie du tableau.", "externalSources": ["api#R.t"]}}
+    nodes = {"core__a": {"id": "core__a", "columns": {"x": _col("transform", "Somme.")}},
+             "raw__r__s": {"id": "raw__r__s", "nodeType": "source", "columns": {"t": parent, "t.amount": {"meta": {}}}}}
+    edge = {"source": "raw__r__s", "sourceColumn": "t.amount", "target": "core__a", "targetColumn": "x"}
+    html = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": [edge]}}, "core__a", "x")
+    assert "t.amount" in html and "not documented" not in html and "api#R.t" in html
 
 
 def _col(logic=None, desc=None):

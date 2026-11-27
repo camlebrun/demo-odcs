@@ -5,6 +5,8 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 ## [Unreleased]
 
 ### Ajouté
+- Catalogue : la recherche ignore les accents ; filtres par responsable, classification, PII et données pseudonymisées (tags de la recherche ⌘K, combinés en ET entre groupes) ; lien vers un contrat (« Copy contract link »).
+- Catalogue : dans l'onglet Trace, un champ imbriqué reprend la documentation de son champ parent (plus de faux « not documented »).
 - Catalogue : la recherche globale (⌘K) lit aussi les descriptions des contrats et des colonnes.
 - Catalogue : bouton « Copy link » dans l'onglet Trace ; le lien rouvre l'onglet sur la colonne (`?model=…&column=…&view=trace`).
 - 14 contrats raw (shopify 4, pos 4, ga4 2, googleads 2, metaads 2) et 3 contrats customer avec lineage par property, et leurs fiches `docs/use-cases/`.

@@ -281,6 +281,22 @@ def _filter_columns(html: str) -> str:
 def _search_descriptions(html: str) -> str:
     """Recherche globale : colibri ne compare que les noms. On ajoute la description du contrat et
     celle de chaque colonne, classees apres les correspondances sur le nom (score 100)."""
+    # Sans accents ni casse : "périmètre" et "perimetre" donnent le meme resultat.
+    html = _sub(html, "f=i.toLowerCase(),p=s.toLowerCase()", "f=window.cpFold(i),p=window.cpFold(s)", 1)
+    # Filtre par tags : ET entre responsable, classification et PII (colibri faisait un OU), et
+    # classification / PII s'appliquent aussi colonne par colonne, avec ou sans texte saisi.
+    html = _sub(html, "description:ie.description})):[]", "description:ie.description,tags:ie.tags||[]})):[]", 1)
+    html = _sub(html, "be=be.filter(Me=>Me.tags.some(ue=>x.has(ue))));", "be=be.filter(Me=>window.cpTagMatch(Me.tags,x)));", 1)
+    html = _sub(html, "for(const Xe of ue.columns){const un=gqt(", "for(const Xe of ue.columns){if(!window.cpColumnTags(Xe.tags,x))continue;const un=gqt(", 1)
+    html = _sub(
+        html,
+        'else if(y.size>0||x.size>0)for(const Me of be)ye.push({...Me,resultType:"model",searchScore:0,matchIndex:0});',
+        'else if(y.size>0||x.size>0)for(const Me of be){ye.push({...Me,resultType:"model",searchScore:0,matchIndex:0});'
+        'if(Be&&window.cpColumnFiltered(x))for(const Xe of Me.columns)window.cpColumnTags(Xe.tags,x)&&'
+        'ye.push({...Me,resultType:"column",matchedColumn:Xe.columnName,matchedColumnDataType:Xe.dataType,searchScore:0,matchIndex:0})}',
+        1,
+    )
+    html = _sub(html, "Y.columns.slice(0,20)", "Y.columns.slice(0,200)", 1)
     html = _sub(html, "cue(i.id,s,40)]):null", "cue(i.id,s,40),cue(i.description,s,100)]):null", 1)
     html = _sub(html, "gqt=(i,s)=>cue(i,s,0)", "gqt=(i,s,d)=>hqt([cue(i,s,0),cue(d,s,100)])", 1)
     html = _sub(html, "gqt(Xe.columnName,Me)", "gqt(Xe.columnName,Me,Xe.description)", 1)
