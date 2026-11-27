@@ -47,6 +47,7 @@ html.cp-expert .cp-expert-toggle{background:hsl(var(--purple-primary));border-co
 .cp-query pre{max-height:none}
 .cp-sql pre{white-space:pre}
 .cp-table{font-weight:600;margin-top:4px}
+.cp-fname{font:600 11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:hsl(var(--muted-foreground));margin-top:4px}
 .cp-from{font-size:11.5px;color:hsl(var(--muted-foreground));overflow-wrap:anywhere}
 .cp-from>div{padding-left:10px}
 .cp-summary .cp-badge{margin-right:6px}

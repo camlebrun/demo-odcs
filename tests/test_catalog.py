@@ -372,9 +372,9 @@ def test_trace_shows_column_description_first_and_hides_trivial_sql(tmp_path):
     t = _trace(tmp_path, g, "mart", "is_ok")
     summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
     header = summary.split(">Transformations<")[0]
-    assert header.index("Toujours vrai ici.") < header.index(">Transformation<") < header.index("Calcul is_ok.") < header.index("latest")
+    assert header.index("Toujours vrai ici.") < header.index(">transformDescription<") < header.index("Calcul is_ok.") < header.index(">transformExpression<") < header.index("latest")
     assert "Calcul flag." in summary and "Description de l" not in summary, "une etape dit comment la colonne est calculee"
-    assert summary.count("Transformation SQL") == 1 and "latest" in summary, "le SQL reduit au nom de colonne est masque"
+    assert summary.count("Transformation SQL") == 2, "affiche meme quand il reprend le nom de la colonne"
     del top["description"]
     assert "Calcul is_ok." in _trace(tmp_path, g, "mart", "is_ok"), "repli sur transformDescription"
 
@@ -388,8 +388,8 @@ def test_trace_steps_list_their_source_objects(tmp_path):
     t = _trace(tmp_path, g, "mart", "k")
     summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
     header, steps = summary.split(">Transformations<")
-    assert '<div class="cp-from">Source objects<div>proj.core.a: k</div></div>' in header
-    assert '<div class="cp-from">Source objects<div>proj.raw.x: a, b</div></div>' in steps
+    assert '<div class="cp-fname">transformSourceObjects</div><div class="cp-from"><div>proj.core.a: k</div></div>' in header
+    assert '<div class="cp-from"><div>proj.raw.x: a, b</div></div>' in steps
 
 
 def test_trace_shows_sources_unfolded_when_none_is_sensitive(tmp_path):
@@ -407,3 +407,13 @@ def test_trace_column_without_upstream_says_it_once(tmp_path):
     t = _trace(tmp_path, g, "raw__x", "nested").split('<details class="cp-deep">')[0]
     assert "No upstream lineage declared" in t
     assert "plain copies only" not in t and "step not documented" not in t and ">Sources<" not in t
+
+
+def test_trace_shows_the_same_three_fields_for_every_column_and_step(tmp_path):
+    g = _graph({"core__a": ["k"], "mart": ["k", "cur"]}, [("core__a", "k", "mart", "k")])
+    g["nodes"]["mart"]["columns"]["cur"] = {"meta": {"transformLogic": "create", "transformDescription": "Constante."}}
+    for col, blocks in (("k", 2), ("cur", 1)):
+        summary = _trace(tmp_path, g, "mart", col).split('<details class="cp-deep">')[0]
+        for name in ("transformDescription", "transformExpression", "transformSourceObjects"):
+            assert summary.count(f'>{name}<') == blocks, (col, name)
+    assert summary.count("not declared") == 1 and ">none<" in summary and ">create<" in summary

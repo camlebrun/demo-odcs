@@ -221,14 +221,6 @@
     return shown + (folded ? acc("C1 and lower · " + plural(low, "field"), folded, false) : "");
   }
   function columnOf(c, col) { return ((data().nodes[c] || {}).columns || {})[col] || {}; }
-  /* Texte en tete : la description de la colonne (la regle metier), sinon celle de la transformation. */
-  function textOf(c, col) { return columnOf(c, col).description || metaOf(c, col).transformDescription || ""; }
-  function descOf(text) { return text ? esc(text) : '<span class="cp-note">Transformation not documented</span>'; }
-  /* SQL de la colonne, masque quand il se reduit a son nom. */
-  function expressionOf(c, col) {
-    var expression = String(metaOf(c, col).transformExpression || "").trim();
-    return expression && expression !== String(col).split(".").pop() ? sql(expression, "Transformation SQL") : "";
-  }
   /* Identifiant de la table (projet.dataset.table) et colonne. Un contrat a plusieurs tables a une
      relation "{a,b}" et des colonnes "<table>.<champ>". Sans relation : l'identifiant du contrat. */
   function tableRef(c, col) {
@@ -238,7 +230,7 @@
     var parts = String(col).split("."), object = parts.shift();
     return { table: relation.replace(/\{.*\}/, function () { return object; }), column: parts.join(".") };
   }
-  /* Entrees directes d'une colonne (transformSourceObjects) : une ligne par table, puis ses colonnes. */
+  /* Entrees directes d'une colonne : une ligne par table puis ses colonnes, et les sources externes. */
   function sourceObjectsHtml(c, col) {
     var byTable = {}, tables = [];
     parentsOf(c, col).forEach(function (p) {
@@ -246,14 +238,25 @@
       if (!byTable[ref.table]) { byTable[ref.table] = []; tables.push(ref.table); }
       byTable[ref.table].push(ref.column);
     });
-    return tables.length ? '<div class="cp-from">Source objects' + tables.map(function (table) {
-      return "<div>" + esc(table + ": " + byTable[table].join(", ")) + "</div>";
-    }).join("") + "</div>" : "";
+    var lines = tables.map(function (table) { return table + ": " + byTable[table].join(", "); })
+      .concat(metaOf(c, col).externalSources || []);
+    return lines.length ? '<div class="cp-from">' + lines.map(function (line) { return "<div>" + esc(line) + "</div>"; }).join("") + "</div>"
+      : '<div class="cp-note">none</div>';
   }
+  /* Les trois champs de transformation du contrat, nommes et toujours presents, pour la colonne
+     choisie comme pour chaque etape : rien n'est masque, l'absence est dite. */
+  function transformationHtml(c, col) {
+    var m = metaOf(c, col), missing = '<div class="cp-note">not declared</div>';
+    function field(name, body) { return '<div class="cp-fname">' + name + "</div>" + body; }
+    return field("transformDescription", m.transformDescription ? "<div>" + esc(m.transformDescription) + "</div>" : missing) +
+      field("transformExpression", m.transformExpression ? sql(m.transformExpression, "Transformation SQL") : missing) +
+      field("transformSourceObjects", sourceObjectsHtml(c, col));
+  }
+  function logicBadge(m) { return m.transformLogic ? badge(m.transformLogic) : ""; }
   /* Une etape amont : colonne, classification, description, entrees (la table est le titre du groupe). */
   function stepHtml(s) {
     return '<div class="cp-step"><div><span class="cp-hopcol">' + esc(tableRef(s.c, s.col).column) + "</span> " +
-      levelBadge(s.m.classification) + "</div><div>" + descOf(s.m.transformDescription) + "</div>" + expressionOf(s.c, s.col) + sourceObjectsHtml(s.c, s.col) + "</div>";
+      levelBadge(s.m.classification) + logicBadge(s.m) + "</div>" + transformationHtml(s.c, s.col) + "</div>";
   }
   /* Mots a surligner : la colonne choisie et les champs cites par son SQL (ni mots-cles ni fonctions). */
   function wordsOf(col, expression) {
@@ -272,13 +275,6 @@
         return '<span class="cp-line' + (words.test(line) ? " cp-hit" : "") + '">' + (hl(line) || " ") + "</span>";
       }).join("") + "</code></pre></div>";
   }
-  /* Transformation de la colonne choisie : sa transformDescription (sauf si l'en-tete la montre deja)
-     et son SQL. */
-  function transformationHtml(c, col) {
-    var text = metaOf(c, col).transformDescription;
-    var h = (text && text !== textOf(c, col) ? "<div>" + esc(text) + "</div>" : "") + expressionOf(c, col);
-    return h ? '<div class="cp-h">Transformation</div>' + h : "";
-  }
   /* Bloc resume, assemble sans rien reformuler : la colonne choisie et sa classification (declaree,
      et la plus haute en amont), les champs sources, puis les transformations par table, de la plus
      proche a la plus lointaine. */
@@ -288,7 +284,8 @@
       "<div>Declared: " + levelBadge(m.classification) +
       (walk.highest ? " Highest upstream: " + levelBadge(walk.highest) +
         '<div class="cp-note">Upstream includes fields used only for joins or filters.</div>' : "") + "</div>" +
-      "<div>" + descOf(textOf(model, col)) + "</div>" + transformationHtml(model, col) + sourceObjectsHtml(model, col);
+      (columnOf(model, col).description ? "<div>" + esc(columnOf(model, col).description) + "</div>" : "") +
+      '<div class="cp-h">Transformation ' + logicBadge(m) + "</div>" + transformationHtml(model, col);
     /* Colonne sans amont ni source externe : l'avertissement au-dessus du bloc suffit. */
     var traced = parentsOf(model, col).length || m.externalSources;
     var sources = traced ? sourcesHtml(walk) : "";

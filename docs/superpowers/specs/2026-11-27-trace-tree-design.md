@@ -12,16 +12,16 @@ Un data steward choisit une colonne et comprend ce qui a été fait, des sources
 ## Écran
 Liste des colonnes à gauche, avec leur classification déclarée. À droite, de haut en bas :
 1. Colonne et table ; classification déclarée et la plus haute en amont (un signal, pas un verdict).
-2. `description` de la colonne, sinon `transformDescription`.
-3. Transformation : `transformDescription` et `transformExpression`.
-4. « Source objects » : entrées directes, une ligne par table puis ses colonnes.
+2. `description` de la colonne.
+3. « Transformation » avec `transformLogic`, puis `transformDescription`, `transformExpression` et `transformSourceObjects`.
+4. Ces trois champs sont nommés et toujours présents, pour la colonne comme pour chaque étape ; l'absence est écrite.
 5. « Sources » : champs sources par niveau puis système, PII signalée. C1 et moins repliés seulement s'il y a plus sensible ; les champs non classés restent visibles.
-6. « Transformations » : par table, de la plus proche à la plus lointaine, sans les recopies `map` ; description, SQL et entrées de chaque étape.
+6. « Transformations » : par table, de la plus proche à la plus lointaine, sans les recopies `map` ; les trois mêmes champs à chaque étape.
 7. « Full table SQL » (replié) : `transformInputs` de chaque table, lignes de la colonne surlignées.
 8. « Lineage tree » (replié) : arbre jusqu'aux systèmes sources, avec le détail de la ligne choisie ; une colonne partagée n'est dépliée qu'une fois.
 
 ## Règles
-- `transformExpression` est masqué quand il se réduit au nom de la colonne.
+- Rien n'est masqué, même un `transformExpression` qui reprend le nom de la colonne.
 - Colonne sans amont ni source externe : un seul avertissement.
 - Limite de 400 lignes : message visible.
 - Assemblé par le code depuis les champs existants : aucun contrat modifié, aucune IA.
