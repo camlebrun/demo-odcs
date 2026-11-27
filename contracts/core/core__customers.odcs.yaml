@@ -2,7 +2,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: core__customers
 name: core__customers
-version: 1.0.0
+version: 1.1.0
 status: active
 domain: core
 tags:
@@ -48,46 +48,6 @@ slaProperties:
     unit: y
     element: customers
     description: Historique conservé 3 ans.
-customProperties:
-  - property: transformInputs
-    value: |-
-      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
-      -- Colonnes de customers_all : celles de la table.
-      WITH consent AS (
-        -- Règle « le signal de consentement le plus récent gagne ».
-        SELECT customer_key, ARRAY_AGG(STRUCT(is_opted_in, signal_at, source) ORDER BY signal_at DESC NULLS LAST LIMIT 1)[OFFSET(0)] AS latest
-        FROM (
-          SELECT IF(NULLIF(TRIM(c.email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(c.email))))) AS customer_key,
-                 c.accepts_marketing AS is_opted_in, c.accepts_marketing_updated_at AS signal_at, 'shopify' AS source
-          FROM raw_shopify.customers c
-          UNION ALL
-          SELECT IF(NULLIF(TRIM(lm.email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(lm.email))))),
-                 lm.marketing_opt_in, lm.marketing_opt_in_at, 'pos'
-          FROM raw_pos.loyalty_members lm
-        ) WHERE customer_key IS NOT NULL AND is_opted_in IS NOT NULL
-        GROUP BY customer_key
-      ),
-      first_dates AS (
-        SELECT customer_key,
-               MIN(IF(event_type = 'sale', event_date, NULL)) AS first_sale_date,
-               MIN(IF(event_type = 'sale' AND source_system = 'shopify', event_at, NULL)) AS first_web_order_at
-        FROM core.sales_events WHERE customer_key IS NOT NULL GROUP BY customer_key
-      ),
-      known_keys AS (
-        SELECT IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email))))) AS customer_key
-        FROM (SELECT email FROM raw_shopify.customers UNION ALL SELECT email FROM raw_pos.loyalty_members)
-        UNION DISTINCT
-        SELECT customer_key FROM first_dates
-      ),
-      customers_all AS (
-        SELECT k.customer_key, consent.latest.is_opted_in AS is_marketing_consented, consent.latest.source AS consent_source,
-               consent.latest.signal_at AS consent_updated_at, f.first_sale_date, f.first_web_order_at
-        FROM known_keys k
-        LEFT JOIN consent USING (customer_key)
-        LEFT JOIN first_dates f USING (customer_key)
-        WHERE k.customer_key IS NOT NULL
-      )
-      -- Chaque champ : SELECT <champs> FROM customers_all
 schema:
   - name: customers
     physicalName: customers
@@ -141,7 +101,7 @@ schema:
         transformDescription: Hachage des e-mails Shopify et fidélité, complété par les clés déjà présentes dans les ventes.
         customProperties:
           - property: transformExpression
-            value: customer_key
+            value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
       - name: is_marketing_consented
         physicalType: BOOL
         logicalType: boolean
@@ -151,13 +111,11 @@ schema:
           - pseudonymized
         transformLogic: transform
         transformSourceObjects:
-          - raw__customers__shopify#customers.email
           - raw__customers__shopify#customers.accepts_marketing
-          - raw__customers__shopify#customers.accepts_marketing_updated_at
-          - raw__loyalty_members__pos#loyalty_members.email
           - raw__loyalty_members__pos#loyalty_members.marketing_opt_in
-          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in_at
-        transformDescription: Valeur du signal de consentement le plus récent.
+        transformDescription: >-
+          Valeur du signal de consentement le plus récent, rapproché par la clé client (e-mail haché). Les
+          signaux sans valeur sont ignorés.
         customProperties:
           - property: transformExpression
             value: is_marketing_consented
@@ -181,13 +139,11 @@ schema:
             description: 'Valeurs autorisées : shopify, pos.'
         transformLogic: transform
         transformSourceObjects:
-          - raw__customers__shopify#customers.email
           - raw__customers__shopify#customers.accepts_marketing
-          - raw__customers__shopify#customers.accepts_marketing_updated_at
-          - raw__loyalty_members__pos#loyalty_members.email
           - raw__loyalty_members__pos#loyalty_members.marketing_opt_in
-          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in_at
-        transformDescription: Système du signal le plus récent.
+        transformDescription: >-
+          shopify ou pos, selon le système du signal de consentement le plus récent (d'après sa date),
+          rapproché par la clé client.
         customProperties:
           - property: transformExpression
             value: consent_source
@@ -200,13 +156,11 @@ schema:
           - pseudonymized
         transformLogic: transform
         transformSourceObjects:
-          - raw__customers__shopify#customers.email
-          - raw__customers__shopify#customers.accepts_marketing
           - raw__customers__shopify#customers.accepts_marketing_updated_at
-          - raw__loyalty_members__pos#loyalty_members.email
-          - raw__loyalty_members__pos#loyalty_members.marketing_opt_in
           - raw__loyalty_members__pos#loyalty_members.marketing_opt_in_at
-        transformDescription: Date du signal le plus récent.
+        transformDescription: >-
+          Date du signal de consentement le plus récent, rapproché par la clé client. Les signaux sans valeur
+          sont ignorés.
         customProperties:
           - property: transformExpression
             value: consent_updated_at
@@ -219,10 +173,9 @@ schema:
           - pseudonymized
         transformLogic: transform
         transformSourceObjects:
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_type
           - core__sales_events#sales_events.event_date
-        transformDescription: Plus ancienne date de vente du client.
+        transformDescription: >-
+          Plus ancienne date des ventes (type sale) du client, rapprochées par sa clé.
         customProperties:
           - property: transformExpression
             value: first_sale_date
@@ -235,11 +188,10 @@ schema:
           - pseudonymized
         transformLogic: transform
         transformSourceObjects:
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.source_system
           - core__sales_events#sales_events.event_at
-        transformDescription: Plus ancienne commande Shopify du client.
+        transformDescription: >-
+          Plus ancienne commande Shopify du client : ventes (type sale) de source shopify, rapprochées par sa
+          clé.
         customProperties:
           - property: transformExpression
             value: first_web_order_at

@@ -89,9 +89,9 @@ def _columns(contract_id: str) -> dict:
     return {p["name"]: p for p in load_yaml(path)["schema"][0]["properties"]}
 
 
-def test_repository_hashed_key_expression_names_a_published_column():
+def test_repository_hashed_key_expression_carries_the_hash_rule():
     key = _columns("core__customers")["customer_key"]
-    assert key["customProperties"][0]["value"] == "customer_key"
+    assert "TO_HEX(SHA256(LOWER(TRIM(email))))" in key["customProperties"][0]["value"], "sans transformInputs, la regle est dans la colonne"
 
 
 def test_repository_ga4_event_id_is_pseudonymized():
@@ -99,10 +99,12 @@ def test_repository_ga4_event_id_is_pseudonymized():
     assert event_id["classification"] == "C2" and "pseudonymized" in event_id["tags"]
 
 
-def test_repository_lineage_lists_columns_that_filter_rows():
+def test_repository_sources_are_the_fields_that_make_the_value():
     def sources(contract_id, column):
         return {s.split(".", 1)[1] for s in _columns(contract_id)[column]["transformSourceObjects"]}
 
     assert {"user_pseudo_id", "event_type", "is_analytics_consented", "web_order_id", "source_system"} <= sources("audiences", "customer_key")
-    for column in ("channel", "month_date"):
-        assert {"first_web_order_at", "customer_key", "event_type", "source_system"} <= sources("acquisition_monthly", column)
+    # audiences n'est pas encore passee a cette definition (assertion ci-dessus).
+    assert sources("acquisition_monthly", "channel") == {"platform", "marketing_channel"}
+    assert sources("acquisition_monthly", "month_date") == {"spend_date", "event_at"}
+    assert sources("acquisition_monthly", "campaign_name") == {"campaign_name"}

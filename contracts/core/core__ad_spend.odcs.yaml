@@ -2,7 +2,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: core__ad_spend
 name: core__ad_spend
-version: 1.0.0
+version: 1.1.0
 status: active
 domain: core
 tags:
@@ -48,24 +48,6 @@ slaProperties:
     unit: y
     element: ad_spend
     description: Historique conservé 3 ans.
-customProperties:
-  - property: transformInputs
-    value: |-
-      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
-      -- Colonnes de spend : celles de la table.
-      WITH spend AS (
-        SELECT g.segments_date AS spend_date, 'google_ads' AS platform, g.campaign_id,
-               SUM(CAST(g.metrics_cost_micros AS NUMERIC) / 1000000) AS spend_eur
-        FROM raw_googleads.ad_spend g
-        WHERE g.currency_code = 'EUR'
-        GROUP BY spend_date, g.campaign_id
-        UNION ALL
-        SELECT m.date_start, 'meta_ads', m.campaign_id, SUM(m.spend)
-        FROM raw_metaads.ad_spend m
-        WHERE m.account_currency = 'EUR'
-        GROUP BY m.date_start, m.campaign_id
-      )
-      -- Chaque champ : SELECT <champs> FROM spend
 schema:
   - name: ad_spend
     physicalName: ad_spend
@@ -113,9 +95,8 @@ schema:
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.segments_date
           - raw__ad_spend__metaads#ad_spend.date_start
-          - raw__ad_spend__googleads#ad_spend.currency_code
-          - raw__ad_spend__metaads#ad_spend.account_currency
-        transformDescription: Jour des statistiques de la plateforme.
+        transformDescription: >-
+          Jour des statistiques de la plateforme. Seules les lignes en euros sont retenues.
         customProperties:
           - property: transformExpression
             value: spend_date
@@ -142,9 +123,9 @@ schema:
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.campaign_id
           - raw__ad_spend__metaads#ad_spend.campaign_id
-          - raw__ad_spend__googleads#ad_spend.currency_code
-          - raw__ad_spend__metaads#ad_spend.account_currency
-        transformDescription: Constante selon la table d'origine.
+        transformDescription: >-
+          Constante selon la table d'origine (google_ads ou meta_ads). Seules les lignes en euros sont
+          retenues.
         customProperties:
           - property: transformExpression
             value: platform
@@ -160,9 +141,8 @@ schema:
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.campaign_id
           - raw__ad_spend__metaads#ad_spend.campaign_id
-          - raw__ad_spend__googleads#ad_spend.currency_code
-          - raw__ad_spend__metaads#ad_spend.account_currency
-        transformDescription: Identifiant de campagne de la plateforme.
+        transformDescription: >-
+          Identifiant de campagne de la plateforme. Seules les lignes en euros sont retenues.
         customProperties:
           - property: transformExpression
             value: campaign_id
@@ -176,12 +156,36 @@ schema:
         transformSourceObjects:
           - raw__ad_spend__googleads#ad_spend.metrics_cost_micros
           - raw__ad_spend__metaads#ad_spend.spend
-          - raw__ad_spend__googleads#ad_spend.currency_code
-          - raw__ad_spend__metaads#ad_spend.account_currency
-        transformDescription: Micros Google divisés par 1 000 000, montant Meta tel quel, en euros seulement.
+        transformDescription: >-
+          Somme par jour, plateforme et campagne : micros Google divisés par 1 000 000, montant Meta tel quel.
+          Les lignes dont la devise n'est pas l'euro sont écartées.
         customProperties:
           - property: transformExpression
             value: spend_eur
+      - name: currency
+        physicalType: STRING
+        logicalType: string
+        description: 'Code devise ISO 4217 du montant : seules les lignes en euros sont retenues.'
+        required: true
+        classification: C1
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues:
+                - EUR
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            description: 'Valeur autorisée : EUR.'
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__ad_spend__googleads#ad_spend.currency_code
+          - raw__ad_spend__metaads#ad_spend.account_currency
+        transformDescription: Devise de la ligne publicitaire, Google ou Meta, filtrée sur EUR.
+        customProperties:
+          - property: transformExpression
+            value: currency
       - name: meta_computed_at
         physicalType: TIMESTAMP
         logicalType: timestamp

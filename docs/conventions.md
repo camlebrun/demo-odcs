@@ -109,7 +109,9 @@ Le lineage est porté **au niveau property** des contrats core et customer. Chac
 | `transformLogic` | `map`, `transform` ou `create` |
 | `transformSourceObjects` | liste de `<contract_id>#<schema_object_name>.<property_name>` ; imbriqué : `raw__pages_views__ga4#events.event_params.key` |
 | `transformDescription` | une phrase en français (L008) |
-| `customProperties` | `transformExpression` : SQL BigQuery exact ; obligatoire pour `transform` |
+| `customProperties` | `transformExpression` : l'expression SQL de la colonne ; obligatoire pour `transform`. Les contrats ne portent pas de requête de table (`transformInputs` retiré) |
+
+Une source est un champ qui fournit la valeur de la colonne. Les champs qui ne servent qu'à joindre ou filtrer ne sont pas listés dans `transformSourceObjects` : la jointure ou le filtre s'écrit en français dans `transformDescription`. Pour une valeur constante selon l'origine, on liste l'identifiant (ou le champ type) de chaque table d'origine.
 
 Exemple :
 
