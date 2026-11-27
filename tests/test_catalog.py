@@ -103,22 +103,48 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     forbidden = ("Colibri Cloud", "Copy dbt", "dbt build", "dbt compile", "getdbt.com", "Saved Views", "Column lineage unavailable", 'children:"Code"', 'children:"Model Information"', 'children:"Contract Enforced"')
     for text in forbidden:
         assert text not in html, text
-    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace"', 'id:"cp-trace-panel"'))
+    assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", 'id:"trace",label:"Trace"', 'id:"cp-trace-panel"', "data-cp-col", "cp-trace-wrap bg-background", ".cp-trace-wrap{pointer-events:auto}"))
+    assert "data-sidebar-column]{" not in html, "plus de contournement CSS sur le panneau natif"
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
 
-def test_trace_tab_follows_the_column_selected_in_the_contract_panel(tmp_path):
-    """L'onglet Trace suit la colonne selectionnee dans la liste des colonnes du contrat."""
+def test_trace_tab_lists_columns_and_follows_the_selected_one(tmp_path):
+    """L'onglet Trace rend sa propre liste de colonnes et la chaine de la colonne choisie."""
     manifest = build_catalog.build_manifest(FIXTURE)
     hint = _trace(tmp_path, manifest, "kpis_monthly")
     assert "Source trace · kpis_monthly" in hint
-    assert "Select a column in the contract panel" in hint
-    # colonne cliquee dans le panneau du contrat : trace complete raw -> core -> mart
+    assert 'data-cp-col="customer_key"' in hint and "Select a column" in hint
+    assert "cp-result" not in hint
     trace = _trace(tmp_path, manifest, "kpis_monthly", "customer_key")
-    assert "<b>kpis_monthly</b>" in trace
-    assert trace.index("<b>raw__orders__shopify</b>") < trace.index("<b>core__orders</b>") < trace.index("<b>kpis_monthly</b>")
+    assert 'class="cp-colbtn cp-on" data-cp-model="kpis_monthly" data-cp-col="customer_key"' in trace
+    # resultat en tete, puis la chaine remontee jusqu'aux raw, en dernier
+    assert trace.index("cp-result") < trace.index('data-cp-layer="core"') < trace.index('data-cp-layer="raw"')
     for text in ("Recopie du champ email", "Alimente customer_key", "from core__orders#customer_key", "TO_HEX"):
         assert text in trace, text
+
+
+def test_trace_tab_collapses_copies_and_orders_contracts_by_dependency(tmp_path):
+    def col(logic=None, desc=None):
+        return {"meta": {k: v for k, v in (("transformLogic", logic), ("transformDescription", desc)) if v}}
+
+    def node(i, kind, **cols):
+        return {"id": i, "nodeType": kind, "columns": cols}
+
+    nodes = {
+        "raw__a": node("raw__a", "source", x=col("map", "Copie x."), y=col("map", "Copie y."), z=col()),
+        "core__first": node("core__first", "model", k=col("transform", "Premier calcul.")),
+        "core__second": node("core__second", "model", k=col("transform", "Second calcul.")),
+        "mart": node("mart", "model", k=col("transform", "Resultat.")),
+    }
+    pairs = [("raw__a", "x", "core__first"), ("raw__a", "y", "core__first"), ("raw__a", "z", "core__first"),
+             ("core__first", "k", "core__second"), ("core__second", "k", "mart"), ("core__first", "k", "mart")]
+    edges = [{"source": s, "sourceColumn": c, "target": t, "targetColumn": "k"} for s, c, t in pairs]
+    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "mart", "k")
+    assert "<summary><b>raw__a</b> · 2 copied columns · 1 undocumented</summary>" in trace
+    assert "<details" in trace and "<details open" not in trace
+    assert trace.index("<b>core__second</b>") < trace.index("<b>core__first</b>") < trace.index("<b>raw__a</b>")
+    assert "from raw__a#x, raw__a#y, raw__a#z" in trace, "les etapes amont affichent leurs entrees"
+    assert "3 transformations · 4 contracts" in trace
 
 
 def test_trace_tab_survives_a_stale_react_model_state(tmp_path):

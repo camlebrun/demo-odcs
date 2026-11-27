@@ -234,14 +234,16 @@ def _trace_tab(html: str) -> str:
         1,
     )
     # c) Panneau de contenu de l'onglet, frere du panneau docs (selectedModelId = l dans cette portee).
+    #    Fond opaque : la vue lineage reste montee dessous et ses noeuds React Flow forcent
+    #    visibility:visible en inline, ils transparaitraient sinon a travers le panneau.
     trace_panel = (
-        'R.jsx("div",{className:`absolute inset-0 flex flex-col isolate ${i!=="trace"?"invisible pointer-events-none":""}`,'
-        'children:R.jsx("div",{className:"flex-1 flex flex-col overflow-hidden",children:'
-        'R.jsx("div",{id:"cp-trace-panel",className:"flex-1 overflow-auto p-4",dangerouslySetInnerHTML:{__html:window.cpTraceTabHtml(l)}})})})'
+        'R.jsx("div",{className:`absolute inset-0 flex flex-col isolate pointer-events-none ${i!=="trace"?"invisible":""}`,'
+        'children:R.jsxs("div",{className:"flex-1 flex flex-col overflow-hidden cp-trace-wrap bg-background",children:['
+        "Ee,"
+        'R.jsx("div",{id:"cp-trace-panel",className:"flex-1 min-h-0 overflow-hidden p-4",dangerouslySetInnerHTML:{__html:window.cpTraceTabHtml(l)}})]})})'
     )
     html = _sub(html, "setExpandedSchemas:J})})})]})", "setExpandedSchemas:J})})})," + trace_panel + "]})", 1)
-    # d) Clic sur une ligne de colonne du panneau du contrat (ligne surlignee en bleu quand
-    #    selectionnee) : l'onglet Trace suit cette colonne.
+    # d) Clic sur une ligne de colonne du panneau du contrat : l'onglet Trace reprend cette colonne.
     row_click = "onClick:()=>{l&&s&&l(s,Y.columnName)}"
     followed = "onClick:()=>{window.cpTraceColumnSet&&s&&window.cpTraceColumnSet(String(s),Y.columnName);l&&s&&l(s,Y.columnName)}"
     return _sub(html, row_click, followed, 1)
