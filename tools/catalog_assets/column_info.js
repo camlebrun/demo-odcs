@@ -17,11 +17,14 @@
     if (navigator.clipboard && txt != null) navigator.clipboard.writeText(txt).then(function () { b.textContent = "Copied"; });
   }, true);
 
-  /* Clic sur une colonne de la liste rendue par l'onglet Trace (voir traceListHtml). Delegation :
-     le contenu du panneau est remplace a chaque selection. */
+  /* Clics de l'onglet Trace : liste des colonnes (traceListHtml), puis lignes de l'arbre et entrees
+     du detail. Delegation : le contenu du panneau est remplace apres le rendu React. */
   document.addEventListener("click", function (ev) {
-    var btn = ev.target.closest && ev.target.closest("[data-cp-col]");
-    if (btn) window.cpTraceColumnSet(btn.getAttribute("data-cp-model"), btn.getAttribute("data-cp-col"));
+    if (!ev.target.closest) return;
+    var btn = ev.target.closest("[data-cp-col]");
+    if (btn) return window.cpTraceColumnSet(btn.getAttribute("data-cp-model"), btn.getAttribute("data-cp-col"));
+    btn = ev.target.closest("[data-cp-node-col]");
+    if (btn) window.cpTraceNodeSet(btn.getAttribute("data-cp-node-model"), btn.getAttribute("data-cp-node-col"));
   });
 
   function data() { return window.colibriData || { nodes: {}, lineage: { edges: [] } }; }
@@ -103,15 +106,14 @@
     }).join("") + "</div>";
   };
 
-  /* ---------- Onglet "Trace" : pour le contrat selectionne, trace de la colonne selectionnee
-     dans la liste des colonnes du panneau (ligne surlignee en bleu). Toutes les transformations
-     appliquees a cette colonne, des contrats raw (sources) jusqu'a elle. Une colonne amont n'est
-     listee qu'une fois (diamants, cycles bornes), les contrats sont groupes par couche (raw,
-     core, customer) dans le sens source -> contrat. Les contrats ne sont pas tous documentes de
-     la meme facon : une etape sans transformation est signalee comme telle. ---------- */
+  /* ---------- Onglet "Trace" : pour la colonne choisie dans la liste, un bloc (classification,
+     description et SQL, champs sources, transformations par table), puis en option (replie) l'arbre
+     "qui alimente quoi" jusqu'aux systemes sources des raw, et le detail de la ligne choisie.
+     Une colonne amont n'est depliee qu'une fois (diamants, cycles). Les contrats ne sont pas tous
+     documentes de la meme facon : une etape sans description est signalee. ---------- */
   var PARENTS = null;
-  var LAYER_RANK = { raw: 0, core: 1, customer: 2 };
-  var TRACE_MAX = 400; /* garde-fou : contrat tres large ou lineage cyclique */
+  var TRACE_MAX = 400; /* garde-fou : contrat tres large */
+  var SEP = "\u001f";
 
   /* Index des colonnes amont, construit une seule fois depuis les aretes colonne a colonne. */
   function parentsIndex() {
@@ -119,140 +121,233 @@
     PARENTS = {};
     (((data().lineage || {}).edges) || []).forEach(function (e) {
       if (!e.sourceColumn || !e.targetColumn) return; /* arete de contrat a contrat */
-      var k = e.target + "\u001f" + e.targetColumn;
+      var k = e.target + SEP + e.targetColumn;
       var list = PARENTS[k] || (PARENTS[k] = []);
       for (var i = 0; i < list.length; i++) if (list[i].c === e.source && list[i].col === e.sourceColumn) return;
       list.push({ c: e.source, col: e.sourceColumn });
     });
     return PARENTS;
   }
-  function layerOf(id) {
-    var n = data().nodes[id] || {};
-    if (n.nodeType === "source") return "raw";
-    return String(id).indexOf("core__") === 0 ? "core" : "customer";
-  }
-  /* Union des colonnes amont de plusieurs colonnes (celles du contrat selectionne),
-     de la source (premiere) au contrat (dernier). */
-  function traceSteps(seeds) {
-    var seen = {}, steps = [], queue = [];
-    seeds.forEach(function (s) {
-      seen[s.c + "\u001f" + s.col] = 1;
-      queue.push({ c: s.c, col: s.col, d: 0 });
-    });
-    while (queue.length && steps.length < TRACE_MAX) {
-      var cur = queue.shift(), ps = parentsIndex()[cur.c + "\u001f" + cur.col] || [];
-      steps.push(cur);
-      for (var i = 0; i < ps.length && steps.length < TRACE_MAX; i++) {
-        var k = ps[i].c + "\u001f" + ps[i].col;
-        if (seen[k]) continue; /* diamant ou cycle : la colonne n'est listee qu'une fois */
-        seen[k] = 1;
-        queue.push({ c: ps[i].c, col: ps[i].col, d: cur.d + 1 });
-      }
-    }
-    return steps.sort(function (a, b) {
-      var ra = LAYER_RANK[layerOf(a.c)], rb = LAYER_RANK[layerOf(b.c)];
-      return ra !== rb ? ra - rb : b.d - a.d;
-    });
-  }
-  /* Hauteur de chaque colonne tracee : plus long chemin depuis une source. Ordonne les contrats
-     par dependance (une etape est listee avant celles qui l'alimentent) ; cycles ignores. */
-  function heights(steps) {
-    var inTrace = {}, h = {};
-    steps.forEach(function (s) { inTrace[s.c + "\u001f" + s.col] = 1; });
-    function height(k) {
-      if (h[k] != null) return h[k];
-      h[k] = 0; /* marque la visite : un retour sur k (cycle) vaut 0 */
-      var max = 0;
-      (parentsIndex()[k] || []).forEach(function (p) {
-        var pk = p.c + "\u001f" + p.col;
-        if (inTrace[pk]) max = Math.max(max, height(pk) + 1);
-      });
-      return (h[k] = max);
-    }
-    steps.forEach(function (s) { height(s.c + "\u001f" + s.col); });
-    return h;
-  }
-  function metaOf(step) { return (((data().nodes[step.c] || {}).columns || {})[step.col] || {}).meta || {}; }
-  /* Recopie ("map") ou colonne sans rien de declare : repliee par contrat. */
+  function parentsOf(c, col) { return parentsIndex()[c + SEP + col] || []; }
+  function metaOf(c, col) { return (((data().nodes[c] || {}).columns || {})[col] || {}).meta || {}; }
+  /* Recopie ("map") ou colonne sans rien de declare : grisee, non comptee comme transformation. */
   function isCopy(m) { return m.transformLogic === "map" || (!m.transformLogic && !m.transformDescription); }
   function plural(n, word) { return n + " " + word + (n > 1 ? "s" : ""); }
-  /* Une etape : colonne, logique, description, SQL et entrees directes. */
-  function traceStepHtml(step, name) {
-    var m = metaOf(step), ps = parentsIndex()[step.c + "\u001f" + step.col] || [];
-    return '<div class="cp-step"><div class="cp-stepline"><span class="cp-hopcol">' + esc(name || step.col) + "</span>" +
-      (m.transformLogic ? badge(m.transformLogic) : "") + "</div>" +
-      (m.transformDescription ? '<div class="cp-hopdesc">' + esc(m.transformDescription) + "</div>"
+  function nodeAttrs(c, col) { return ' data-cp-node-model="' + esc(c) + '" data-cp-node-col="' + esc(col) + '"'; }
+
+  /* Ligne de l'arbre (et du detail) : un bouton qui selectionne la colonne. */
+  function nodeButton(c, col, cls, extra) {
+    var m = metaOf(c, col);
+    return '<button type="button" class="' + cls + (isCopy(m) ? " cp-copy" : "") + '"' + nodeAttrs(c, col) + ">" +
+      '<span class="cp-nc">' + esc(c) + '</span> <span class="cp-hopcol">' + esc(col) + "</span> " +
+      (m.transformLogic ? badge(m.transformLogic) : "") +
+      (m.transformDescription ? "" : '<span class="cp-note">not documented</span>') + (extra || "") + "</button>";
+  }
+  function external(m, cls) {
+    return (m.externalSources || []).map(function (x) { return '<div class="' + cls + '">' + esc(x) + "</div>"; }).join("");
+  }
+  /* Parcours en profondeur depuis la colonne choisie. `walk` cumule les colonnes deja depliees,
+     le nombre de lignes et les compteurs de l'en-tete. */
+  function treeNode(c, col, picked, walk) {
+    if (walk.lines >= TRACE_MAX) { walk.truncated = true; return ""; }
+    walk.lines++;
+    var key = c + SEP + col, cls = "cp-node" + (key === picked ? " cp-on" : "");
+    if (walk.seen[key]) return "<li>" + nodeButton(c, col, cls + " cp-ref", ' <span class="cp-note">shown above</span>') + "</li>";
+    walk.seen[key] = 1;
+    if (!walk.root) walk.root = key;
+    var m = metaOf(c, col), ps = parentsOf(c, col);
+    if (!m.transformDescription) walk.undocumented++;
+    if (key !== walk.root && rankOf(m.classification) > rankOf(walk.highest)) walk.highest = m.classification;
+    var raw = (data().nodes[c] || {}).nodeType === "source";
+    if (m.externalSources) m.externalSources.forEach(function (x) { addSource(walk, c, col, x); });
+    else if (raw && !ps.length && m.transformLogic !== "create") addField(walk, c, col, c, col);
+    var line = nodeButton(c, col, cls);
+    var step = { c: c, col: col, m: m };
+    if (!ps.length) {
+      if (!isCopy(m)) walk.steps.push(step);
+      return "<li>" + line + external(m, "cp-ext") + "</li>";
+    }
+    var kids = ps.map(function (p) { return treeNode(p.c, p.col, picked, walk); }).join("");
+    if (!isCopy(m)) walk.steps.push(step); /* apres ses entrees : ordre sources -> resultat */
+    return "<li><details open><summary>" + line + "</summary>" + external(m, "cp-ext") + "<ul>" + kids + "</ul></details></li>";
+  }
+  /* Detail de la ligne choisie : description, SQL, entrees directes (toutes), sources externes. */
+  function detailHtml(c, col) {
+    var m = metaOf(c, col), ps = parentsOf(c, col);
+    var h = '<div class="cp-dtitle">' + esc(c + "." + col) + "</div>" +
+      (m.transformLogic ? "<div>" + badge(m.transformLogic) + "</div>" : "") +
+      (m.transformDescription ? "<div>" + esc(m.transformDescription) + "</div>"
         : '<div class="cp-note">Transformation not documented</div>') +
-      (ps.length ? '<div class="cp-note cp-from">from ' + esc(ps.slice(0, 8).map(function (p) { return p.c + "#" + p.col; }).join(", ")) +
-        (ps.length > 8 ? " +" + (ps.length - 8) : "") + "</div>" : "") +
-      (m.transformExpression ? acc("SQL", sql(m.transformExpression, "Transformation SQL"), false) : "") + "</div>";
+      (m.transformExpression ? sql(m.transformExpression, "Transformation SQL") : "");
+    if (ps.length) {
+      h += '<div class="cp-h">Inputs · ' + ps.length + "</div>" +
+        ps.map(function (p) { return nodeButton(p.c, p.col, "cp-input"); }).join("");
+    }
+    if (m.externalSources) h += '<div class="cp-h">Source system</div>' + external(m, "cp-ext-detail");
+    return h;
   }
-  /* Un contrat amont : les transformations reelles sont visibles, les recopies repliees. */
-  function traceContractHtml(id, steps) {
-    var real = [], copies = [], undocumented = 0;
-    steps.forEach(function (s) {
-      var m = metaOf(s);
-      if (!isCopy(m)) { real.push(s); return; }
-      copies.push(s);
-      if (!m.transformDescription) undocumented++;
-    });
-    var copied = copies.length - undocumented, label = [];
-    if (copied) label.push(plural(copied, "copied column"));
-    if (undocumented) label.push(undocumented + " undocumented");
-    var folded = copies.map(function (s) { return traceStepHtml(s); }).join("");
-    var title = "<b>" + esc(id) + "</b>";
-    /* Contrat sans aucune transformation : une seule ligne depliable. */
-    if (!real.length) return '<details class="cp-acc"><summary>' + title + " · " + label.join(" · ") + '</summary><div class="cp-in">' + folded + "</div></details>";
-    return '<div class="cp-contract">' + title + real.map(function (s) { return traceStepHtml(s); }).join("") +
-      (copies.length ? acc(label.join(" · "), folded, false) : "") + "</div>";
+  function rankOf(level) { return ["C0", "C1", "C2", "C3"].indexOf(level); }
+  function levelBadge(level, pii) {
+    if (!level) return '<span class="cp-badge">unclassified</span>';
+    return badge(level + (pii ? " · pii" : ""), level === "C3" ? "hi" : level === "C2" ? "mid" : "");
   }
-  /* Chaine amont, du resultat vers les sources : une section par couche (customer, core, raw en
-     dernier), contrats ordonnes par dependance. */
-  function traceChainHtml(steps) {
-    var up = steps.filter(function (s) { return s.d > 0; }), h = heights(steps);
-    var byContract = {}, ids = [];
-    up.forEach(function (s) {
-      if (!byContract[s.c]) { byContract[s.c] = []; ids.push(s.c); }
-      byContract[s.c].push(s);
-    });
-    function top(id) { return Math.max.apply(null, byContract[id].map(function (s) { return h[s.c + "\u001f" + s.col]; })); }
-    var out = "";
-    ["customer", "core", "raw"].forEach(function (layer) {
-      var inLayer = ids.filter(function (id) { return layerOf(id) === layer; })
-        .sort(function (a, b) { return top(b) - top(a) || a.localeCompare(b); });
-      if (!inLayer.length) return;
-      out += '<section data-cp-layer="' + layer + '"><div class="cp-h">' + layer + " · " + plural(inLayer.length, "contract") + "</div>" +
-        inLayer.map(function (id) { return traceContractHtml(id, byContract[id]); }).join("") + "</section>";
-    });
-    return out;
+  /* Champ source d'une colonne raw, avec la classification et le marquage PII de cette colonne. */
+  function addField(walk, c, col, system, field) {
+    var column = ((data().nodes[c] || {}).columns || {})[col] || {};
+    walk.sources.push({ level: (column.meta || {}).classification || "", pii: (column.tags || []).indexOf("pii") >= 0,
+      system: system, field: field });
   }
-  /* Colonne choisie : le resultat (fixe en haut), puis toute la chaine qui y mene. */
-  function traceBodyHtml(model, col) {
-    var steps = traceSteps([{ c: model, col: col }]);
-    var root = { c: model, col: col, d: 0 };
-    var transforms = steps.filter(function (s) { return !isCopy(metaOf(s)); }).length;
-    var contracts = {};
-    steps.forEach(function (s) { contracts[s.c] = 1; });
-    var h = '<div class="cp-result"><div class="cp-note">' + plural(transforms, "transformation") + " · " +
-      plural(Object.keys(contracts).length, "contract") + "</div>" + traceStepHtml(root, model + "." + col) + "</div>";
-    if (steps.length < 2) {
-      return h + '<div class="cp-note">' + (metaOf(root).transformLogic === "create"
+  function addSource(walk, c, col, ref) {
+    var parts = String(ref).split("#");
+    addField(walk, c, col, parts[0], parts[1] || "");
+  }
+  /* Champs sources par niveau puis systeme, les plus sensibles d'abord. C1 et C0 sont replies quand
+     il y a plus sensible a montrer ; un champ sans classification ne l'est jamais. */
+  function sourcesHtml(walk) {
+    var groups = {}, low = 0;
+    walk.sources.forEach(function (f) {
+      var rank = f.level ? rankOf(f.level) : 1.5; /* non classe : visible, apres C2 */
+      var key = [9 - rank, f.pii ? 0 : 1, f.system].join(SEP);
+      var g = groups[key] || (groups[key] = { f: f, fields: [] });
+      if (g.fields.indexOf(f.field) < 0) g.fields.push(f.field);
+    });
+    var shown = "", folded = "";
+    Object.keys(groups).sort().forEach(function (key) {
+      var g = groups[key], line = "<div>" + levelBadge(g.f.level, g.f.pii) + "<b>" + esc(g.f.system) + "</b> " +
+        esc(g.fields.join(", ")) + "</div>";
+      if (g.f.level === "C1" || g.f.level === "C0") { folded += line; low += g.fields.length; } else shown += line;
+    });
+    if (!shown) return folded;
+    return shown + (folded ? acc("C1 and lower · " + plural(low, "field"), folded, false) : "");
+  }
+  function columnOf(c, col) { return ((data().nodes[c] || {}).columns || {})[col] || {}; }
+  /* Texte en tete : la description de la colonne (la regle metier), sinon celle de la transformation. */
+  function textOf(c, col) { return columnOf(c, col).description || metaOf(c, col).transformDescription || ""; }
+  function descOf(text) { return text ? esc(text) : '<span class="cp-note">Transformation not documented</span>'; }
+  /* SQL de la colonne, masque quand il se reduit a son nom. */
+  function expressionOf(c, col) {
+    var expression = String(metaOf(c, col).transformExpression || "").trim();
+    return expression && expression !== String(col).split(".").pop() ? sql(expression, "Transformation SQL") : "";
+  }
+  /* Identifiant de la table (projet.dataset.table) et colonne. Un contrat a plusieurs tables a une
+     relation "{a,b}" et des colonnes "<table>.<champ>". Sans relation : l'identifiant du contrat. */
+  function tableRef(c, col) {
+    var relation = (data().nodes[c] || {}).relationName;
+    if (!relation) return { table: c, column: col };
+    if (relation.indexOf("{") < 0) return { table: relation, column: col };
+    var parts = String(col).split("."), object = parts.shift();
+    return { table: relation.replace(/\{.*\}/, function () { return object; }), column: parts.join(".") };
+  }
+  /* Entrees directes d'une colonne (transformSourceObjects) : une ligne par table, puis ses colonnes. */
+  function sourceObjectsHtml(c, col) {
+    var byTable = {}, tables = [];
+    parentsOf(c, col).forEach(function (p) {
+      var ref = tableRef(p.c, p.col);
+      if (!byTable[ref.table]) { byTable[ref.table] = []; tables.push(ref.table); }
+      byTable[ref.table].push(ref.column);
+    });
+    return tables.length ? '<div class="cp-from">Source objects' + tables.map(function (table) {
+      return "<div>" + esc(table + ": " + byTable[table].join(", ")) + "</div>";
+    }).join("") + "</div>" : "";
+  }
+  /* Une etape amont : colonne, classification, description, entrees (la table est le titre du groupe). */
+  function stepHtml(s) {
+    return '<div class="cp-step"><div><span class="cp-hopcol">' + esc(tableRef(s.c, s.col).column) + "</span> " +
+      levelBadge(s.m.classification) + "</div><div>" + descOf(s.m.transformDescription) + "</div>" + expressionOf(s.c, s.col) + sourceObjectsHtml(s.c, s.col) + "</div>";
+  }
+  /* Mots a surligner : la colonne choisie et les champs cites par son SQL (ni mots-cles ni fonctions). */
+  function wordsOf(col, expression) {
+    var words = [String(col).split(".").pop()], re = /('(?:[^'\\]|\\.)*')|\b([A-Za-z_][A-Za-z0-9_]*)\b(\s*\()?/g, m;
+    while ((m = re.exec(expression || ""))) if (m[2] && !m[3] && !KW[m[2].toUpperCase()]) words.push(m[2]);
+    return new RegExp("\\b(" + words.join("|") + ")\\b");
+  }
+  /* Requete declaree par une table (customProperties.transformInputs), entiere. C'est la que se
+     lisent jointures et filtres. */
+  function queryHtml(id, words) {
+    var n = data().nodes[id] || {}, query = ((n.meta || {}).customProperties || {}).transformInputs;
+    if (!query) return "";
+    copies.push(String(query));
+    return '<div class="cp-sql"><div class="cp-sqlbar"><span>' + esc(n.relationName || id) + '</span><button class="cp-btn" data-cp-copy="' + (copies.length - 1) +
+      '">Copy</button></div><pre><code>' + String(query).split("\n").map(function (line) {
+        return '<span class="cp-line' + (words.test(line) ? " cp-hit" : "") + '">' + (hl(line) || " ") + "</span>";
+      }).join("") + "</code></pre></div>";
+  }
+  /* Transformation de la colonne choisie : sa transformDescription (sauf si l'en-tete la montre deja)
+     et son SQL. */
+  function transformationHtml(c, col) {
+    var text = metaOf(c, col).transformDescription;
+    var h = (text && text !== textOf(c, col) ? "<div>" + esc(text) + "</div>" : "") + expressionOf(c, col);
+    return h ? '<div class="cp-h">Transformation</div>' + h : "";
+  }
+  /* Bloc resume, assemble sans rien reformuler : la colonne choisie et sa classification (declaree,
+     et la plus haute en amont), les champs sources, puis les transformations par table, de la plus
+     proche a la plus lointaine. */
+  function summaryHtml(model, col, walk) {
+    var m = metaOf(model, col), words = wordsOf(col, m.transformExpression);
+    var h = '<div class="cp-dtitle">' + esc(col) + ' <span class="cp-note">' + esc(tableRef(model, col).table) + "</span></div>" +
+      "<div>Declared: " + levelBadge(m.classification) +
+      (walk.highest ? " Highest upstream: " + levelBadge(walk.highest) +
+        '<div class="cp-note">Upstream includes fields used only for joins or filters.</div>' : "") + "</div>" +
+      "<div>" + descOf(textOf(model, col)) + "</div>" + transformationHtml(model, col) + sourceObjectsHtml(model, col);
+    /* Colonne sans amont ni source externe : l'avertissement au-dessus du bloc suffit. */
+    var traced = parentsOf(model, col).length || m.externalSources;
+    var sources = traced ? sourcesHtml(walk) : "";
+    if (sources) h += '<div class="cp-h">Sources</div>' + sources;
+    var byTable = {}, ids = [];
+    walk.steps.slice().reverse().forEach(function (s) {
+      if (s.c === model && s.col === col) return;
+      if (!byTable[s.c]) { byTable[s.c] = []; ids.push(s.c); }
+      byTable[s.c].push(s);
+    });
+    if (ids.length) {
+      h += '<div class="cp-h">Transformations</div>' + ids.map(function (id) {
+        return '<div class="cp-table">' + esc(tableRef(id, byTable[id][0].col).table) + "</div>" +
+          byTable[id].map(stepHtml).join("");
+      }).join("");
+    }
+    if (traced && !walk.steps.length) h += '<div class="cp-note">No transformation declared: plain copies only.</div>';
+    if (traced && walk.undocumented) h += '<div class="cp-note">' + plural(walk.undocumented, "step") + " not documented</div>";
+    /* Un seul bloc replie pour le SQL des tables : celle du resultat, puis les tables amont. */
+    var queries = [model].concat(ids.filter(function (id) { return id !== model; }))
+      .map(function (id) { return queryHtml(id, words); }).join("");
+    if (queries) {
+      h += '<details class="cp-acc cp-query"><summary>Full table SQL</summary><div class="cp-in">' + queries + "</div></details>";
+    }
+    return '<div class="cp-summary">' + h + "</div>";
+  }
+  /* Colonne choisie : compteurs, resume, puis en option l'arbre et le detail. `node` est la ligne
+     choisie dans l'arbre, absente tant qu'on n'a rien clique. */
+  function traceBodyHtml(model, col, node) {
+    var walk = { seen: {}, sources: [], steps: [], lines: 0, undocumented: 0, truncated: false, root: "", highest: "" };
+    var shown = node || { c: model, col: col };
+    var tree = treeNode(model, col, shown.c + SEP + shown.col, walk);
+    var m = metaOf(model, col), why = "";
+    if (!parentsOf(model, col).length && !m.externalSources) {
+      why = '<div class="cp-note">' + (m.transformLogic === "create"
         ? "Created in this contract, no upstream source." : "No upstream lineage declared for this column.") + "</div>";
     }
-    return h + traceChainHtml(steps);
+    return why +
+      (walk.truncated ? '<div class="cp-note cp-truncated">Trace truncated at ' + TRACE_MAX + " lines.</div>" : "") +
+      summaryHtml(model, col, walk) +
+      '<details class="cp-deep"' + (node ? " open" : "") + '><summary>Lineage tree</summary>' +
+      '<div class="cp-split"><div class="cp-tree"><ul>' + tree + '</ul></div><div class="cp-detail">' +
+      detailHtml(shown.c, shown.col) + "</div></div></details>";
   }
-  /* Liste des colonnes du contrat (selecteur de l'onglet), "T" = la colonne a des sources amont. */
+  /* Liste des colonnes du contrat (selecteur de l'onglet), avec leur classification declaree. */
   function traceListHtml(model, sel) {
     var cols = Object.keys(data().nodes[model].columns || {});
     return '<nav class="cp-cols"><div class="cp-colhead"><b>' + esc(model) + '</b><span class="cp-note">' +
       plural(cols.length, "column") + "</span></div>" +
       cols.map(function (c) {
+        var level = metaOf(model, c).classification;
         return '<button type="button" class="cp-colbtn' + (c === sel ? " cp-on" : "") + '" data-cp-model="' + esc(model) +
           '" data-cp-col="' + esc(c) + '"><span>' + esc(c) + "</span>" +
-          (parentsIndex()[model + "\u001f" + c] ? '<span class="cp-t">T</span>' : "") + "</button>";
+          (level ? '<span class="cp-t">' + levelBadge(level) + "</span>" : "") + "</button>";
       }).join("") + "</nav>";
   }
   var TRACE_SEL = {}; /* contrat -> colonne selectionnee dans la liste des colonnes du panneau */
+  var TRACE_NODE = {}; /* contrat + colonne -> ligne de l'arbre choisie (racine par defaut) */
+  var SHOWN = null; /* contrat et colonne du dernier arbre rendu */
   var TRACE_MODEL = null; /* dernier contrat connu (clic de colonne) : la carte de colonnes de la
      vue lineage garde son propre etat interne, le rendu React du panneau peut donc rester sur un
      contrat absent. Sans ce repli, le panneau afficherait une invite vide. */
@@ -273,6 +368,7 @@
     if (!model) return;
     TRACE_MODEL = model;
     TRACE_SEL[model] = col;
+    delete TRACE_NODE[model + SEP + col];
     var panel = document.getElementById && document.getElementById("cp-trace-panel");
     if (!panel) return;
     var list = panel.querySelector(".cp-cols"), top = list ? list.scrollTop : 0;
@@ -280,19 +376,35 @@
     list = panel.querySelector(".cp-cols");
     if (list) list.scrollTop = top;
   };
-  /* Onglet "Trace" : liste des colonnes a gauche, chaine de la colonne choisie a droite.
+  /* Clic sur une ligne de l'arbre : seuls le detail et le surlignage changent, l'arbre n'est pas
+     redessine (les branches repliees le restent). */
+  window.cpTraceNodeSet = function (c, col) {
+    if (!SHOWN) return;
+    TRACE_NODE[SHOWN] = { c: c, col: col };
+    var panel = document.getElementById && document.getElementById("cp-trace-panel");
+    var detail = panel && panel.querySelector(".cp-detail");
+    if (!detail) return;
+    detail.innerHTML = detailHtml(c, col);
+    detail.scrollTop = 0;
+    Array.prototype.forEach.call(panel.querySelectorAll(".cp-node"), function (b) {
+      b.classList.toggle("cp-on", b.getAttribute("data-cp-node-model") === c && b.getAttribute("data-cp-node-col") === col);
+    });
+  };
+  /* Onglet "Trace" : liste des colonnes a gauche, arbre et detail de la colonne choisie a droite.
      Aucune exception ne remonte : une erreur ne doit pas faire tomber tout le rendu React. */
   window.cpTraceTabHtml = function (model) {
     try {
+      SHOWN = null;
       model = traceModelOf(model);
       var n = model && data().nodes[model];
       if (!n) return '<div class="cp-trace"><div class="cp-note">Select a contract to see its source trace.</div></div>';
       var sel = TRACE_SEL[model];
       if (!(n.columns || {})[sel]) sel = null;
-      var body = n.nodeType === "source"
-        ? '<div class="cp-note">Raw contract: no upstream in the catalog; its sources are the external systems documented in each column.</div>'
-        : sel ? traceBodyHtml(model, sel)
-          : '<div class="cp-note">Select a column to see every transformation applied to it, from the raw sources.</div>';
+      var body = '<div class="cp-note">Select a column to see what feeds it, down to the source systems.</div>';
+      if (sel) {
+        SHOWN = model + SEP + sel;
+        body = traceBodyHtml(model, sel, TRACE_NODE[SHOWN]);
+      }
       return '<div class="cp-trace">' + traceListHtml(model, sel) + '<div class="cp-chain"><div class="cp-h">Source trace · ' +
         esc(model) + "</div>" + body + "</div></div>";
     } catch (e) {

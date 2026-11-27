@@ -15,35 +15,39 @@ ASSETS = Path(build_catalog.__file__).parent / "catalog_assets"
 # injecte comme dans l'index.html (metadata, nodes, lineage.edges, tree).
 HARNESS = """
 const fs = require("fs");
-const [asset, manifestPath, model, column, clickModel] = process.argv.slice(2);
+const [asset, manifestPath, model, column, clickModel, nodeModel, nodeCol, nextColumn] = process.argv.slice(2);
 global.window = {};
 global.document = { documentElement: { classList: { toggle() {} } }, addEventListener() {} };
 global.navigator = {};
 eval(fs.readFileSync(asset, "utf8"));
 const src = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 window.colibriData = { metadata: src.metadata, nodes: src.nodes, lineage: { edges: src.lineage.edges }, tree: src.tree };
+const shown = model === "" ? null : model;
 if (column) window.cpTraceColumnSet(clickModel || model, column);
-process.stdout.write(window.cpTraceTabHtml(model === "" ? null : model));
+if (nodeModel) { window.cpTraceTabHtml(shown); window.cpTraceNodeSet(nodeModel, nodeCol); }
+if (nextColumn) { window.cpTraceTabHtml(shown); window.cpTraceColumnSet(model, nextColumn); }
+process.stdout.write(window.cpTraceTabHtml(shown));
 """
 
 
 def _trace(
-    tmp_path, manifest: dict, model: str, column: str | None = None, click_model: str | None = None
+    tmp_path, manifest: dict, model: str, column: str | None = None, click_model: str | None = None,
+    node: tuple[str, str] | None = None, next_column: str | None = None,
 ) -> str:
     """Rend l'onglet Trace d'un contrat avec node (le JS du catalogue n'est pas reimplemente en Python).
     `model=""` simule un rendu React dont l'etat contrat est absent (vue lineage) ; `column` simule
     la colonne cliquee dans la liste des colonnes du panneau du contrat, `click_model` le contrat
-    de ce clic quand il differe de l'etat React."""
-    node = shutil.which("node")
-    if not node:
+    de ce clic quand il differe de l'etat React ; `node` simule le clic sur une ligne de l'arbre,
+    `next_column` un changement de colonne ensuite."""
+    node_bin = shutil.which("node")
+    if not node_bin:
         pytest.skip("node est necessaire pour executer le JS du catalogue")
     harness = tmp_path / "trace.js"
     harness.write_text(HARNESS, encoding="utf-8")
     data = tmp_path / "manifest.json"
     data.write_text(json.dumps(manifest), encoding="utf-8")
-    args = [node, str(harness), str(ASSETS / "column_info.js"), str(data), model]
-    if column:
-        args += [column, click_model or model]
+    args = [node_bin, str(harness), str(ASSETS / "column_info.js"), str(data), model,
+            column or "", click_model or model, *(node or ("", "")), next_column or ""]
     out = subprocess.run(args, capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr
     return out.stdout
@@ -108,43 +112,86 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
 
 
+def _col(logic=None, desc=None):
+    return {"meta": {k: v for k, v in (("transformLogic", logic), ("transformDescription", desc)) if v}}
+
+
+def _graph(columns: dict[str, list[str]], pairs: list[tuple[str, str, str, str]]) -> dict:
+    """Manifeste minimal : contrat -> colonnes ; aretes (source, colonne, cible, colonne)."""
+    nodes = {c: {"id": c, "nodeType": "model", "columns": {n: _col("transform", f"Calcul {n}.") for n in cols}}
+             for c, cols in columns.items()}
+    keys = ("source", "sourceColumn", "target", "targetColumn")
+    return {"nodes": nodes, "lineage": {"edges": [dict(zip(keys, p)) for p in pairs]}}
+
+
 def test_trace_tab_lists_columns_and_follows_the_selected_one(tmp_path):
-    """L'onglet Trace rend sa propre liste de colonnes et la chaine de la colonne choisie."""
     manifest = build_catalog.build_manifest(FIXTURE)
     hint = _trace(tmp_path, manifest, "kpis_monthly")
     assert "Source trace · kpis_monthly" in hint
     assert 'data-cp-col="customer_key"' in hint and "Select a column" in hint
-    assert "cp-result" not in hint
+    assert "cp-tree" not in hint
     trace = _trace(tmp_path, manifest, "kpis_monthly", "customer_key")
     assert 'class="cp-colbtn cp-on" data-cp-model="kpis_monthly" data-cp-col="customer_key"' in trace
-    # resultat en tete, puis la chaine remontee jusqu'aux raw, en dernier
-    assert trace.index("cp-result") < trace.index('data-cp-layer="core"') < trace.index('data-cp-layer="raw"')
-    for text in ("Recopie du champ email", "Alimente customer_key", "from core__orders#customer_key", "TO_HEX"):
-        assert text in trace, text
+    assert "transformations ·" not in trace
 
 
-def test_trace_tab_collapses_copies_and_orders_contracts_by_dependency(tmp_path):
-    def col(logic=None, desc=None):
-        return {"meta": {k: v for k, v in (("transformLogic", logic), ("transformDescription", desc)) if v}}
+def test_trace_tree_goes_from_result_to_external_source(tmp_path):
+    m = build_catalog.build_manifest(FIXTURE)
+    t = _trace(tmp_path, m, "kpis_monthly", "customer_key")
+    order = [t.index(f'data-cp-node-model="{c}"') for c in ("kpis_monthly", "core__orders", "raw__orders__shopify")]
+    assert order == sorted(order)
+    assert "shopify_admin_api#Order.email" in t
+    assert "<details open" in t and 'class="cp-detail"' in t
+    assert "TO_HEX" in t.split('<details class="cp-deep">')[0], "le SQL d'une etape amont est affiche"
+    assert "TO_HEX" in _trace(tmp_path, m, "kpis_monthly", "customer_key", node=("core__orders", "customer_key"))
 
-    def node(i, kind, **cols):
-        return {"id": i, "nodeType": kind, "columns": cols}
 
-    nodes = {
-        "raw__a": node("raw__a", "source", x=col("map", "Copie x."), y=col("map", "Copie y."), z=col()),
-        "core__first": node("core__first", "model", k=col("transform", "Premier calcul.")),
-        "core__second": node("core__second", "model", k=col("transform", "Second calcul.")),
-        "mart": node("mart", "model", k=col("transform", "Resultat.")),
-    }
-    pairs = [("raw__a", "x", "core__first"), ("raw__a", "y", "core__first"), ("raw__a", "z", "core__first"),
-             ("core__first", "k", "core__second"), ("core__second", "k", "mart"), ("core__first", "k", "mart")]
-    edges = [{"source": s, "sourceColumn": c, "target": t, "targetColumn": "k"} for s, c, t in pairs]
-    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "mart", "k")
-    assert "<summary><b>raw__a</b> · 2 copied columns · 1 undocumented</summary>" in trace
-    assert "<details" in trace and "<details open" not in trace
-    assert trace.index("<b>core__second</b>") < trace.index("<b>core__first</b>") < trace.index("<b>raw__a</b>")
-    assert "from raw__a#x, raw__a#y, raw__a#z" in trace, "les etapes amont affichent leurs entrees"
-    assert "3 transformations · 4 contracts" in trace
+def test_trace_tree_on_a_raw_contract_shows_the_external_system(tmp_path):
+    t = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "raw__pages_views__ga4", "event_name")
+    assert "ga4_bigquery_export#events.event_name" in t
+    assert "Raw contract: no upstream" not in t
+
+
+def test_trace_tree_shows_a_shared_column_once_and_survives_cycles(tmp_path):
+    g = _graph(
+        {"raw__x": ["k"], "a": ["k"], "b": ["k"], "mart": ["k"]},
+        [("a", "k", "mart", "k"), ("b", "k", "mart", "k"), ("raw__x", "k", "a", "k"),
+         ("raw__x", "k", "b", "k"), ("mart", "k", "a", "k")],
+    )
+    g["nodes"]["raw__x"]["columns"]["k"] = {"meta": {"externalSources": ["sys#o.k"]}}
+    t = _trace(tmp_path, g, "mart", "k")
+    assert t.count("shown above") == 2  # raw__x sous b, et le retour sur mart
+    assert t.count('class="cp-ext"') == 1
+    assert "not documented" in t
+
+
+def test_trace_tree_says_when_truncated(tmp_path):
+    wide = [f"c{i}" for i in range(450)]
+    g = _graph({"src": wide, "mart": ["k"]}, [("src", c, "mart", "k") for c in wide])
+    t = _trace(tmp_path, g, "mart", "k")
+    assert "Trace truncated at 400 lines." in t
+    assert t.count('class="cp-node') == 400
+
+
+def test_trace_tree_escapes_names(tmp_path):
+    name = 'a"<b>'
+    g = _graph({"src": [name], "mart": ["k"]}, [("src", name, "mart", "k")])
+    t = _trace(tmp_path, g, "mart", "k")
+    assert name not in t and "a&quot;&lt;b&gt;" in t
+
+
+def test_trace_tree_resets_detail_on_column_change(tmp_path):
+    g = _graph({"src": ["x"], "mart": ["k", "j"]}, [("src", "x", "mart", "k")])
+    picked = _trace(tmp_path, g, "mart", "k", node=("src", "x"))
+    assert '<div class="cp-dtitle">src.x</div>' in picked
+    assert '<div class="cp-dtitle">mart.j</div>' in _trace(tmp_path, g, "mart", "k", node=("src", "x"), next_column="j")
+
+
+def test_trace_tree_without_upstream_says_why(tmp_path):
+    g = _graph({"mart": ["k"]}, [])
+    assert "No upstream lineage declared" in _trace(tmp_path, g, "mart", "k")
+    g["nodes"]["mart"]["columns"]["k"] = _col("create", "Constante.")
+    assert "Created in this contract" in _trace(tmp_path, g, "mart", "k")
 
 
 def test_trace_tab_survives_a_stale_react_model_state(tmp_path):
@@ -156,37 +203,9 @@ def test_trace_tab_survives_a_stale_react_model_state(tmp_path):
     assert "Select a contract to see its source trace." in empty
     stale = _trace(tmp_path, manifest, "", "customer_key", click_model="kpis_monthly")
     assert "Source trace · kpis_monthly" in stale
-    assert "Alimente customer_key" in stale and "TO_HEX" in stale
-
-
-def test_trace_tab_on_a_raw_contract_says_its_sources_are_external(tmp_path):
-    trace = _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "raw__orders__shopify")
-    assert "Raw contract: no upstream in the catalog" in trace
-
-
-def test_trace_tab_reports_undocumented_step_and_ignores_cycles(tmp_path):
-    """Qualite variable : une colonne amont sans transformation est signalee, un cycle ne boucle pas."""
-    nodes = {
-        "raw__orders__shopify": {"id": "raw__orders__shopify", "nodeType": "source", "columns": {"id": {}}},
-        "core__orders": {"id": "core__orders", "nodeType": "model", "columns": {"order_id": {"meta": {"transformLogic": "map"}}}},
-        "kpis_monthly": {
-            "id": "kpis_monthly",
-            "nodeType": "model",
-            "columns": {"order_id": {"meta": {"transformLogic": "map", "transformDescription": "Copie de order_id."}}},
-        },
-    }
-    edges = [
-        {"id": 1, "source": "core__orders", "target": "kpis_monthly", "sourceColumn": "order_id", "targetColumn": "order_id"},
-        {"id": 2, "source": "raw__orders__shopify", "target": "core__orders", "sourceColumn": "id", "targetColumn": "order_id"},
-        {"id": 3, "source": "raw__orders__shopify", "target": "core__orders", "sourceColumn": "id", "targetColumn": "order_id"},
-        # arete de retour : un contrat amont qui depend de lui-meme (cycle)
-        {"id": 4, "source": "kpis_monthly", "target": "core__orders", "sourceColumn": "order_id", "targetColumn": "order_id"},
-    ]
-    trace = _trace(tmp_path, {"nodes": nodes, "lineage": {"edges": edges}}, "kpis_monthly", "order_id")
-    assert trace.count("<b>raw__orders__shopify</b>") == 1, "une colonne amont n'est listee qu'une fois"
-    assert trace.count("<b>core__orders</b>") == 1
-    assert "Transformation not documented" in trace
-    assert "Copie de order_id." in trace
+    assert "Alimente customer_key" in stale
+    picked = _trace(tmp_path, manifest, "", "customer_key", click_model="kpis_monthly", node=("core__orders", "customer_key"))
+    assert "TO_HEX" in picked
 
 
 def test_trace_tab_and_column_panels_render_for_every_contract_of_the_repo(tmp_path):
@@ -214,7 +233,7 @@ for (const id of Object.keys(window.colibriData.nodes)) {
     for (const fn of ["cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml"]) {
       try { window[fn](id, col); } catch (e) { errors.push(fn + " " + id + "." + col + " -> " + e.message); }
     }
-    try { window.cpTraceColumnSet(id, col); window.cpTraceTabHtml(id); window.cpTraceTabHtml(null); } catch (e) { errors.push("cpTraceTabHtml " + id + "." + col + " -> " + e.message); }
+    try { window.cpTraceColumnSet(id, col); window.cpTraceTabHtml(id); window.cpTraceNodeSet(id, col); window.cpTraceTabHtml(null); } catch (e) { errors.push("cpTraceTabHtml " + id + "." + col + " -> " + e.message); }
   }
 }
 process.stdout.write(JSON.stringify(errors));
@@ -243,3 +262,148 @@ def test_manifest_exposes_external_sources_of_raw_columns_only():
     assert cols["event_name"]["meta"]["externalSources"] == ["ga4_bigquery_export#events.event_name"]
     assert "externalSources" not in cols["meta_loaded_at"]["meta"]
     assert "externalSources" not in nodes["core__orders"]["columns"]["customer_key"]["meta"]
+
+
+def test_trace_summary_lists_changes_from_sources_to_result_with_tree_closed(tmp_path):
+    g = _graph(
+        {"raw__x": ["k"], "core__a": ["k"], "core__b": ["k"], "mart": ["k"]},
+        [("core__a", "k", "mart", "k"), ("core__b", "k", "mart", "k"), ("raw__x", "k", "core__a", "k"),
+         ("core__a", "k", "core__b", "k")],
+    )
+    cols = {c: n["columns"] for c, n in g["nodes"].items()}
+    cols["raw__x"]["k"] = {"meta": {"transformLogic": "map", "transformDescription": "Recopie brute.",
+                                    "externalSources": ["sys_api#o.k", "sys_api#o.j"]}}
+    cols["core__a"]["k"] = _col("transform", "Etape A.")
+    cols["core__b"]["k"] = _col("transform", "Etape B.")
+    cols["mart"]["k"] = _col("transform", "Resultat final.")
+    t = _trace(tmp_path, g, "mart", "k")
+    summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
+    assert summary.index("Resultat final.") < summary.index("Etape B.") < summary.index("Etape A."), \
+        "resultat en haut, puis du plus proche au plus lointain"
+    assert summary.count("Etape A.") == 1, "une colonne partagee n'est resumee qu'une fois"
+    assert "Recopie brute." not in summary, "les recopies sont omises du resume"
+    assert '<details class="cp-deep" open' not in t and 'class="cp-tree"' in t
+    assert '<details class="cp-deep" open>' in _trace(tmp_path, g, "mart", "k", node=("core__a", "k")), \
+        "un re-rendu apres un clic dans l'arbre ne referme pas la vue detaillee"
+
+
+def test_trace_summary_reports_undocumented_steps_and_plain_copies(tmp_path):
+    g = _graph({"src": ["x"], "mart": ["k"]}, [("src", "x", "mart", "k")])
+    g["nodes"]["src"]["columns"]["x"] = {}
+    g["nodes"]["mart"]["columns"]["k"] = _col("map", "Copie de x.")
+    t = _trace(tmp_path, g, "mart", "k")
+    assert "No transformation declared: plain copies only." in t
+    assert "1 step not documented" in t
+
+
+def test_trace_summary_shows_classification_and_sources_by_sensitivity(tmp_path):
+    """Classification declaree et la plus haute en amont ; champs sources les plus sensibles d'abord, C1 replies."""
+    g = _graph(
+        {"raw__x": ["cost", "cur", "nested"], "core__a": ["spend"], "core__copy": ["spend_copy"], "mart": ["total"]},
+        [("raw__x", "cost", "core__a", "spend"), ("raw__x", "cur", "core__a", "spend"),
+         ("raw__x", "nested", "core__a", "spend"), ("core__a", "spend", "core__copy", "spend_copy"),
+         ("core__copy", "spend_copy", "mart", "total")],
+    )
+    cols = {c: n["columns"] for c, n in g["nodes"].items()}
+    g["nodes"]["raw__x"]["nodeType"] = "source"
+    for name in ("cost", "cur"):
+        cols["raw__x"][name] = {"meta": {"transformLogic": "map", "externalSources": [f"ads_api#campaign.{name}"]}}
+    cols["raw__x"]["cost"]["meta"]["classification"] = "C1"
+    cols["raw__x"]["cur"]["meta"]["classification"] = "C3"
+    cols["raw__x"]["cur"]["tags"] = ["pii"]
+    cols["raw__x"]["nested"] = {}  # champ imbrique : aucune source externe, aucune classification
+    cols["core__a"]["spend"] = {"meta": {"transformLogic": "transform", "transformDescription": "Conversion en euros.",
+                                         "transformExpression": "core_sql_here", "classification": "C2"}}
+    cols["core__copy"]["spend_copy"] = _col("map", "Copie.")
+    cols["mart"]["total"] = {"meta": {"transformLogic": "transform", "transformDescription": "Somme.",
+                                      "transformExpression": "mart_sql_here", "classification": "C1"}}
+    t = _trace(tmp_path, g, "mart", "total")
+    s = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
+    order = [s.index(x) for x in ("Declared: ", "Highest upstream: ", "Somme.", "mart_sql_here", ">Sources<", ">Transformations<", "Conversion en euros.")]
+    assert order == sorted(order)
+    assert 'Highest upstream: <span class="cp-badge hi">C3' in s
+    sources = s.split(">Sources<")[1].split(">Transformations<")[0]
+    visible, folded = sources.split("<summary>C1 and lower · 1 field</summary>")
+    assert "C3 · pii" in visible and "<b>ads_api</b> campaign.cur" in visible
+    assert "<b>raw__x</b> nested" in visible and "unclassified" in visible, "sans classification : jamais replie"
+    assert "campaign.cost" in folded and "campaign.cost" not in visible
+    assert ">core__copy<" not in s and "<div>core__copy: spend_copy</div>" in s, "entree declaree, pas une etape"
+    assert "core_sql_here" in s and "Step inputs" not in s
+    assert '<span class="cp-t"><span class="cp-badge ">C1' in t, "la liste affiche la classification"
+
+
+def test_trace_steps_show_the_table_id(tmp_path):
+    g = _graph({"core__a": ["k"], "core__multi": ["obj.k"], "mart": ["k"]},
+               [("core__a", "k", "mart", "k"), ("core__multi", "obj.k", "mart", "k")])
+    g["nodes"]["core__a"]["relationName"] = "proj.core.a"
+    g["nodes"]["core__multi"]["relationName"] = "proj.core.{obj,other}"
+    t = _trace(tmp_path, g, "mart", "k")
+    steps = t.split(">Transformations<")[1].split('<details class="cp-deep">')[0]
+    assert ">proj.core.a</div>" in steps
+    assert ">proj.core.obj</div>" in steps and '<span class="cp-hopcol">k</span>' in steps, "contrat a plusieurs tables"
+    assert "core__a" not in steps
+
+
+def test_trace_shows_table_queries_with_column_lines_highlighted(tmp_path):
+    g = _graph({"core__a": ["flag"], "mart": ["is_ok"]}, [("core__a", "flag", "mart", "is_ok")])
+    g["nodes"]["mart"]["columns"]["is_ok"]["meta"]["transformExpression"] = "IFNULL(latest.opted, FALSE)"
+    g["nodes"]["mart"]["meta"] = {"customProperties": {"transformInputs": "SELECT a\nFROM t\nWHERE latest.opted"}}
+    g["nodes"]["core__a"]["meta"] = {"customProperties": {"transformInputs": "-- regle <b>\nSELECT x AS opted\nFROM raw"}}
+    t = _trace(tmp_path, g, "mart", "is_ok")
+    block = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
+    assert block.count('<details class="cp-acc cp-query"><summary>Full table SQL</summary>') == 1, "un seul bloc, replie"
+    assert block.index(">Transformations<") < block.index("Full table SQL") < block.index(">mart</span>", block.index("Full table SQL")) < block.index(">core__a</span>", block.index("Full table SQL"))
+    block = block[block.index("Full table SQL"):]
+    hits = block.split('class="cp-line cp-hit"')[1:]
+    assert len(hits) == 2, "latest/opted ; ni IFNULL ni FALSE"
+    assert block.count('class="cp-line') == 6, "une ligne rendue par ligne de requete"
+    assert "regle &lt;b&gt;" in block and "<b>\n" not in block
+    assert "Full table SQL" not in _trace(tmp_path, build_catalog.build_manifest(FIXTURE), "kpis_monthly", "customer_key")
+
+
+def test_trace_shows_column_description_first_and_hides_trivial_sql(tmp_path):
+    g = _graph({"core__a": ["flag"], "mart": ["is_ok"]}, [("core__a", "flag", "mart", "is_ok")])
+    top = g["nodes"]["mart"]["columns"]["is_ok"]
+    top["description"] = "Regle metier. Toujours vrai ici."
+    top["meta"]["transformExpression"] = "latest.opted"
+    step = g["nodes"]["core__a"]["columns"]["flag"]
+    step["description"] = "Description de l'etape."
+    step["meta"]["transformExpression"] = "flag"
+    t = _trace(tmp_path, g, "mart", "is_ok")
+    summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
+    header = summary.split(">Transformations<")[0]
+    assert header.index("Toujours vrai ici.") < header.index(">Transformation<") < header.index("Calcul is_ok.") < header.index("latest")
+    assert "Calcul flag." in summary and "Description de l" not in summary, "une etape dit comment la colonne est calculee"
+    assert summary.count("Transformation SQL") == 1 and "latest" in summary, "le SQL reduit au nom de colonne est masque"
+    del top["description"]
+    assert "Calcul is_ok." in _trace(tmp_path, g, "mart", "is_ok"), "repli sur transformDescription"
+
+
+def test_trace_steps_list_their_source_objects(tmp_path):
+    g = _graph({"raw__x": ["a", "b"], "core__a": ["k"], "mart": ["k"]},
+               [("raw__x", "a", "core__a", "k"), ("raw__x", "b", "core__a", "k"), ("core__a", "k", "mart", "k")])
+    g["nodes"]["raw__x"]["columns"] = {"a": _col("map"), "b": _col("map")}
+    g["nodes"]["raw__x"]["relationName"] = "proj.raw.x"
+    g["nodes"]["core__a"]["relationName"] = "proj.core.a"
+    t = _trace(tmp_path, g, "mart", "k")
+    summary = t[t.index('class="cp-summary"'):t.index('<details class="cp-deep">')]
+    header, steps = summary.split(">Transformations<")
+    assert '<div class="cp-from">Source objects<div>proj.core.a: k</div></div>' in header
+    assert '<div class="cp-from">Source objects<div>proj.raw.x: a, b</div></div>' in steps
+
+
+def test_trace_shows_sources_unfolded_when_none_is_sensitive(tmp_path):
+    g = _graph({"raw__x": ["a"], "mart": ["k"]}, [("raw__x", "a", "mart", "k")])
+    g["nodes"]["raw__x"]["columns"]["a"] = {"meta": {"classification": "C1", "externalSources": ["sys#o.a"]}}
+    t = _trace(tmp_path, g, "mart", "k")
+    sources = t.split(">Sources<")[1].split(">Transformations<")[0].split('<details class="cp-acc cp-query">')[0]
+    assert "o.a" in sources and "C1 and lower" not in sources
+
+
+def test_trace_column_without_upstream_says_it_once(tmp_path):
+    g = _graph({"raw__x": ["nested"]}, [])
+    g["nodes"]["raw__x"]["nodeType"] = "source"
+    g["nodes"]["raw__x"]["columns"]["nested"] = {}
+    t = _trace(tmp_path, g, "raw__x", "nested").split('<details class="cp-deep">')[0]
+    assert "No upstream lineage declared" in t
+    assert "plain copies only" not in t and "step not documented" not in t and ">Sources<" not in t

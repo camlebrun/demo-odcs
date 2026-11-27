@@ -11,7 +11,7 @@ Retraits :
 - l'onglet "Compiled" (pas de code compile dans un contrat).
 Ajouts dans le panneau natif "Model info" (catalog_assets/column_info.js et .css) : infos du
 contrat, types logique et physique en accordeon, SQL de transformation, mode expert, onglet
-"Trace" (toutes les transformations, des contrats raw jusqu'au contrat selectionne).
+"Trace" (pour une colonne : classification, sources, transformations et arbre de lignage).
 """
 from __future__ import annotations
 
@@ -220,8 +220,8 @@ def _drop_lineage_warning(html: str) -> str:
 
 
 def _trace_tab(html: str) -> str:
-    """Onglet "Trace" a cote de "Model Info" et "Lineage" : pour le contrat selectionne, toutes les
-    transformations des contrats raw jusqu'a lui, rendues par window.cpTraceTabHtml(selectedModelId)."""
+    """Onglet "Trace" a cote de "Model Info" et "Lineage" : le contenu, pour le contrat selectionne,
+    est rendu par window.cpTraceTabHtml(selectedModelId)."""
     # a) Entree de la barre d'onglets (le rendu du bouton est natif : f.map(...)), avec sa propre
     #    icone (lucide "route"), creee par la meme fabrique que les icones du bundle.
     icon = '_De=pi("file-text",KSt)'
