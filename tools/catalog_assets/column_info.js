@@ -32,15 +32,15 @@
 
   /* Lien vers une colonne : ouvre l'onglet Trace sur elle. view=trace le distingue des liens de
      colibri (?model=&column=), qui ouvrent la vue lineage et gardent leur comportement. */
-  window.cpColumnLink = function (model, col) {
+  window.cpColumnLink = function (model, col) { /* sans colonne : lien vers le contrat */
     var base = String((window.location || {}).href || "").split("#")[0].split("?")[0];
-    return base + "?model=" + encodeURIComponent(model) + "&column=" + encodeURIComponent(col) + "&view=trace";
+    return base + "?model=" + encodeURIComponent(model) + (col ? "&column=" + encodeURIComponent(col) : "") + "&view=trace";
   };
   window.cpDeepLink = function (search) {
     try {
       var p = new URLSearchParams(search || "");
       var model = p.get("model"), column = p.get("column");
-      return p.get("view") === "trace" && model && column ? { model: model, column: column } : null;
+      return p.get("view") === "trace" && model ? { model: model, column: column } : null;
     } catch (e) { return null; }
   };
   function copyLink(btn) {
@@ -64,6 +64,22 @@
     if (tries > 0) setTimeout(function () { openLinked(tries - 1); }, 100);
   }
   if (LINKED) setTimeout(function () { openLinked(150); }, 0);
+
+  /* Recherche : comparaison sans casse ni accents. */
+  window.cpFold = function (s) { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); };
+  /* pii et pseudonymized restent des donnees personnelles : un seul groupe, donc "l'un ou l'autre". */
+  function tagGroup(t) { return t === "pii" || t === "pseudonymized" ? "personal" : String(t).split(":")[0]; }
+  /* Filtre par tags : au moins un tag coche dans chaque groupe coche (owner, classification, personal...). */
+  window.cpTagMatch = function (tags, selected) {
+    var groups = {};
+    selected.forEach(function (t) { var g = tagGroup(t); groups[g] = groups[g] || (tags || []).indexOf(t) >= 0; });
+    return Object.keys(groups).every(function (g) { return groups[g]; });
+  };
+  function columnSelection(selected) {
+    return Array.from(selected).filter(function (t) { var g = tagGroup(t); return g === "personal" || g === "classification"; });
+  }
+  window.cpColumnFiltered = function (selected) { return columnSelection(selected).length > 0; };
+  window.cpColumnTags = function (tags, selected) { return window.cpTagMatch(tags, columnSelection(selected)); };
 
   function data() { return window.colibriData || { nodes: {}, lineage: { edges: [] } }; }
   function esc(s) {
@@ -169,7 +185,21 @@
     return PARENTS;
   }
   function parentsOf(c, col) { return parentsIndex()[c + SEP + col] || []; }
-  function metaOf(c, col) { return (((data().nodes[c] || {}).columns || {})[col] || {}).meta || {}; }
+  function ownMeta(c, col) { return (((data().nodes[c] || {}).columns || {})[col] || {}).meta || {}; }
+  /* Un champ imbrique sans documentation propre reprend celle de son parent (la classification reste la sienne). */
+  function metaOf(c, col) {
+    var m = ownMeta(c, col), path = String(col).split(".");
+    if (m.transformLogic || m.transformDescription) return m;
+    while (path.length > 1) {
+      path.pop();
+      var p = ownMeta(c, path.join("."));
+      if (p.transformDescription) {
+        return Object.assign({}, m, { transformLogic: p.transformLogic, transformDescription: p.transformDescription,
+          externalSources: p.externalSources });
+      }
+    }
+    return m;
+  }
   /* Recopie ("map") ou colonne sans rien de declare : grisee, non comptee comme transformation. */
   function isCopy(m) { return m.transformLogic === "map" || (!m.transformLogic && !m.transformDescription); }
   function plural(n, word) { return n + " " + word + (n > 1 ? "s" : ""); }
@@ -179,11 +209,10 @@
     if ((data().nodes[c] || {}).nodeType === "source") return "raw";
     return c.indexOf("core__") === 0 ? "core" : "customer";
   }
-  /* dataset.table (le projet est le meme partout) ; vide si le contrat ne declare pas de table. */
+  /* Identifiant complet projet.dataset.table ; vide si le contrat ne declare pas de table. */
   function tableName(c, col) {
     if (!(data().nodes[c] || {}).relationName) return "";
-    var parts = tableRef(c, col).table.split(".");
-    return '<span class="cp-tname">' + esc(parts.slice(parts.length > 2 ? 1 : 0).join(".")) + "</span> ";
+    return '<span class="cp-tname">' + esc(tableRef(c, col).table) + "</span> ";
   }
   /* Ligne de l'arbre (et du detail) : un bouton qui selectionne la colonne. */
   function nodeButton(c, col, cls, extra) {
@@ -286,7 +315,8 @@
   function traceListHtml(model, sel) {
     var cols = Object.keys(data().nodes[model].columns || {});
     return '<nav class="cp-cols"><div class="cp-colhead"><b>' + esc(model) + '</b><span class="cp-note">' +
-      plural(cols.length, "column") + "</span></div>" +
+      plural(cols.length, "column") + '</span><button type="button" class="cp-link" data-cp-link="' + esc(model) +
+      '">Copy contract link</button></div>' +
       cols.map(function (c) {
         var level = metaOf(model, c).classification;
         return '<button type="button" class="cp-colbtn' + (c === sel ? " cp-on" : "") + '" data-cp-model="' + esc(model) +

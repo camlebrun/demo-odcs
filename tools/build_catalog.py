@@ -138,6 +138,11 @@ def build_manifest(root: Path) -> dict:
                 entry["tests"] = tests
             columns[name] = {k: v for k, v in entry.items() if v is not None}
 
+        # Tags de contrat pour les filtres : responsable, classification, PII et donnees pseudonymisees.
+        team = (d.get("team") or {}).get("name") if isinstance(d.get("team"), dict) else None
+        filters = {f"owner:{team}"} if team else set()
+        filters |= {t for e in columns.values() for t in e.get("tags", []) if t in ("pii", "pseudonymized") or t.startswith("classification:")}
+
         objs = schema_objects(c) or [{}]
         obj0 = objs[0]
         tables = [o.get("physicalName") or o.get("name") for o in objs]
@@ -178,7 +183,7 @@ def build_manifest(root: Path) -> dict:
             "rawCode": c.path.read_text(encoding="utf-8"),
             "compiledCode": None,
             "refs": [],
-            "tags": sorted({*(d.get("tags") or []), f"domain:{d.get('domain')}", f"status:{d.get('status')}"}),
+            "tags": sorted({*(d.get("tags") or []), f"domain:{d.get('domain')}", f"status:{d.get('status')}", *filters}),
             "columns": columns,
             "relationName": ".".join(x for x in (srv.get("project"), srv.get("dataset"), table) if x) or None,
             "meta": {k: v for k, v in node_meta.items() if v is not None},
