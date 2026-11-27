@@ -44,6 +44,39 @@ summary{cursor:pointer;font-weight:600}
 <body>
 <nav><strong>data-contracts</strong><a href="index.html">Catalogue</a><a href="lineage.fr.html" aria-current="page">Doc</a><a class="lang" href="lineage.html" lang="en">English</a></nav>
 <main>
+<h1>Tutoriel : le client, puis le catalogue</h1>
+<p class="lead">Dix minutes pour savoir de quelles données on parle et où les lire. Le fonctionnement technique est plus bas.</p>
+<h2>Le client</h2>
+<p>Une enseigne de commerce omnicanal (cas fictif) : 40 magasins et une boutique web. Ses données viennent de cinq endroits.</p>
+<div class="scroll"><table><tr><th>Origine</th><th>Ce qu'on y trouve</th><th>Contrats</th></tr>
+<tr><td>Caisse des magasins</td><td>tickets, magasins, cartes de fidélité</td><td><code>raw__…__pos</code></td></tr>
+<tr><td>Shopify</td><td>commandes, retours, clients web</td><td><code>raw__…__shopify</code></td></tr>
+<tr><td>Google Analytics 4</td><td>pages vues et achats sur le site</td><td><code>raw__…__ga4</code></td></tr>
+<tr><td>Google Ads</td><td>campagnes et dépenses</td><td><code>raw__…__googleads</code></td></tr>
+<tr><td>Meta Ads</td><td>campagnes et dépenses</td><td><code>raw__…__metaads</code></td></tr></table></div>
+<p>Il n'y a pas de table « pos_export » : c'est le nom technique de l'export de caisse. Les données de caisse sont dans les contrats qui finissent par <code>__pos</code>.</p>
+<h2>Ses trois besoins</h2>
+<div class="scroll"><table><tr><th>Table</th><th>Pour qui</th><th>Question posée</th></tr>
+<tr><td><code>acquisition_monthly</code></td><td>acquisition payante</td><td>Combien coûte un nouveau client par campagne, et que rapporte-t-il ?</td></tr>
+<tr><td><code>audiences</code></td><td>CRM et marketing</td><td>Qui cibler, exclure ou relancer, parmi les clients consentants ?</td></tr>
+<tr><td><code>kpis_monthly</code></td><td>finance</td><td>Comment évoluent la base clients et le chiffre d'affaires ?</td></tr></table></div>
+<p>Le fil conducteur est <code>customer_key</code> : l'e-mail normalisé puis haché, qui relie un même client entre caisse et web. Cela reste une donnée personnelle.</p>
+<h2>Les trois couches</h2>
+<p><strong>raw</strong> (copie de chaque source) → <strong>core</strong> (règles métier communes) → <strong>customer</strong> (les trois tables ci-dessus).</p>
+<h2>Les onglets du catalogue</h2>
+<div class="scroll"><table><tr><th>Onglet</th><th>Quand l'ouvrir</th></tr>
+<tr><td>Model Info</td><td>à quoi sert la table, qui en est responsable, quels contrôles qualité</td></tr>
+<tr><td>Lineage</td><td>quelles tables alimentent quelles tables</td></tr>
+<tr><td>Trace</td><td>d'où vient une colonne précise et comment elle est calculée</td></tr></table></div>
+<p>Pour chercher : le champ « Filter models… » à gauche accepte un nom de table, de colonne ou de dossier ; ⌘K (Ctrl+K) ouvre la recherche globale.</p>
+<h2>Exemple : d'où vient <code>audiences.consent_updated_at</code> ?</h2>
+<ol><li>Ouvrir le contrat <code>audiences</code>, onglet <strong>Trace</strong>, choisir la colonne.</li>
+<li>En haut : <strong>Declared</strong> est la classification de la colonne ; <strong>Highest upstream</strong> la plus sensible rencontrée en amont. Un écart n'est pas une erreur en soi.</li>
+<li><strong>Lineage tree</strong> : toutes les colonnes en amont, jusqu'aux champs des systèmes sources, avec leur couche, leur table et leur classification.</li>
+<li>Plus bas : la description de la transformation, puis les champs raw d'origine.</li>
+<li>Le bouton <strong>Data engineer mode</strong> montre en plus le SQL (expression de chaque colonne, requêtes complètes).</li></ol>
+<h2>Niveaux de classification</h2>
+<p>De C0 (le moins sensible) à C3 (le plus sensible). <code>pii</code> signale une donnée personnelle directe, comme l'e-mail.</p>
 <h1>Des contrats ODCS au data catalogue</h1>
 <p class="lead">Nos contrats suffisent à construire le catalogue et son lineage. Ni dbt, ni base de données, ni analyse du SQL.</p>
 <p>Le code qui crée le JSON : <a href="https://github.com/camlebrun/demo-odcs/blob/main/tools/build_catalog.py">tools/build_catalog.py</a> (fonction <code>build_manifest</code>). Le résultat : <a href="colibri-manifest.json">colibri-manifest.json</a>.</p>
@@ -67,13 +100,10 @@ summary{cursor:pointer;font-weight:600}
   transformLogic: transform
   transformSourceObjects:
     - core__ad_spend#ad_spend.spend_eur
-    - core__ad_spend#ad_spend.spend_date
-    - core__ad_spend#ad_spend.platform
-    - core__ad_spend#ad_spend.campaign_id
   customProperties:
     - property: transformExpression
       value: IFNULL(SUM(spend_eur), 0)</code></pre>
-<p>La dépense est la somme de <code>spend_eur</code>. Les trois autres colonnes servent à la grouper par mois, canal et campagne : <b>elles sont citées aussi</b>, pas seulement celle de l'expression.</p>
+<p>La dépense est la somme de <code>spend_eur</code> : c'est la seule source. <b>Une source est un champ qui fournit la valeur</b>. Les colonnes qui ne servent qu'à joindre, filtrer ou grouper (ici le mois, la plateforme et la campagne) ne sont pas listées : elles sont décrites en français dans <code>transformDescription</code>. Pour une constante selon l'origine, on liste l'identifiant ou le champ type de chaque table d'origine.</p>
 <details><summary>Nos règles d'écriture</summary>
 <ul><li>Un champ imbriqué s'écrit avec son chemin : <code>raw__refunds__shopify#refunds.transactions.amount</code>.</li><li><code>transformExpression</code> : le SQL BigQuery, propriété maison dans <code>customProperties</code>. Il est affiché, jamais exécuté.</li></ul><div class="scroll"><table><tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression</th></tr>
 <tr><td><code>map</code></td><td>exactement une</td><td>facultative : renommage ou cast simple seulement</td></tr>
@@ -89,7 +119,7 @@ summary{cursor:pointer;font-weight:600}
 <svg width="720" viewBox="0 0 720 308" role="img" aria-label="Une source transformSourceObjects declaree dans le contrat devient une arete dans lineage.edges, puis une fleche entre les tables core__ad_spend et acquisition_monthly dans le catalogue.">
 <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--accent)"/></marker></defs>
 <rect class="box" x="0" y="0" width="720" height="88" rx="8"/>
-<text class="cap" x="14" y="24">1. Dans le contrat — une des 4 sources de <tspan class="mono">spend_amount</tspan></text>
+<text class="cap" x="14" y="24">1. Dans le contrat — la source de <tspan class="mono">spend_amount</tspan></text>
 <text class="mono" x="14" y="46">- name: spend_amount</text>
 <text class="mono" x="14" y="64">  transformSourceObjects: <tspan class="hi">core__ad_spend#ad_spend.spend_eur</tspan></text>
 <text class="lab" x="219" y="80" text-anchor="middle">contrat</text>

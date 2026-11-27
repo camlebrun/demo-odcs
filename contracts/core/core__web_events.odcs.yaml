@@ -2,7 +2,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: core__web_events
 name: core__web_events
-version: 1.0.0
+version: 1.1.0
 status: active
 domain: core
 tags:
@@ -48,43 +48,6 @@ slaProperties:
     unit: y
     element: web_events
     description: Historique conservé 3 ans.
-customProperties:
-  - property: transformInputs
-    value: |-
-      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
-      -- Colonnes de web : celles de la table.
-      WITH valid_orders AS (
-        -- La commande web valide est définie dans core.sales_events ; le nom vient du raw.
-        SELECT o.id, o.name
-        FROM raw_shopify.orders o
-        JOIN core.sales_events s ON s.web_order_id = o.id AND s.source_system = 'shopify' AND s.event_type = 'sale'
-      ),
-      web AS (
-        SELECT CONCAT('purchase:', IFNULL(p.user_pseudo_id, ''), ':', CAST(p.event_timestamp AS STRING), ':',
-                      IFNULL(CAST(p.event_bundle_sequence_id AS STRING), ''), ':', IFNULL(p.ecommerce.transaction_id, '')) AS event_id,
-               'purchase' AS event_type, TIMESTAMP_MICROS(p.event_timestamp) AS event_at, p.user_pseudo_id,
-               wo.id AS web_order_id, CAST(NULL AS STRING) AS user_id_customer_key,
-               -- Règle « canal marketing ».
-               CASE WHEN p.collected_traffic_source.gclid IS NOT NULL
-                      OR (LOWER(p.collected_traffic_source.manual_source) = 'google'
-                          AND LOWER(p.collected_traffic_source.manual_medium) IN ('cpc', 'ppc', 'paid')) THEN 'google_ads'
-                    WHEN LOWER(p.collected_traffic_source.manual_source) IN ('facebook', 'instagram', 'meta', 'fb', 'ig')
-                      AND LOWER(p.collected_traffic_source.manual_medium) IN ('cpc', 'paid', 'paid_social', 'cpm') THEN 'meta_ads'
-                    ELSE 'other_web' END AS marketing_channel,
-               LOWER(TRIM(p.collected_traffic_source.manual_campaign_name)) AS utm_campaign,
-               p.privacy_info.analytics_storage = 'Yes' AS is_analytics_consented
-        FROM raw_ga4.purchase_events p
-        LEFT JOIN valid_orders wo ON p.ecommerce.transaction_id IN (CAST(wo.id AS STRING), wo.name, LTRIM(wo.name, '#'))
-        UNION ALL
-        SELECT CONCAT(v.event_name, ':', IFNULL(v.user_pseudo_id, ''), ':', CAST(v.event_timestamp AS STRING), ':',
-                      IFNULL(CAST(v.event_bundle_sequence_id AS STRING), '')),
-               v.event_name, TIMESTAMP_MICROS(v.event_timestamp), v.user_pseudo_id,
-               NULL, IF(NULLIF(TRIM(c.email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(c.email))))),
-               NULL, NULL, v.privacy_info.analytics_storage = 'Yes'
-        FROM raw_ga4.page_view_events v
-        LEFT JOIN raw_shopify.customers c ON v.user_id = CAST(c.id AS STRING)
-      )
-      -- Chaque champ : SELECT <champs> FROM web
 schema:
   - name: web_events
     physicalName: web_events
@@ -209,17 +172,11 @@ schema:
           - pseudonymized
         transformLogic: transform
         transformSourceObjects:
-          - raw__purchases__ga4#events.event_name
-          - raw__purchases__ga4#events.event_timestamp
-          - raw__purchases__ga4#events.user_pseudo_id
-          - raw__purchases__ga4#events.event_bundle_sequence_id
           - raw__purchases__ga4#events.ecommerce.transaction_id
           - raw__orders__shopify#orders.id
-          - raw__orders__shopify#orders.name
-          - core__sales_events#sales_events.web_order_id
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-        transformDescription: Rapprochement de la transaction GA4 avec le numéro d'une commande valide.
+        transformDescription: >-
+          Rapprochement de la transaction GA4 avec l'identifiant ou le numéro d'une commande Shopify valide
+          (vente présente dans core__sales_events). Vide sinon.
         customProperties:
           - property: transformExpression
             value: web_order_id
@@ -232,13 +189,13 @@ schema:
           - pseudonymized
         transformLogic: transform
         transformSourceObjects:
-          - raw__pages_views__ga4#events.user_id
-          - raw__customers__shopify#customers.id
           - raw__customers__shopify#customers.email
-        transformDescription: Hachage de l'e-mail du client Shopify dont l'identifiant est le user_id.
+        transformDescription: >-
+          Hachage de l'e-mail du client Shopify dont l'identifiant est le user_id de la page vue. Vide pour
+          les achats.
         customProperties:
           - property: transformExpression
-            value: user_id_customer_key
+            value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
       - name: marketing_channel
         physicalType: STRING
         logicalType: string

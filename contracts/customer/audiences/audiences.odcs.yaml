@@ -3,7 +3,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: audiences
 name: audiences
-version: 2.0.0
+version: 3.0.0
 status: active
 domain: customer
 tags: [customer]
@@ -58,68 +58,6 @@ slaProperties:
     unit: d
     element: customer_audiences
     description: Instantanes quotidiens conserves 30 jours (minimisation des donnees personnelles).
-
-customProperties:
-  - property: sponsor
-    value: CRM / marketing
-  - property: segments
-    value: buyers_90d, inactive_12m, product_viewers_no_purchase, top_customers
-  - property: transformInputs
-    value: |-
-      -- Ensemble intermediaire sur lequel portent les transformExpression des champs de cette table.
-      -- Colonnes de customer_stats : customer_key, last_order_at, orders_12m_count, net_revenue_12m_eur.
-      -- Colonnes de consent : customer_key, latest (STRUCT is_opted_in, signal_at, source). Colonnes de product_views : customer_key, last_product_view_at.
-      WITH events AS (
-        SELECT event_type, event_at, event_id AS order_id, amount_eur, customer_key FROM core.sales_events
-      ),
-      customer_stats AS (
-        SELECT customer_key,
-               MAX(IF(event_type = 'sale', event_at, NULL)) AS last_order_at,
-               COUNT(DISTINCT IF(event_type = 'sale' AND event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY), order_id, NULL)) AS orders_12m_count,
-               SUM(IF(event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY), amount_eur, 0)) AS net_revenue_12m_eur
-        FROM events WHERE customer_key IS NOT NULL GROUP BY customer_key
-      ),
-      consent AS (
-        -- Sans signal, is_marketing_consented est NULL : le client reste exclu.
-        SELECT customer_key, STRUCT(is_marketing_consented AS is_opted_in, consent_updated_at AS signal_at, consent_source AS source) AS latest
-        FROM core.customers WHERE is_marketing_consented IS NOT NULL
-      ),
-      ga_identity AS (
-        SELECT p.user_pseudo_id, s.customer_key
-        FROM core.web_events p
-        JOIN core.sales_events s ON s.web_order_id = p.web_order_id AND s.source_system = 'shopify' AND s.event_type = 'sale'
-        WHERE p.event_type = 'purchase' AND p.user_pseudo_id IS NOT NULL
-        UNION ALL
-        SELECT user_pseudo_id, user_id_customer_key
-        FROM core.web_events
-        WHERE event_type != 'purchase' AND user_id_customer_key IS NOT NULL AND user_pseudo_id IS NOT NULL
-      ),
-      product_views AS (
-        SELECT i.customer_key, MAX(v.event_at) AS last_product_view_at
-        FROM core.web_events v
-        JOIN ga_identity i ON i.user_pseudo_id = v.user_pseudo_id
-        WHERE v.event_type = 'view_item' AND v.is_analytics_consented
-          AND v.event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 DAY)
-        GROUP BY i.customer_key
-      ),
-      segments AS (
-        SELECT 'buyers_90d' AS segment_name, s.*, CAST(NULL AS TIMESTAMP) AS last_product_view_at FROM customer_stats s
-        WHERE s.last_order_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
-        UNION ALL
-        SELECT 'inactive_12m', s.*, NULL FROM customer_stats s
-        WHERE s.last_order_at < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY)
-        UNION ALL
-        SELECT 'top_customers', r.customer_key, r.last_order_at, r.orders_12m_count, r.net_revenue_12m_eur, NULL
-        FROM (SELECT s.*, PERCENT_RANK() OVER (ORDER BY s.net_revenue_12m_eur) AS pct_rank
-              FROM customer_stats s WHERE s.orders_12m_count >= 2) r
-        WHERE r.pct_rank >= 0.9
-        UNION ALL
-        SELECT 'product_viewers_no_purchase', pv.customer_key, s.last_order_at, IFNULL(s.orders_12m_count, 0),
-               IFNULL(s.net_revenue_12m_eur, 0), pv.last_product_view_at
-        FROM product_views pv LEFT JOIN customer_stats s USING (customer_key)
-        WHERE s.last_order_at IS NULL OR s.last_order_at < pv.last_product_view_at
-      )
-      -- Table finale : SELECT <champs> FROM segments JOIN consent USING (customer_key) WHERE consent.latest.is_opted_in
 
 schema:
   - name: customer_audiences
@@ -177,19 +115,13 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.customer_key
-          - core__customers#customers.customer_key
-          - core__customers#customers.is_marketing_consented
           - core__web_events#web_events.user_id_customer_key
-          - core__web_events#web_events.user_pseudo_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.is_analytics_consented
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
-        transformDescription: Cle client reprise de la couche core, sans recalcul.
+        transformDescription: >-
+          Cle client (e-mail hache) calculee dans la couche core et reprise ici sans recalcul.
+          Un client entre dans la table s'il appartient a au moins un segment (a partir de ses ventes,
+          ou de ses consultations de fiches produit rattachees par achat web ou connexion) et si son
+          consentement marketing le plus recent est positif. Jamais vide.
+          Les consultations ne comptent qu'avec le consentement analytics.
         customProperties:
           - property: transformExpression
             value: customer_key
@@ -213,8 +145,19 @@ schema:
           - value: inactive_12m
           - value: product_viewers_no_purchase
           - value: top_customers
-        transformLogic: create
-        transformDescription: Constante propre a chaque branche de l'union des quatre segments, sans colonne source.
+        transformLogic: transform
+        transformSourceObjects:
+          - core__sales_events#sales_events.event_type
+          - core__web_events#web_events.event_type
+        transformDescription: >-
+          Nom du segment, ecrit en dur par chacune des quatre branches de l'union : buyers_90d (dernier
+          achat de 90 jours ou moins), inactive_12m (dernier achat de plus de 365 jours), top_customers
+          (au moins 2 achats sur 365 jours et CA net dans les 10 % les plus eleves),
+          product_viewers_no_purchase (fiche produit vue sur 14 jours, sans achat depuis). Jamais vide.
+          Les consultations ne comptent qu'avec le consentement analytics, le visiteur etant rattache au client par un achat web ou sa connexion. Seuls les clients au consentement marketing positif sont gardes.
+        customProperties:
+          - property: transformExpression
+            value: segment_name
         quality:
           - type: library
             metric: invalidValues
@@ -233,7 +176,8 @@ schema:
         classification: C2
         tags: [pseudonymized]
         transformLogic: create
-        transformDescription: Date du jour de calcul dans le fuseau Europe/Paris.
+        transformDescription: >-
+          Date du jour du calcul, dans le fuseau Europe/Paris. Jamais vide.
         customProperties:
           - property: transformExpression
             value: CURRENT_DATE('Europe/Paris')
@@ -247,13 +191,13 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__customers#customers.is_marketing_consented
-          - core__customers#customers.consent_updated_at
-          - core__customers#customers.consent_source
-          - core__customers#customers.customer_key
-        transformDescription: Valeur du consentement dans le signal le plus recent parmi Shopify et la caisse.
+        transformDescription: >-
+          Consentement marketing le plus recent du client, entre Shopify et la caisse. La regle est
+          appliquee dans core__customers ; la valeur est reprise telle quelle. Un client sans signal ou
+          avec un refus est exclu de la table : la colonne vaut donc toujours vrai.
         customProperties:
           - property: transformExpression
-            value: latest.is_opted_in
+            value: customers.is_marketing_consented
       - name: consent_source
         physicalType: STRING
         logicalType: string
@@ -266,14 +210,14 @@ schema:
           - value: pos
         transformLogic: transform
         transformSourceObjects:
-          - core__customers#customers.is_marketing_consented
-          - core__customers#customers.consent_updated_at
           - core__customers#customers.consent_source
-          - core__customers#customers.customer_key
-        transformDescription: Source (Shopify ou caisse) du signal de consentement le plus recent.
+        transformDescription: >-
+          Systeme (shopify ou pos) qui a emis le signal de consentement le plus recent du client.
+          Repris de core__customers, rattache par customer_key, pour les seuls clients consentants.
+          Jamais vide.
         customProperties:
           - property: transformExpression
-            value: latest.source
+            value: customers.consent_source
       - name: consent_updated_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -283,11 +227,13 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__customers#customers.consent_updated_at
-          - core__customers#customers.customer_key
-        transformDescription: Horodatage du signal de consentement le plus recent.
+        transformDescription: >-
+          Date et heure (UTC) du signal de consentement le plus recent du client, entre Shopify et la
+          caisse. Reprise de core__customers, rattachee par customer_key, pour les seuls clients
+          consentants. Vide si la source n'a pas horodate le consentement.
         customProperties:
           - property: transformExpression
-            value: latest.signal_at
+            value: customers.consent_updated_at
       - name: last_order_at
         physicalType: TIMESTAMP
         logicalType: timestamp
@@ -297,9 +243,11 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.customer_key
-        transformDescription: Plus recente date de vente parmi les tickets de caisse (convertis en UTC) et les commandes Shopify du client.
+        transformDescription: >-
+          Date et heure (UTC) de la vente la plus recente du client, tous canaux (tickets de caisse et
+          commandes Shopify), sans limite d'anciennete. Les retours sont ignores. Vide pour un client
+          present uniquement par ses consultations de fiches produit et qui n'a jamais achete.
+          Les ventes sont rattachees par customer_key.
         customProperties:
           - property: transformExpression
             value: MAX(IF(event_type = 'sale', event_at, NULL))
@@ -313,13 +261,13 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.event_id
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.customer_key
-        transformDescription: Comptage des tickets de vente et des commandes Shopify du client sur 365 jours.
+        transformDescription: >-
+          Nombre de ventes distinctes (tickets de caisse et commandes Shopify) du client sur les
+          365 jours precedant le calcul. Les retours ne sont pas comptes. Vaut 0 sans achat.
+          Les ventes sont rattachees par customer_key.
         customProperties:
           - property: transformExpression
-            value: COUNT(DISTINCT IF(event_type = 'sale' AND event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY), order_id, NULL))
+            value: COUNT(DISTINCT IF(event_type = 'sale' AND event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY), event_id, NULL))
       - name: net_revenue_12m_eur
         physicalType: NUMERIC
         logicalType: number
@@ -330,9 +278,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
-        transformDescription: Somme des ventes et retours du client sur 365 jours, centimes de la caisse divises par 100.
+        transformDescription: >-
+          Chiffre d'affaires net du client en euros TTC sur les 365 jours precedant le calcul, tous
+          canaux : somme des montants des ventes et des retours. Vaut 0 sans achat sur la periode.
+          Montants rattaches par customer_key.
         customProperties:
           - property: transformExpression
             value: SUM(IF(event_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY), amount_eur, 0))
@@ -345,16 +294,11 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__web_events#web_events.event_at
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.user_pseudo_id
-          - core__web_events#web_events.user_id_customer_key
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.is_analytics_consented
-          - core__sales_events#sales_events.web_order_id
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.customer_key
-        transformDescription: Plus recente consultation de fiche produit des 14 derniers jours d'un visiteur rattache au client par un achat web passe ou par sa connexion.
+        transformDescription: >-
+          Date et heure (UTC) de la consultation de fiche produit (view_item) la plus recente des
+          14 derniers jours, avec consentement analytics. Le visiteur GA4 est rattache au client par un
+          achat web passe ou par sa connexion. Renseignee pour le seul segment
+          product_viewers_no_purchase, vide pour les autres.
         customProperties:
           - property: transformExpression
             value: MAX(event_at)
@@ -366,7 +310,8 @@ schema:
         classification: C2
         tags: [pseudonymized]
         transformLogic: create
-        transformDescription: Horodatage du calcul de la ligne.
+        transformDescription: >-
+          Date et heure (UTC) du calcul de la ligne. Jamais vide.
         customProperties:
           - property: transformExpression
             value: CURRENT_TIMESTAMP()

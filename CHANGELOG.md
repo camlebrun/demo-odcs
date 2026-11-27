@@ -10,9 +10,17 @@ Ce fichier suit le format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0
 - Couche core : 5 contrats (`core__sales_events`, `core__customers`, `core__ad_spend`, `core__campaigns`, `core__web_events`) et règle L019 (clé primaire en core).
 - Règles L015 (nommage des properties) et L016 (`customer_key` pseudonymisé).
 - Catalogue : page d'explication du lineage en anglais (`lineage.html`) et en français (`lineage.fr.html`), liée depuis le dashboard.
-- Catalogue : onglet « Trace » dans le panneau d'un contrat, à côté de « Model Info » et « Lineage ». Pour la colonne choisie : classification déclarée et la plus haute en amont, description et SQL, champs sources par sensibilité, transformations par table sans les recopies ; SQL complet des tables et arbre de lignage repliés.
+- Catalogue : onglet « Trace » dans le panneau d'un contrat, à côté de « Model Info » et « Lineage ». Pour la colonne choisie : classification déclarée et la plus haute en amont, description et SQL, arbre de lignage et détail de la ligne choisie.
 
 ### Modifié
+- Catalogue, onglet Trace : arbre de lignage toujours affiché (sans accordéon) et en premier, avec couche et classification de chaque source ; sources nommées par contrat raw ; SQL des expressions réservé au « Data engineer mode » (ex « Expert mode »), SQL des contrôles qualité toujours affiché ; références des systèmes externes retirées de l'arbre. Le filtre de gauche cherche aussi dans les colonnes et les dossiers. Tutoriel en tête de la page Doc française.
+- Onglet Trace : chaque colonne de l'arbre et du détail porte le nom de sa table (`dataset.table`). Couleurs : noms en noir, système source en gris, pâle réservé aux colonnes « shown above ».
+- Onglet Trace : responsable de la table, nombre de colonnes amont dans le titre de l'arbre. `audiences.segment_name` déclare ses sources.
+- **Cassant** : le bloc `customProperties` des contrats (dont `transformInputs`, `sponsor`) est retiré des 8 contrats core et customer ; le « Full table SQL » disparaît donc du catalogue. `acquisition_monthly.campaign_name` porte son SQL complet et toutes ses sources. Les références de système source sont toujours affichées.
+- Lineage de la devise jusqu'aux raw : colonne `currency` dans `core__sales_events` et `core__ad_spend` (1.1.0) ; `currency` de `acquisition_monthly` et `kpis_monthly` en `transform` avec ses sources.
+- Définition d'une source : seuls les champs qui font la valeur figurent dans `transformSourceObjects` (core et customer) ; jointures et filtres passent dans `transformDescription`.
+- **Cassant** : la même définition s'applique à `audiences` et `kpis_monthly`. Le jeu de sources des 3 contrats customer ayant changé, ils passent en 3.0.0 ; colonnes inchangées.
+- `audiences` : descriptions de transformation complètes, `transformExpression` au niveau colonne ; sources de consentement corrigées.
 - **Cassant** : les 3 contrats customer passent en 2.0.0 et ne lisent plus que core (L004) ; colonnes inchangées. Un customer reprend `customer_key` sans le recalculer (L012). L004 contrôle aussi le SQL ; nouvelle règle L020 (aucun e-mail en core) ; L012 et L016 couvrent tout champ finissant par `customer_key`.
 - Catalogue : page Doc réécrite, limitée à un sujet : comment ODCS et `transformSourceObjects` produisent le data catalogue.
 - Catalogue : l'onglet Doc ouvre la version française (`lineage.fr.html`).

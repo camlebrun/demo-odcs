@@ -2,7 +2,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: core__campaigns
 name: core__campaigns
-version: 1.0.0
+version: 1.1.0
 status: active
 domain: core
 tags:
@@ -48,17 +48,6 @@ slaProperties:
     unit: y
     element: campaigns
     description: Historique conservé 3 ans.
-customProperties:
-  - property: transformInputs
-    value: |-
-      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
-      -- Colonnes de campaigns_all : celles de la table.
-      WITH campaigns_all AS (
-        SELECT 'google_ads' AS platform, campaign_id, campaign_name FROM raw_googleads.campaigns
-        UNION ALL
-        SELECT 'meta_ads', campaign_id, name FROM raw_metaads.campaigns
-      )
-      -- Chaque champ : SELECT <champs> FROM campaigns_all
 schema:
   - name: campaigns
     physicalName: campaigns

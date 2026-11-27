@@ -2,7 +2,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: core__sales_events
 name: core__sales_events
-version: 1.0.0
+version: 1.1.0
 status: active
 domain: core
 tags:
@@ -48,53 +48,6 @@ slaProperties:
     unit: y
     element: sales_events
     description: Historique conservé 3 ans.
-customProperties:
-  - property: transformInputs
-    value: |-
-      -- Ensemble intermédiaire sur lequel portent les transformExpression des champs de cette table.
-      -- Colonnes de la CTE events : celles de la table, plus email (jamais publié).
-      WITH web_orders AS (
-        -- Règle « commande web valide ».
-        SELECT o.id, o.created_at, o.total_price,
-               COALESCE(NULLIF(TRIM(o.email), ''), c.email) AS email
-        FROM raw_shopify.orders o
-        LEFT JOIN raw_shopify.customers c ON c.id = o.customer_id
-        WHERE o.test = FALSE AND o.cancelled_at IS NULL AND o.currency = 'EUR'
-          AND COALESCE(o.source_name, 'web') != 'pos'
-          AND o.financial_status IN ('paid', 'partially_paid', 'partially_refunded', 'refunded')
-      ),
-      events AS (
-        SELECT CONCAT('pos:', CAST(t.ticket_id AS STRING)) AS event_id, 'pos' AS source_system, t.ticket_type AS event_type,
-               IF(t.original_web_order_id IS NULL, 'store', 'web') AS channel,
-               IF(t.original_web_order_id IS NULL, t.store_id, NULL) AS store_id,
-               IF(t.original_web_order_id IS NULL, s.store_code, 'WEB') AS store_code,
-               TIMESTAMP(t.ticket_datetime_local, s.timezone) AS event_at,
-               DATE(t.ticket_datetime_local) AS event_date,
-               CAST(t.total_amount_cents AS NUMERIC) / 100 AS amount_eur,
-               COALESCE(NULLIF(TRIM(lm.email), ''), wo.email) AS email,
-               t.original_web_order_id AS web_order_id
-        FROM raw_pos.tickets t
-        JOIN raw_pos.stores s ON s.store_id = t.store_id
-        LEFT JOIN raw_pos.loyalty_members lm ON lm.loyalty_card_id = t.loyalty_card_id
-        LEFT JOIN web_orders wo ON wo.id = t.original_web_order_id
-        WHERE t.currency = 'EUR'
-          -- Un retour déjà remboursé sur Shopify n'est pas compté deux fois.
-          AND NOT (t.original_web_order_id IS NOT NULL
-                   AND EXISTS (SELECT 1 FROM raw_shopify.refunds r WHERE r.order_id = t.original_web_order_id))
-        UNION ALL
-        SELECT CONCAT('web:', CAST(wo.id AS STRING)), 'shopify', 'sale', 'web', NULL, 'WEB',
-               wo.created_at, DATE(wo.created_at, 'Europe/Paris'), wo.total_price, wo.email, wo.id
-        FROM web_orders wo
-        UNION ALL
-        SELECT CONCAT('refund:', CAST(r.id AS STRING)), 'shopify', 'return', 'web', NULL, 'WEB',
-               r.created_at, DATE(r.created_at, 'Europe/Paris'),
-               -(SELECT IFNULL(SUM(tr.amount), 0) FROM UNNEST(r.transactions) tr
-                 WHERE tr.kind = 'refund' AND tr.status = 'success' AND tr.currency = 'EUR'),
-               wo.email, wo.id
-        FROM raw_shopify.refunds r
-        JOIN web_orders wo ON wo.id = r.order_id
-      )
-      -- Chaque champ : SELECT <champs> FROM events
 schema:
   - name: sales_events
     physicalName: sales_events
@@ -149,19 +102,10 @@ schema:
           - raw__tickets__pos#tickets.ticket_id
           - raw__orders__shopify#orders.id
           - raw__refunds__shopify#refunds.id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Préfixe selon l'origine, suivi de l'identifiant source.
+        transformDescription: >-
+          Préfixe pos, web ou refund, suivi de l'identifiant source. Seules les commandes web valides sont
+          retenues (hors test, annulées, caisse, payées en euros), ainsi que les tickets en euros ; un retour
+          en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: event_id
@@ -187,19 +131,10 @@ schema:
           - raw__tickets__pos#tickets.ticket_id
           - raw__orders__shopify#orders.id
           - raw__refunds__shopify#refunds.id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: pos pour un ticket, shopify pour une commande ou un remboursement.
+        transformDescription: >-
+          pos pour un ticket, shopify pour une commande ou un remboursement. Seules les commandes web valides
+          sont retenues (hors test, annulées, caisse, payées en euros), ainsi que les tickets en euros ; un
+          retour en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: source_system
@@ -225,20 +160,10 @@ schema:
           - raw__tickets__pos#tickets.ticket_type
           - raw__orders__shopify#orders.id
           - raw__refunds__shopify#refunds.id
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Type du ticket ; une commande est une vente, un remboursement un retour.
+        transformDescription: >-
+          Type du ticket ; une commande est une vente, un remboursement un retour. Seules les commandes web
+          valides sont retenues (hors test, annulées, caisse, payées en euros), ainsi que les tickets en euros
+          ; un retour en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: event_type
@@ -264,19 +189,10 @@ schema:
           - raw__tickets__pos#tickets.original_web_order_id
           - raw__orders__shopify#orders.id
           - raw__refunds__shopify#refunds.id
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: web si commande, remboursement ou ticket lié à une commande web ; sinon store.
+        transformDescription: >-
+          web pour une commande, un remboursement ou un ticket lié à une commande web ; sinon store. Seules
+          les commandes web valides sont retenues (hors test, annulées, caisse, payées en euros), ainsi que
+          les tickets en euros ; un retour en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: channel
@@ -288,20 +204,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.currency
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Magasin du ticket, vide pour le canal web.
+        transformDescription: >-
+          Magasin du ticket, vide pour le canal web. Seules les commandes web valides sont retenues (hors
+          test, annulées, caisse, payées en euros), ainsi que les tickets en euros ; un retour en caisse déjà
+          remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: store_id
@@ -314,21 +220,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - raw__stores__pos#stores.store_code
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Code du magasin du ticket, WEB pour le canal web.
+        transformDescription: >-
+          Code du magasin du ticket (rapproché par l'identifiant de magasin), WEB pour le canal web. Seules
+          les commandes web valides sont retenues (hors test, annulées, caisse, payées en euros), ainsi que
+          les tickets en euros ; un retour en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: store_code
@@ -344,21 +239,10 @@ schema:
           - raw__stores__pos#stores.timezone
           - raw__orders__shopify#orders.created_at
           - raw__refunds__shopify#refunds.created_at
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Heure locale du magasin convertie en UTC ; date de création pour le web.
+        transformDescription: >-
+          Heure locale du ticket convertie en UTC avec le fuseau du magasin ; date de création pour le web.
+          Seules les commandes web valides sont retenues (hors test, annulées, caisse, payées en euros), ainsi
+          que les tickets en euros ; un retour en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: event_at
@@ -373,21 +257,10 @@ schema:
           - raw__tickets__pos#tickets.ticket_datetime_local
           - raw__orders__shopify#orders.created_at
           - raw__refunds__shopify#refunds.created_at
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Date locale du magasin ou date à Paris pour le web.
+        transformDescription: >-
+          Date locale du ticket, ou date de création à Paris pour le web. Seules les commandes web valides
+          sont retenues (hors test, annulées, caisse, payées en euros), ainsi que les tickets en euros ; un
+          retour en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: event_date
@@ -402,27 +275,42 @@ schema:
           - raw__tickets__pos#tickets.total_amount_cents
           - raw__orders__shopify#orders.total_price
           - raw__refunds__shopify#refunds.transactions.amount
-          - raw__refunds__shopify#refunds.transactions.kind
-          - raw__refunds__shopify#refunds.transactions.status
-          - raw__refunds__shopify#refunds.transactions.currency
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Centimes du ticket divisés par 100, total de la commande, ou somme négative des remboursements réussis.
+        transformDescription: >-
+          Centimes du ticket divisés par 100, total de la commande, ou somme négative des remboursements
+          réussis en euros. Seules les commandes web valides sont retenues (hors test, annulées, caisse,
+          payées en euros), ainsi que les tickets en euros ; un retour en caisse déjà remboursé sur Shopify
+          est écarté.
         customProperties:
           - property: transformExpression
             value: amount_eur
+      - name: currency
+        physicalType: STRING
+        logicalType: string
+        description: 'Code devise ISO 4217 du montant : seules les lignes en euros sont retenues.'
+        required: true
+        classification: C1
+        quality:
+          - type: library
+            metric: invalidValues
+            arguments:
+              validValues:
+                - EUR
+            mustBe: 0
+            dimension: conformity
+            severity: error
+            description: 'Valeur autorisée : EUR.'
+        transformLogic: transform
+        transformSourceObjects:
+          - raw__tickets__pos#tickets.currency
+          - raw__orders__shopify#orders.currency
+          - raw__refunds__shopify#refunds.transactions.currency
+        transformDescription: >-
+          Devise du ticket, de la commande ou du remboursement, filtrée sur EUR. Seules les commandes web
+          valides sont retenues (hors test, annulées, caisse, payées en euros), ainsi que les tickets en euros
+          ; un retour en caisse déjà remboursé sur Shopify est écarté.
+        customProperties:
+          - property: transformExpression
+            value: currency
       - name: customer_key
         physicalType: STRING
         logicalType: string
@@ -433,25 +321,13 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - raw__loyalty_members__pos#loyalty_members.email
-          - raw__loyalty_members__pos#loyalty_members.loyalty_card_id
           - raw__orders__shopify#orders.email
           - raw__customers__shopify#customers.email
-          - raw__tickets__pos#tickets.loyalty_card_id
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__tickets__pos#tickets.original_web_order_id
-          - raw__stores__pos#stores.store_id
-          - raw__refunds__shopify#refunds.order_id
-          - raw__orders__shopify#orders.id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Hachage de l'e-mail fidélité, sinon de l'e-mail de la commande web d'origine.
+        transformDescription: >-
+          Hachage de l'e-mail fidélité (retrouvé par la carte), sinon de l'e-mail de la commande web
+          d'origine, à défaut celui du client Shopify. Seules les commandes web valides sont retenues (hors
+          test, annulées, caisse, payées en euros), ainsi que les tickets en euros ; un retour en caisse déjà
+          remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: IF(NULLIF(TRIM(email), '') IS NULL, NULL, TO_HEX(SHA256(LOWER(TRIM(email)))))
@@ -467,18 +343,10 @@ schema:
           - raw__tickets__pos#tickets.original_web_order_id
           - raw__orders__shopify#orders.id
           - raw__refunds__shopify#refunds.order_id
-          - raw__tickets__pos#tickets.ticket_id
-          - raw__tickets__pos#tickets.store_id
-          - raw__tickets__pos#tickets.currency
-          - raw__stores__pos#stores.store_id
-          - raw__orders__shopify#orders.customer_id
-          - raw__orders__shopify#orders.test
-          - raw__orders__shopify#orders.cancelled_at
-          - raw__orders__shopify#orders.currency
-          - raw__orders__shopify#orders.source_name
-          - raw__orders__shopify#orders.financial_status
-          - raw__customers__shopify#customers.id
-        transformDescription: Commande de la vente, du remboursement ou d'origine du ticket.
+        transformDescription: >-
+          Commande de la vente, du remboursement, ou commande d'origine du ticket. Seules les commandes web
+          valides sont retenues (hors test, annulées, caisse, payées en euros), ainsi que les tickets en euros
+          ; un retour en caisse déjà remboursé sur Shopify est écarté.
         customProperties:
           - property: transformExpression
             value: web_order_id

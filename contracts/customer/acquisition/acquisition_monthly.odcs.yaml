@@ -3,7 +3,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: acquisition_monthly
 name: acquisition_monthly
-version: 2.0.0
+version: 3.0.0
 status: active
 domain: customer
 tags: [customer]
@@ -53,77 +53,6 @@ slaProperties:
     element: customer_acquisition_monthly
     description: Historique mensuel conserve 3 ans.
 
-customProperties:
-  - property: sponsor
-    value: Acquisition
-  - property: attributionModel
-    value: last-click GA4, web uniquement
-  - property: platformRoasNotUsed
-    value: Les conversions Google Ads (metrics_conversions, metrics_conversions_value) et les actions Meta (actions, action_values, purchase_roas) sont des mesures plateforme non dedupliquees ; elles ne servent a aucun calcul.
-  - property: transformInputs
-    value: |-
-      -- Ensemble intermediaire sur lequel portent les transformExpression des champs de cette table.
-      -- Colonnes de acq_facts : month_date, channel (google_ads | meta_ads | other_web), campaign_id (0 si non rapproche), campaign_name,
-      -- spend_eur (lignes de depense), customer_key, first_order_revenue_eur, cohort_value_90d_eur, is_cohort_90d_mature (lignes de nouveaux clients).
-      WITH shopify_events AS (
-        -- Les retours en caisse ne comptent pas dans la cohorte web.
-        SELECT web_order_id, event_type, event_at, amount_eur, customer_key
-        FROM core.sales_events WHERE source_system = 'shopify'
-      ),
-      first_orders AS (
-        SELECT cu.customer_key,
-               ARRAY_AGG(STRUCT(e.web_order_id AS id, e.event_at AS created_at, e.amount_eur AS total_price) LIMIT 1)[OFFSET(0)] AS first_order
-        FROM core.customers cu
-        JOIN shopify_events e ON e.customer_key = cu.customer_key AND e.event_type = 'sale' AND e.event_at = cu.first_web_order_at
-        GROUP BY cu.customer_key
-      ),
-      attributed AS (
-        -- Premier achat GA4 par commande.
-        SELECT web_order_id AS order_id, marketing_channel AS channel, utm_campaign
-        FROM core.web_events
-        WHERE event_type = 'purchase' AND web_order_id IS NOT NULL
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY web_order_id ORDER BY event_at) = 1
-      ),
-      cohort AS (
-        SELECT fo.customer_key, SUM(e.amount_eur) AS value_90d
-        FROM first_orders fo
-        JOIN shopify_events e ON e.customer_key = fo.customer_key
-         AND e.event_at < TIMESTAMP_ADD(fo.first_order.created_at, INTERVAL 90 DAY)
-        GROUP BY fo.customer_key
-      ),
-      new_customer_rows AS (
-        SELECT DATE_TRUNC(DATE(fo.first_order.created_at, 'Europe/Paris'), MONTH) AS month_date,
-               IFNULL(a.channel, 'other_web') AS channel,
-               IFNULL(ca.campaign_id, 0) AS campaign_id,
-               ca.campaign_name,
-               fo.customer_key,
-               fo.first_order.total_price AS first_order_revenue_eur,
-               IFNULL(co.value_90d, 0) AS cohort_value_90d_eur,
-               TIMESTAMP_ADD(fo.first_order.created_at, INTERVAL 90 DAY) <= CURRENT_TIMESTAMP() AS is_cohort_90d_mature
-        FROM first_orders fo
-        LEFT JOIN attributed a ON a.order_id = fo.first_order.id
-        LEFT JOIN cohort co ON co.customer_key = fo.customer_key
-        LEFT JOIN core.campaigns ca ON ca.platform = a.channel
-          AND (a.utm_campaign = LOWER(TRIM(ca.campaign_name))
-               OR (ca.platform = 'meta_ads' AND a.utm_campaign = CAST(ca.campaign_id AS STRING)))
-      ),
-      spend_rows AS (
-        SELECT DATE_TRUNC(sp.spend_date, MONTH) AS month_date, sp.platform AS channel, sp.campaign_id, ca.campaign_name, sp.spend_eur
-        FROM core.ad_spend sp
-        LEFT JOIN core.campaigns ca ON ca.platform = sp.platform AND ca.campaign_id = sp.campaign_id
-      ),
-      acq_facts AS (
-        SELECT month_date, channel, campaign_id, campaign_name, spend_eur,
-               CAST(NULL AS STRING) AS customer_key, CAST(NULL AS NUMERIC) AS first_order_revenue_eur,
-               CAST(NULL AS NUMERIC) AS cohort_value_90d_eur, CAST(NULL AS BOOL) AS is_cohort_90d_mature
-        FROM spend_rows
-        UNION ALL
-        SELECT month_date, channel, campaign_id, COALESCE(campaign_name, 'unattributed'), NULL,
-               customer_key, first_order_revenue_eur, cohort_value_90d_eur, is_cohort_90d_mature
-        FROM new_customer_rows
-      )
-      -- Chaque champ est calcule par : SELECT month_date, channel, campaign_id, <mesures> FROM acq_facts GROUP BY month_date, channel, campaign_id
-
 schema:
   - name: customer_acquisition_monthly
     physicalName: customer_acquisition_monthly
@@ -171,12 +100,9 @@ schema:
         transformSourceObjects:
           - core__ad_spend#ad_spend.spend_date
           - core__sales_events#sales_events.event_at
-          - core__customers#customers.first_web_order_at
-          - core__customers#customers.customer_key
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.source_system
-        transformDescription: Mois du jour de depense Google Ads ou Meta, ou de la premiere commande Shopify convertie en Europe/Paris.
+        transformDescription: >-
+          Mois du jour de depense, ou, pour un nouveau client, de sa premiere commande Shopify (type sale)
+          convertie en Europe/Paris.
         customProperties:
           - property: transformExpression
             value: month_date
@@ -196,18 +122,9 @@ schema:
         transformSourceObjects:
           - core__ad_spend#ad_spend.platform
           - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__customers#customers.first_web_order_at
-          - core__customers#customers.customer_key
-          - core__sales_events#sales_events.customer_key
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_at
-        transformDescription: Canal deduit de la source collectee sur l'evenement purchase GA4 (gclid ou UTM), google_ads et meta_ads pour la depense de la plateforme correspondante.
+        transformDescription: >-
+          Plateforme de la depense, ou, pour un nouveau client, canal du premier evenement purchase GA4 de sa
+          premiere commande Shopify, other_web sans evenement rapproche.
         customProperties:
           - property: transformExpression
             value: channel
@@ -222,13 +139,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__ad_spend#ad_spend.campaign_id
-          - core__campaigns#campaigns.platform
           - core__campaigns#campaigns.campaign_id
-          - core__campaigns#campaigns.campaign_name
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.web_order_id
-        transformDescription: Identifiant de campagne Google Ads ou Meta de la depense, ou de la campagne rapprochee de l'achat par son nom UTM, 0 sinon.
+        transformDescription: >-
+          Identifiant de la campagne depensee, ou de la campagne reconnue par l'utm du premier achat web d'un
+          nouveau client (nom, ou identifiant pour Meta), 0 sinon.
         customProperties:
           - property: transformExpression
             value: campaign_id
@@ -239,17 +153,18 @@ schema:
         classification: C1
         transformLogic: transform
         transformSourceObjects:
-          - core__campaigns#campaigns.platform
-          - core__campaigns#campaigns.campaign_id
           - core__campaigns#campaigns.campaign_name
-          - core__ad_spend#ad_spend.campaign_id
-          - core__ad_spend#ad_spend.platform
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.marketing_channel
-        transformDescription: Nom de la campagne Google Ads ou Meta, unattributed quand l'achat n'est rapproche d'aucune campagne.
+        transformDescription: >-
+          Pour une ligne de depense, nom de la campagne depensee (rapprochee par plateforme et
+          identifiant) ; sans campagne connue, le nom reste vide. Pour un nouveau client, campagne
+          reconnue par l'utm de son premier achat web (nom, ou identifiant pour Meta), sinon
+          unattributed.
         customProperties:
           - property: transformExpression
-            value: ANY_VALUE(campaign_name)
+            value: |-
+              -- Ligne de depense : campaigns.campaign_name
+              -- Nouveau client   : COALESCE(campaigns.campaign_name, 'unattributed')
+              ANY_VALUE(campaign_name)
       - name: currency
         physicalType: STRING
         logicalType: string
@@ -260,8 +175,11 @@ schema:
           minLength: 3
           maxLength: 3
         examples: [EUR]
-        transformLogic: create
-        transformDescription: Constante EUR, seules les lignes en euros etant retenues.
+        transformLogic: transform
+        transformSourceObjects:
+          - core__ad_spend#ad_spend.currency
+          - core__sales_events#sales_events.currency
+        transformDescription: Toujours EUR. La devise vient de core__ad_spend et core__sales_events, qui ecartent les lignes dans une autre devise.
         customProperties:
           - property: transformExpression
             value: "'EUR'"
@@ -274,10 +192,8 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__ad_spend#ad_spend.spend_eur
-          - core__ad_spend#ad_spend.spend_date
-          - core__ad_spend#ad_spend.platform
-          - core__ad_spend#ad_spend.campaign_id
-        transformDescription: Somme de la depense quotidienne de core__ad_spend, en EUR.
+        transformDescription: >-
+          Somme de la depense de core__ad_spend en EUR, par mois, plateforme et campagne ; 0 sans depense.
         customProperties:
           - property: transformExpression
             value: IFNULL(SUM(spend_eur), 0)
@@ -290,21 +206,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__customers#customers.customer_key
-          - core__customers#customers.first_web_order_at
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
-          - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__campaigns#campaigns.platform
-          - core__campaigns#campaigns.campaign_id
-          - core__campaigns#campaigns.campaign_name
-        transformDescription: Comptage des clients dont la premiere commande Shopify est rattachee a la ligne par le pont transaction_id et la source GA4.
+        transformDescription: >-
+          Nombre de nouveaux clients de la ligne. Un nouveau client est rapproche de sa premiere commande
+          Shopify (type sale), puis du premier evenement purchase GA4 de cette commande et de la campagne
+          reconnue par son utm.
         customProperties:
           - property: transformExpression
             value: COUNT(DISTINCT customer_key)
@@ -316,25 +221,11 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__ad_spend#ad_spend.spend_eur
-          - core__ad_spend#ad_spend.spend_date
-          - core__ad_spend#ad_spend.platform
-          - core__ad_spend#ad_spend.campaign_id
           - core__customers#customers.customer_key
-          - core__customers#customers.first_web_order_at
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
-          - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__campaigns#campaigns.platform
-          - core__campaigns#campaigns.campaign_id
-          - core__campaigns#campaigns.campaign_name
-        transformDescription: Depense divisee par le nombre de nouveaux clients, NULL sans nouveau client.
+        transformDescription: >-
+          Depense divisee par le nombre de nouveaux clients, NULL sans nouveau client. Un nouveau client est
+          rapproche de sa premiere commande Shopify (type sale), puis du premier evenement purchase GA4 de
+          cette commande et de la campagne reconnue par son utm.
         customProperties:
           - property: transformExpression
             value: SAFE_DIVIDE(SUM(spend_eur), COUNT(DISTINCT customer_key))
@@ -347,22 +238,10 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__customers#customers.customer_key
-          - core__customers#customers.first_web_order_at
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
-          - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__campaigns#campaigns.platform
-          - core__campaigns#campaigns.campaign_id
-          - core__campaigns#campaigns.campaign_name
-        transformDescription: Somme des totaux TTC des premieres commandes des nouveaux clients de la ligne.
+        transformDescription: >-
+          Somme des totaux TTC des premieres commandes des nouveaux clients de la ligne. Un nouveau client est
+          rapproche de sa premiere commande Shopify (type sale), puis du premier evenement purchase GA4 de
+          cette commande et de la campagne reconnue par son utm.
         customProperties:
           - property: transformExpression
             value: IFNULL(SUM(first_order_revenue_eur), 0)
@@ -375,25 +254,10 @@ schema:
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
           - core__ad_spend#ad_spend.spend_eur
-          - core__ad_spend#ad_spend.spend_date
-          - core__ad_spend#ad_spend.platform
-          - core__ad_spend#ad_spend.campaign_id
-          - core__customers#customers.customer_key
-          - core__customers#customers.first_web_order_at
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
-          - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__campaigns#campaigns.platform
-          - core__campaigns#campaigns.campaign_id
-          - core__campaigns#campaigns.campaign_name
-        transformDescription: CA du premier achat divise par la depense, calcule sur les commandes Shopify et non sur les conversions plateforme.
+        transformDescription: >-
+          CA du premier achat divise par la depense, calcule sur les commandes Shopify et non sur les
+          conversions plateforme. Un nouveau client est rapproche de sa premiere commande Shopify (type sale),
+          puis du premier evenement purchase GA4 de cette commande et de la campagne reconnue par son utm.
         customProperties:
           - property: transformExpression
             value: SAFE_DIVIDE(SUM(first_order_revenue_eur), SUM(spend_eur))
@@ -405,22 +269,11 @@ schema:
         transformLogic: transform
         transformSourceObjects:
           - core__sales_events#sales_events.amount_eur
-          - core__customers#customers.customer_key
-          - core__customers#customers.first_web_order_at
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
-          - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__campaigns#campaigns.platform
-          - core__campaigns#campaigns.campaign_id
-          - core__campaigns#campaigns.campaign_name
-        transformDescription: CA net de retours des commandes web des nouveaux clients sur 90 jours apres leur premiere commande, NULL tant que la cohorte est immature.
+        transformDescription: >-
+          CA net de retours des commandes web des nouveaux clients sur 90 jours apres leur premiere commande
+          (retours en caisse exclus), NULL tant que la cohorte est immature. Un nouveau client est rapproche
+          de sa premiere commande Shopify (type sale), puis du premier evenement purchase GA4 de cette
+          commande et de la campagne reconnue par son utm.
         customProperties:
           - property: transformExpression
             value: IF(LOGICAL_AND(IFNULL(is_cohort_90d_mature, TRUE)), SUM(cohort_value_90d_eur), NULL)
@@ -432,22 +285,11 @@ schema:
         classification: C1
         transformLogic: transform
         transformSourceObjects:
-          - core__customers#customers.customer_key
           - core__customers#customers.first_web_order_at
-          - core__sales_events#sales_events.source_system
-          - core__sales_events#sales_events.event_type
-          - core__sales_events#sales_events.event_at
-          - core__sales_events#sales_events.customer_key
-          - core__web_events#web_events.marketing_channel
-          - core__web_events#web_events.utm_campaign
-          - core__web_events#web_events.web_order_id
-          - core__web_events#web_events.event_type
-          - core__web_events#web_events.event_at
-          - core__sales_events#sales_events.web_order_id
-          - core__campaigns#campaigns.platform
-          - core__campaigns#campaigns.campaign_id
-          - core__campaigns#campaigns.campaign_name
-        transformDescription: Vrai quand tous les nouveaux clients de la ligne ont au moins 90 jours de recul.
+        transformDescription: >-
+          Vrai quand tous les nouveaux clients de la ligne ont au moins 90 jours de recul depuis leur premiere
+          commande. Un nouveau client est rapproche de sa premiere commande Shopify (type sale), puis du
+          premier evenement purchase GA4 de cette commande et de la campagne reconnue par son utm.
         customProperties:
           - property: transformExpression
             value: LOGICAL_AND(IFNULL(is_cohort_90d_mature, TRUE))

@@ -67,13 +67,10 @@ summary{cursor:pointer;font-weight:600}
   transformLogic: transform
   transformSourceObjects:
     - core__ad_spend#ad_spend.spend_eur
-    - core__ad_spend#ad_spend.spend_date
-    - core__ad_spend#ad_spend.platform
-    - core__ad_spend#ad_spend.campaign_id
   customProperties:
     - property: transformExpression
       value: IFNULL(SUM(spend_eur), 0)</code></pre>
-<p>The spend is the sum of <code>spend_eur</code>. The three other columns group it by month, channel and campaign: <b>they are cited too</b>, not only the one in the expression.</p>
+<p>The spend is the sum of <code>spend_eur</code>: it is the only source. <b>A source is a field that provides the value</b>. Columns used only to join, filter or group (here month, platform and campaign) are not listed: they are described in <code>transformDescription</code>. For a constant that depends on the origin, list the identifier or type field of each origin table.</p>
 <details><summary>Our writing rules</summary>
 <ul><li>A nested field is written with its path: <code>raw__refunds__shopify#refunds.transactions.amount</code>.</li><li><code>transformExpression</code>: the BigQuery SQL, our own property in <code>customProperties</code>. It is displayed, never run.</li></ul><div class="scroll"><table><tr><th><code>transformLogic</code></th><th>Sources</th><th>Expression</th></tr>
 <tr><td><code>map</code></td><td>exactly one</td><td>optional: simple rename or cast only</td></tr>
@@ -89,7 +86,7 @@ summary{cursor:pointer;font-weight:600}
 <svg width="720" viewBox="0 0 720 308" role="img" aria-label="A transformSourceObjects reference declared in the contract becomes an edge in lineage.edges, then an arrow between the core__ad_spend and acquisition_monthly tables in the catalog.">
 <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--accent)"/></marker></defs>
 <rect class="box" x="0" y="0" width="720" height="88" rx="8"/>
-<text class="cap" x="14" y="24">1. In the contract — one of the 4 sources of <tspan class="mono">spend_amount</tspan></text>
+<text class="cap" x="14" y="24">1. In the contract — the source of <tspan class="mono">spend_amount</tspan></text>
 <text class="mono" x="14" y="46">- name: spend_amount</text>
 <text class="mono" x="14" y="64">  transformSourceObjects: <tspan class="hi">core__ad_spend#ad_spend.spend_eur</tspan></text>
 <text class="lab" x="219" y="80" text-anchor="middle">contract</text>

@@ -54,9 +54,9 @@ Démo publique : https://demo-odcs.camillelebrun.fr, hébergée sur Cloudflare P
 
 Publier sur le domaine : `make publish` (génère le catalogue puis lance `wrangler pages deploy`, voir `wrangler.jsonc` ; nécessite `wrangler login`).
 
-Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le "Expert mode" affiche dans les fiches de colonne la transformation (description et SQL) et les contrôles qualité avec leur SQL.
+Tout collaborateur peut le générer avec cette seule commande (Python 3.12 ou plus). La CI le construit à chaque PR et le publie en artefact `catalogue`. La sortie `dist/catalog/colibri-manifest.json` est le JSON consommé par l'interface. Dans le panneau d'un contrat, le "Data engineer mode" affiche dans les fiches de colonne la transformation (description et SQL) et les contrôles qualité avec leur SQL.
 
-L'onglet **Trace** liste les colonnes du contrat avec leur classification. Pour la colonne choisie : classification déclarée et la plus haute en amont, sa description et son SQL, champs sources par sensibilité (C1 et moins repliés), puis les transformations par table sans les recopies. Le SQL complet des tables et l'arbre de lignage sont repliés.
+L'onglet **Trace** liste les colonnes du contrat avec leur classification. Pour la colonne choisie : classification déclarée et la plus haute en amont, arbre de lignage, détail de la ligne choisie. Hors du "Data engineer mode", seul le SQL des contrôles qualité apparaît. L'onglet Doc commence par un tutoriel (contexte du client, lecture du catalogue).
 
 ## Contribuer
 
