@@ -23,6 +23,7 @@
 .cp-expert-toggle{font-size:11px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:6px;padding:2px 8px;white-space:nowrap}
 html.cp-expert .cp-expert-toggle::after{content:" : on"}
 .cp-expert-toggle::after{content:" : off"}
+.cp-link{align-self:flex-start;font-size:11px;cursor:pointer;border:1px solid hsl(var(--border));background:hsl(var(--background));color:inherit;border-radius:6px;padding:2px 8px}
 html.cp-expert .cp-expert-toggle{background:hsl(var(--purple-primary));border-color:hsl(var(--purple-primary));color:#fff}
 /* Le CSS compile de colibri n'a pas la classe pointer-events-auto : sans cette regle, le panneau
    herite du pointer-events:none de l'overlay (ni clic, ni defilement). */

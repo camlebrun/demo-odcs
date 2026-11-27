@@ -109,8 +109,36 @@ def test_template_patches_apply_and_remove_dbt_and_cloud_upsells():
     for text in forbidden:
         assert text not in html, text
     assert all(f in html for f in ("cpColumnHtml", "cpColumnTabHtml", "cpNodeHtml", "cpToggleExpert", "cpModelTestsHtml", "cpLoadStrategy", "cpObjectType", "cpTraceTabHtml", "cpTraceColumnSet", "window.cpFilterMatch(", 'id:"trace",label:"Trace",icon:cpTraceIcon', 'cpTraceIcon=pi("route"', 'id:"cp-trace-panel"', "data-cp-col", "cp-trace-wrap bg-background", ".cp-trace-wrap{pointer-events:auto}"))
+    assert "cue(i.description,s,100)" in html, "la recherche globale lit la description du contrat"
+    assert "gqt(Xe.columnName,Me,Xe.description)" in html, "et la description de colonne"
+    assert 'placeholder:"Search contracts, columns, descriptions..."' in html
     assert "data-sidebar-column]{" not in html, "plus de contournement CSS sur le panneau natif"
     assert 'children:"Source trace"' not in html and "cp-trace-toggle" not in html, "l'ancien bouton Source trace est retire"
+
+
+def test_column_link_is_offered_and_read_back(tmp_path):
+    node_bin = shutil.which("node")
+    if not node_bin:
+        pytest.skip("node est necessaire pour executer le JS du catalogue")
+    harness = tmp_path / "link.js"
+    harness.write_text("""
+const fs = require("fs");
+global.window = { location: { href: "https://x.test/index.html?model=old#h", search: "" } };
+global.document = { documentElement: { classList: { toggle() {} } }, addEventListener() {} };
+global.navigator = {};
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const link = window.cpColumnLink("a b", "c&d");
+console.log(JSON.stringify([link, window.cpDeepLink(new URL(link).search),
+  window.cpDeepLink("?model=m&column=c"), window.cpDeepLink("?view=trace&model=m")]));
+""", encoding="utf-8")
+    out = subprocess.run([node_bin, str(harness), str(ASSETS / "column_info.js")], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    link, back, native, partial = json.loads(out.stdout)
+    assert link == "https://x.test/index.html?model=a%20b&column=c%26d&view=trace"
+    assert back == {"model": "a b", "column": "c&d"}
+    assert native is None and partial is None, "un lien sans view=trace garde le comportement de colibri"
+    html = _trace(tmp_path, _graph({"core__a": ["x"]}, []), "core__a", "x")
+    assert 'data-cp-link' in html and "Copy link" in html
 
 
 def _col(logic=None, desc=None):
